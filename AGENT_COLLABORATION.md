@@ -125,6 +125,14 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 
 Use newest notes at the top.
 
+### 2026-05-01 - GitHub remote and license metadata configured (Codex)
+
+- Configured Git `origin` to `https://github.com/AbrahamPanama/DeepnestML.git`.
+- Added root `LICENSE` using MIT terms while preserving original Jack Qiao copyright and adding Deepnest ML contributor copyright.
+- Updated `README.md` with the GitHub repository URL and a License section.
+- Updated `package.json` repository metadata to the new GitHub URL and added `"license": "MIT"`.
+- Verification: `package.json` parses successfully with Node.
+
 ### 2026-05-01 - Local Git repository initialized (Codex)
 
 - Initialized a local Git repository for `/Users/abrahamsaenz/Desktop/Deepnest++`.

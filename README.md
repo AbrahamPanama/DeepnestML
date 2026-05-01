@@ -10,6 +10,7 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 - **Version:** `0.7.1`
 - **Product name:** `Deepnest ML`
+- **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
 - **macOS local build:** `dist/Deepnest ML-0.7.1-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
@@ -80,6 +81,10 @@ npm run dist
 `npm start` launches the local Electron app.
 
 `npm run dist` packages the macOS build through Electron Builder.
+
+## License
+
+Deepnest ML is distributed under the MIT License. It is based on the original Deepnest/SVGNest work by Jack Qiao; the original copyright notice is preserved in [LICENSE](LICENSE).
 
 ## Project Guidance
 

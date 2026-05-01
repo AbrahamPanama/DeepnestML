@@ -32,7 +32,11 @@
     "ml:bakeoff": "python3 ml/python/scripts/run_real_world_bakeoff.py",
     "ml:dashboard": "streamlit run ml/python/dashboard/app.py"
   },
-  "repository": "https://github.com/Jack000",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbrahamPanama/DeepnestML.git"
+  },
+  "license": "MIT",
   "keywords": [
     "Electron",
     "Nesting",
