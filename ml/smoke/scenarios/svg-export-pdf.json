@@ -1,0 +1,14 @@
+{
+  "name": "svg-export-pdf",
+  "description": "SVG import, compact box nesting, local PDF export conversion.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "pdf",
+  "timeoutMs": 90000,
+  "configOverrides": {
+    "placementType": "box",
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 2
+  }
+}

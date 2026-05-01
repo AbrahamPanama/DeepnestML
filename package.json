@@ -1,0 +1,96 @@
+{
+  "name": "deepnest-ml",
+  "productName": "Deepnest ML",
+  "version": "0.7.1",
+  "description": "ML-assisted deep nesting for laser and CNC workflows",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "legacy:setup": "bash ml/scripts/setup_legacy_runtime.sh",
+    "legacy:start": "bash ml/scripts/run_legacy_app.sh",
+    "legacy:teacher": "bash ml/scripts/run_legacy_teacher.sh",
+    "legacy:app-smoke": "bash ml/scripts/run_app_smoke_test.sh",
+    "legacy:smoke-battery": "bash ml/scripts/run_smoke_battery.sh",
+    "postinstall": "electron-builder install-app-deps",
+    "configure": "npx -y node-gyp@12 configure --release",
+    "build": "npx -y node-gyp@12 rebuild --target=$(node -p \"require('./node_modules/electron/package.json').version\") --arch=$(node -p \"process.arch\") --dist-url=https://electronjs.org/headers",
+    "build:arm64": "npx -y node-gyp@12 rebuild --target=$(node -p \"require('./node_modules/electron/package.json').version\") --arch=arm64 --dist-url=https://electronjs.org/headers",
+    "clean": "npx -y node-gyp@12 clean",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "ml:teacher": "node ml/cli/run_teacher.js",
+    "ml:benchmark": "python3 ml/python/scripts/generate_benchmark_corpus.py",
+    "ml:synthetic": "python3 ml/python/scripts/generate_synthetic_jobs.py",
+    "ml:sweep": "python3 ml/python/scripts/run_config_sweep.py",
+    "ml:pipeline": "python3 ml/python/scripts/run_training_pipeline.py",
+    "ml:dataset": "python3 ml/python/scripts/build_dataset.py",
+    "ml:duckdb": "python3 ml/python/scripts/create_duckdb.py",
+    "ml:checkpoint": "python3 ml/python/scripts/checkpoint_training_baseline.py",
+    "ml:train-config": "python3 ml/python/scripts/train_config_recommender.py",
+    "ml:eval-config": "python3 ml/python/scripts/evaluate_config_recommender.py",
+    "ml:package-real-world": "python3 ml/python/scripts/package_real_world_corpus.py",
+    "ml:bakeoff": "python3 ml/python/scripts/run_real_world_bakeoff.py",
+    "ml:dashboard": "streamlit run ml/python/dashboard/app.py"
+  },
+  "repository": "https://github.com/Jack000",
+  "keywords": [
+    "Electron",
+    "Nesting",
+    "CNC",
+    "Laser"
+  ],
+  "author": {
+    "name": "Jack Qiao",
+    "email": "jak000@gmail.com",
+    "url": "http://deepnest.io"
+  },
+  "devDependencies": {
+    "electron": "^40.6.1",
+    "electron-builder": "^26.8.1"
+  },
+  "dependencies": {
+    "electron-config": "^0.2.1",
+    "electron-settings": "^2.2.2",
+    "electron-window-manager": "^1.0.4",
+    "filequeue": "^0.5.0",
+    "graceful-fs": "^4.1.11",
+    "melanke-watchjs": "^1.3.1",
+    "nan": "^2.4.0",
+    "paralleljs": "^0.2.1",
+    "request": "^2.79.0",
+    "write-file-queue": "0.0.1"
+  },
+  "build": {
+    "appId": "com.deepnest.ml",
+    "copyright": "Copyright 2016 Jack Qiao",
+    "compression": "maximum",
+    "nodeGypRebuild": false,
+    "files": [
+      "package.json",
+      "main.js",
+      "main/**/*",
+      "ml/live/**/*",
+      "ml/lib/**/*",
+      "scripts/conversion/**/*",
+      "build/Release/**/*",
+      "minkowski/Release/**/*",
+      "node_modules/**/*",
+      "icon.icns",
+      "icon.ico"
+    ],
+    "asarUnpack": [
+      "scripts/conversion/**",
+      "build/Release/*.node",
+      "minkowski/Release/*.node"
+    ],
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": "dmg",
+      "icon": "icon.icns"
+    },
+    "win": {
+      "icon": "icon.ico"
+    }
+  }
+}

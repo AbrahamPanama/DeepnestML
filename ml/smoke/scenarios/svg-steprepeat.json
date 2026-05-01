@@ -1,0 +1,16 @@
+{
+  "name": "svg-steprepeat",
+  "description": "SVG import, deterministic Step & Repeat nesting, SVG export.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "steprepeat",
+    "stepRepeatAlternate180": true,
+    "stepRepeatFillDirection": "columns",
+    "stepRepeatHorizontalDensity": 100,
+    "stepRepeatVerticalDensity": 100,
+    "mergeLines": false
+  }
+}

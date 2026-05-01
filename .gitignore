@@ -1,0 +1,49 @@
+# macOS / editor noise
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+
+# Electron / native build outputs
+dist/
+build/
+minkowski/
+*.node
+
+# Legacy downloaded runtimes
+.legacy/
+
+# ML generated artifacts and logs
+ml/artifacts/
+mlruns/
+checkpoints/
+ml/teacher-main.debug.log
+*.log
+
+# Local caches / temp output
+.cache/
+.tmp/
+tmp/
+temp/
+/ziGZDsbG
+/zikw6S4H
+/ziwGw8YA
+
+# Packaged archives and release payloads
+*.zip
+*.dmg
+*.blockmap
+*.tar.gz
+
+# Python cache files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example

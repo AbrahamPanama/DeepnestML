@@ -1,0 +1,14 @@
+{
+  "name": "svg-gravity",
+  "description": "SVG import, compact gravity nesting, SVG export.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 2
+  }
+}

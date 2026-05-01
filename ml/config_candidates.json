@@ -1,0 +1,92 @@
+[
+  {
+    "candidate_id": "default",
+    "description": "Balanced gravity search tuned for compact 4-rotation nests",
+    "config": {
+      "spacing": 0,
+      "curveTolerance": 0.25,
+      "rotations": 4,
+      "populationSize": 12,
+      "mutationRate": 10,
+      "placementType": "gravity",
+      "mergeLines": true,
+      "timeRatio": 0.7,
+      "scale": 72,
+      "simplify": false,
+      "threads": 1,
+      "endpointTolerance": 0.36
+    }
+  },
+  {
+    "candidate_id": "fast_box",
+    "description": "Compactness baseline with box placement and a lighter search budget",
+    "config": {
+      "spacing": 0,
+      "curveTolerance": 0.3,
+      "rotations": 4,
+      "populationSize": 8,
+      "mutationRate": 8,
+      "placementType": "box",
+      "mergeLines": true,
+      "timeRatio": 0.5,
+      "scale": 72,
+      "simplify": false,
+      "threads": 1,
+      "endpointTolerance": 0.36
+    }
+  },
+  {
+    "candidate_id": "quality_dense",
+    "description": "High-effort gravity search for dense 4-rotation packs",
+    "config": {
+      "spacing": 0,
+      "curveTolerance": 0.25,
+      "rotations": 4,
+      "populationSize": 18,
+      "mutationRate": 12,
+      "placementType": "gravity",
+      "mergeLines": true,
+      "timeRatio": 1.0,
+      "scale": 72,
+      "simplify": false,
+      "threads": 1,
+      "endpointTolerance": 0.36
+    }
+  },
+  {
+    "candidate_id": "convex_fast",
+    "description": "Legacy candidate id kept for compatibility; now a gravity search without merge-line bias",
+    "config": {
+      "spacing": 0,
+      "curveTolerance": 0.25,
+      "rotations": 4,
+      "populationSize": 14,
+      "mutationRate": 10,
+      "placementType": "gravity",
+      "mergeLines": false,
+      "timeRatio": 0.8,
+      "scale": 72,
+      "simplify": false,
+      "threads": 1,
+      "endpointTolerance": 0.36
+    }
+  },
+  {
+    "candidate_id": "merge_focused",
+    "description": "High-effort gravity search biased toward tight merged-line compactness",
+    "config": {
+      "spacing": 0,
+      "curveTolerance": 0.25,
+      "rotations": 4,
+      "populationSize": 16,
+      "mutationRate": 14,
+      "placementType": "gravity",
+      "mergeLines": true,
+      "timeRatio": 1.0,
+      "scale": 72,
+      "simplify": false,
+      "threads": 1,
+      "endpointTolerance": 0.36
+    }
+  }
+]

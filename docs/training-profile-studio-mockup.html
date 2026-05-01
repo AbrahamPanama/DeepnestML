@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deepnest++ Training Profile Studio Mockup</title>
+  <style>
+    :root {
+      --bg: #f2ede4;
+      --panel: #fff9f0;
+      --panel-strong: #fffdf8;
+      --line: #d6c9b2;
+      --line-strong: #b89f77;
+      --ink: #212121;
+      --muted: #665f54;
+      --accent: #d66338;
+      --accent-soft: #f4d7ca;
+      --teal: #1c766f;
+      --teal-soft: #d2ebe7;
+      --gold: #ca9a2f;
+      --shadow: 0 18px 48px rgba(72, 49, 19, 0.12);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(214, 99, 56, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(28, 118, 111, 0.10), transparent 24%),
+        linear-gradient(180deg, #f8f3ea 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 1560px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border: 1px solid rgba(214, 99, 56, 0.22);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.62);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 14px 0 10px;
+      font-size: clamp(32px, 4vw, 54px);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .status-card {
+      min-width: 260px;
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .status-label {
+      color: var(--muted);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .status-value {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .status-list {
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr) 360px;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .panel {
+      background: rgba(255, 249, 240, 0.92);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px 12px;
+      border-bottom: 1px solid rgba(184, 159, 119, 0.22);
+      background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0));
+    }
+
+    .panel-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .panel-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+      margin-top: 4px;
+    }
+
+    .panel-body {
+      padding: 18px 20px 22px;
+    }
+
+    .filter-row,
+    .quick-selects,
+    .choice-group,
+    .summary-chips {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .chip,
+    .toggle,
+    .pill {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: white;
+      color: var(--ink);
+      padding: 10px 14px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 160ms ease;
+    }
+
+    .chip:hover,
+    .toggle:hover,
+    .pill:hover {
+      transform: translateY(-1px);
+      border-color: var(--line-strong);
+    }
+
+    .chip.active,
+    .toggle.active,
+    .pill.active {
+      background: var(--accent-soft);
+      border-color: rgba(214, 99, 56, 0.42);
+      color: #7a250b;
+    }
+
+    .shape-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+      max-height: 800px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .shape-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.82);
+      padding: 14px;
+      cursor: pointer;
+      transition: 160ms ease;
+    }
+
+    .shape-card:hover {
+      border-color: var(--line-strong);
+      transform: translateY(-1px);
+    }
+
+    .shape-card.selected {
+      border-color: rgba(28, 118, 111, 0.38);
+      background: linear-gradient(180deg, rgba(210, 235, 231, 0.8), rgba(255,255,255,0.9));
+    }
+
+    .shape-preview {
+      height: 92px;
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(28, 118, 111, 0.05), transparent),
+        linear-gradient(135deg, #fff 0%, #f4efe6 100%);
+      border: 1px dashed rgba(184, 159, 119, 0.45);
+      display: grid;
+      place-items: center;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .shape-preview svg {
+      width: 88%;
+      height: 78%;
+    }
+
+    .shape-preview text {
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      font-size: 48px;
+      font-weight: 700;
+      fill: none;
+      stroke: #38322b;
+      stroke-width: 1.6;
+    }
+
+    .shape-name {
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .shape-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .shape-tag {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #f3ede4;
+      border: 1px solid rgba(184, 159, 119, 0.25);
+    }
+
+    .main-stack {
+      display: grid;
+      gap: 22px;
+    }
+
+    .builder-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 20px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .field label {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .field input,
+    .field textarea,
+    .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font: inherit;
+      background: white;
+      color: var(--ink);
+    }
+
+    .field textarea {
+      min-height: 88px;
+      resize: vertical;
+    }
+
+    .slider-block {
+      border: 1px solid rgba(184, 159, 119, 0.22);
+      background: rgba(255,255,255,0.74);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .slider-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .slider-title {
+      font-weight: 700;
+    }
+
+    .slider-value {
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .selected-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .selected-item {
+      border: 1px solid rgba(184, 159, 119, 0.22);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.82);
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .preview-stage {
+      border-radius: 24px;
+      min-height: 270px;
+      padding: 18px;
+      background:
+        radial-gradient(circle at top, rgba(214, 99, 56, 0.14), transparent 32%),
+        linear-gradient(180deg, #fffdfa 0%, #f6efe4 100%);
+      border: 1px solid rgba(184, 159, 119, 0.28);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .preview-stage::after {
+      content: "";
+      position: absolute;
+      inset: auto 18px 18px 18px;
+      height: 1px;
+      background: rgba(184, 159, 119, 0.22);
+    }
+
+    .preview-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .preview-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .sample-board {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      min-height: 170px;
+      padding-right: 70px;
+    }
+
+    .sample-token {
+      min-width: 58px;
+      min-height: 58px;
+      padding: 10px 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(184, 159, 119, 0.28);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      box-shadow: 0 8px 20px rgba(72, 49, 19, 0.08);
+    }
+
+    .sample-token.holey {
+      outline: 2px solid rgba(28, 118, 111, 0.22);
+    }
+
+    .pipeline-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .pipeline-summary {
+      border: 1px solid rgba(28, 118, 111, 0.18);
+      background: linear-gradient(180deg, rgba(210, 235, 231, 0.74), rgba(255,255,255,0.82));
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .pipeline-card {
+      border: 1px solid rgba(184, 159, 119, 0.24);
+      border-radius: 20px;
+      padding: 16px;
+      background: rgba(255,255,255,0.86);
+    }
+
+    .pipeline-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      margin-bottom: 12px;
+    }
+
+    .pipeline-name {
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .pipeline-weight {
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    .weight-bar {
+      height: 10px;
+      border-radius: 999px;
+      background: #efe5d3;
+      overflow: hidden;
+      margin: 12px 0 10px;
+    }
+
+    .weight-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #ef8f49);
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      appearance: none;
+      border: none;
+      border-radius: 16px;
+      padding: 14px 18px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      transition: 160ms ease;
+    }
+
+    .button.primary {
+      background: var(--ink);
+      color: white;
+    }
+
+    .button.secondary {
+      background: var(--teal-soft);
+      color: #0f524d;
+    }
+
+    .button.ghost {
+      background: white;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 22px rgba(72, 49, 19, 0.1);
+    }
+
+    .footnote {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1260px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .builder-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Mockup only • no training logic yet</div>
+        <h1>Training Recipe Studio</h1>
+        <p class="lead">
+          A simple interface for choosing shapes, naming a recipe, setting copy density,
+          and adding that recipe into the training pipeline without making the user think in ML terms.
+        </p>
+      </div>
+      <div class="status-card">
+        <div class="status-label">What this mockup is testing</div>
+        <div class="status-value">Can a non-ML user build a training profile in under 2 minutes?</div>
+        <div class="status-list">
+          <div>1. Pick shapes visually</div>
+          <div>2. Choose how dense the jobs should be</div>
+          <div>3. Decide hole and rotation rules</div>
+          <div>4. Add the recipe to the overnight mix</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="workspace">
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Shape Library</div>
+            <div class="panel-subtitle">Click shapes to include them in the recipe. Use bundles for fast setup.</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="filter-row" id="familyFilters"></div>
+          <div class="quick-selects" style="margin-top:12px;">
+            <button class="pill" data-bundle="letters">All letters</button>
+            <button class="pill" data-bundle="numbers">All numbers</button>
+            <button class="pill" data-bundle="simple">Simple shapes</button>
+            <button class="pill" data-bundle="holey">Shapes with holes</button>
+            <button class="pill" data-bundle="clear">Clear all</button>
+          </div>
+          <div class="shape-grid" id="shapeGrid"></div>
+        </div>
+      </section>
+
+      <div class="main-stack">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Recipe Builder</div>
+              <div class="panel-subtitle">Plain-language controls first. Advanced behavior can live behind a later toggle.</div>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="builder-grid">
+              <div>
+                <div class="field">
+                  <label for="profileName">Recipe name</label>
+                  <input id="profileName" value="Alpha + Simple Starter Pack">
+                </div>
+
+                <div class="field">
+                  <label for="profileNotes">What is this recipe for?</label>
+                  <textarea id="profileNotes">Balanced training mix for letters, numbers, and simple geometry. Good for everyday testing before denser industrial profiles.</textarea>
+                </div>
+
+                <div class="field">
+                  <label>Selected shapes</label>
+                  <div class="selected-list" id="selectedList"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="slider-block">
+                  <div class="slider-head">
+                    <div class="slider-title">Copy density</div>
+                    <div class="slider-value" id="copyDensityValue">Balanced</div>
+                  </div>
+                  <input id="copyDensity" type="range" min="1" max="4" step="1" value="2">
+                  <div class="hint">Controls how many copies of each chosen shape may appear inside a generated job.</div>
+                </div>
+
+                <div class="slider-block">
+                  <div class="slider-head">
+                    <div class="slider-title">Objects per job</div>
+                    <div class="slider-value" id="jobSizeValue">48 objects</div>
+                  </div>
+                  <input id="jobSize" type="range" min="8" max="240" step="4" value="48">
+                  <div class="hint">Useful presets later could map to small, medium, large, and very large production jobs.</div>
+                </div>
+
+                <div class="slider-block">
+                  <div class="slider-head">
+                    <div class="slider-title">Training share</div>
+                    <div class="slider-value" id="weightValue">25%</div>
+                  </div>
+                  <input id="weight" type="range" min="5" max="60" step="5" value="25">
+                  <div class="hint">How often this recipe should appear inside the overnight training pipeline.</div>
+                </div>
+
+                <div class="field">
+                  <label>Hole policy</label>
+                  <div class="choice-group" id="holePolicy">
+                    <button class="toggle" data-value="avoid">Avoid holes</button>
+                    <button class="toggle active" data-value="mixed">Mixed</button>
+                    <button class="toggle" data-value="prefer">Prefer holes</button>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label>Rotation freedom</label>
+                  <div class="choice-group" id="rotationPolicy">
+                    <button class="toggle" data-value="2">2 directions</button>
+                    <button class="toggle active" data-value="4">4 directions</button>
+                    <button class="toggle" data-value="8">8 directions</button>
+                    <button class="toggle" data-value="16">16 directions</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="cta-row">
+              <button class="button primary" id="addRecipe">Add recipe to training mix</button>
+              <button class="button secondary" id="cloneRecipe">Duplicate recipe</button>
+              <button class="button ghost" id="resetRecipe">Reset to starter preset</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Sample Job Preview</div>
+              <div class="panel-subtitle">A “what will this recipe roughly generate?” sanity check before it goes into training.</div>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="preview-stage">
+              <div class="preview-head">
+                <div>
+                  <div class="preview-title" id="previewTitle">Alpha + Simple Starter Pack</div>
+                  <div class="panel-subtitle" id="previewSubtitle">48 objects • mixed holes • 4-direction rotation</div>
+                </div>
+                <div class="summary-chips" id="previewChips"></div>
+              </div>
+              <div class="sample-board" id="sampleBoard"></div>
+            </div>
+            <div class="footnote">
+              In the real product, this area could show a randomly generated synthetic layout sample and a coverage summary,
+              not just tokens.
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Training Pipeline</div>
+            <div class="panel-subtitle">Recipes become weighted ingredients for the overnight training run.</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="pipeline-summary">
+            <div class="status-label">Current mix</div>
+            <div class="status-value" id="pipelineStatus">4 recipes active</div>
+            <div class="hint">The goal is to make profile management feel like curating a workload mix, not tuning a model.</div>
+          </div>
+          <div class="pipeline-stack" id="pipelineStack"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const shapes = [
+      { id: "A", name: "A", family: "letters", hole: true, preview: "glyph" },
+      { id: "B", name: "B", family: "letters", hole: true, preview: "glyph" },
+      { id: "C", name: "C", family: "letters", hole: false, preview: "glyph" },
+      { id: "D", name: "D", family: "letters", hole: true, preview: "glyph" },
+      { id: "E", name: "E", family: "letters", hole: false, preview: "glyph" },
+      { id: "O", name: "O", family: "letters", hole: true, preview: "glyph" },
+      { id: "L", name: "L", family: "letters", hole: false, preview: "glyph" },
+      { id: "T", name: "T", family: "letters", hole: false, preview: "glyph" },
+      { id: "N", name: "N", family: "letters", hole: false, preview: "glyph" },
+      { id: "8", name: "8", family: "numbers", hole: true, preview: "glyph" },
+      { id: "1", name: "1", family: "numbers", hole: false, preview: "glyph" },
+      { id: "2", name: "2", family: "numbers", hole: false, preview: "glyph" },
+      { id: "3", name: "3", family: "numbers", hole: false, preview: "glyph" },
+      { id: "star", name: "Star", family: "simple", hole: false, preview: "star" },
+      { id: "circle", name: "Circle", family: "simple", hole: false, preview: "circle" },
+      { id: "triangle", name: "Triangle", family: "simple", hole: false, preview: "triangle" },
+      { id: "rectangle", name: "Rectangle", family: "simple", hole: false, preview: "rectangle" },
+      { id: "square", name: "Square", family: "simple", hole: false, preview: "square" }
+    ];
+
+    const state = {
+      familyFilter: "all",
+      selected: new Set(["A", "B", "O", "8", "1", "2", "3", "star", "triangle", "square"]),
+      holePolicy: "mixed",
+      rotationPolicy: "4",
+      pipeline: [
+        {
+          name: "Alpha Numeric Dense",
+          weight: 35,
+          summary: "Letters + numbers • higher duplicates • mixed holes"
+        },
+        {
+          name: "Simple Orthogonal Large Batch",
+          weight: 25,
+          summary: "Squares, rectangles, triangles • large-count jobs"
+        },
+        {
+          name: "Decorative Mixed Shapes",
+          weight: 20,
+          summary: "Glyph-heavy jobs with a few simple accents"
+        },
+        {
+          name: "Holey Shapes Check",
+          weight: 20,
+          summary: "A, B, D, O, 8 with extra hole-bearing coverage"
+        }
+      ]
+    };
+
+    const familyFilters = [
+      { id: "all", label: "All shapes" },
+      { id: "letters", label: "Letters" },
+      { id: "numbers", label: "Numbers" },
+      { id: "simple", label: "Simple geometry" },
+      { id: "holey", label: "Shapes with holes" }
+    ];
+
+    const copyDensityLabels = {
+      1: "Few copies",
+      2: "Balanced",
+      3: "Many copies",
+      4: "Very dense"
+    };
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;");
+    }
+
+    function shapePreview(shape) {
+      if (shape.preview === "glyph") {
+        return `
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <text x="50" y="64" text-anchor="middle">${escapeHtml(shape.name)}</text>
+          </svg>
+        `;
+      }
+      if (shape.preview === "star") {
+        return `
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <polygon points="50,8 60,36 90,36 66,54 74,84 50,66 26,84 34,54 10,36 40,36" fill="none" stroke="#38322b" stroke-width="2"/>
+          </svg>
+        `;
+      }
+      if (shape.preview === "circle") {
+        return `
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="28" fill="none" stroke="#38322b" stroke-width="2"/>
+          </svg>
+        `;
+      }
+      if (shape.preview === "triangle") {
+        return `
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <polygon points="50,14 84,76 16,76" fill="none" stroke="#38322b" stroke-width="2"/>
+          </svg>
+        `;
+      }
+      if (shape.preview === "rectangle") {
+        return `
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <rect x="14" y="28" width="72" height="44" fill="none" stroke="#38322b" stroke-width="2"/>
+          </svg>
+        `;
+      }
+      return `
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <rect x="24" y="24" width="52" height="52" fill="none" stroke="#38322b" stroke-width="2"/>
+        </svg>
+      `;
+    }
+
+    function visibleShapes() {
+      if (state.familyFilter === "all") {
+        return shapes;
+      }
+      if (state.familyFilter === "holey") {
+        return shapes.filter((shape) => shape.hole);
+      }
+      return shapes.filter((shape) => shape.family === state.familyFilter);
+    }
+
+    function selectedShapes() {
+      return shapes.filter((shape) => state.selected.has(shape.id));
+    }
+
+    function renderFamilyFilters() {
+      const container = document.getElementById("familyFilters");
+      container.innerHTML = familyFilters.map((filter) => `
+        <button class="chip ${state.familyFilter === filter.id ? "active" : ""}" data-family="${filter.id}">
+          ${escapeHtml(filter.label)}
+        </button>
+      `).join("");
+
+      container.querySelectorAll("[data-family]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.familyFilter = button.dataset.family;
+          renderLibrary();
+          renderFamilyFilters();
+        });
+      });
+    }
+
+    function renderLibrary() {
+      const grid = document.getElementById("shapeGrid");
+      grid.innerHTML = visibleShapes().map((shape) => `
+        <article class="shape-card ${state.selected.has(shape.id) ? "selected" : ""}" data-shape="${shape.id}">
+          <div class="shape-preview">${shapePreview(shape)}</div>
+          <div class="shape-name">${escapeHtml(shape.name)}</div>
+          <div class="shape-meta">
+            <span class="shape-tag">${shape.family}</span>
+            <span class="shape-tag">${shape.hole ? "has hole" : "no hole"}</span>
+          </div>
+        </article>
+      `).join("");
+
+      grid.querySelectorAll("[data-shape]").forEach((card) => {
+        card.addEventListener("click", () => {
+          const id = card.dataset.shape;
+          if (state.selected.has(id)) {
+            state.selected.delete(id);
+          } else {
+            state.selected.add(id);
+          }
+          renderAll();
+        });
+      });
+    }
+
+    function renderSelectedList() {
+      const list = document.getElementById("selectedList");
+      const picked = selectedShapes();
+      list.innerHTML = picked.length ? picked.map((shape) => `
+        <div class="selected-item">
+          <span>${escapeHtml(shape.name)}</span>
+          <span class="shape-tag">${shape.hole ? "hole" : "solid"}</span>
+        </div>
+      `).join("") : `
+        <div class="hint">No shapes selected yet. Pick some from the library.</div>
+      `;
+    }
+
+    function buildSampleTokens() {
+      const copyDensity = Number(document.getElementById("copyDensity").value);
+      const jobSize = Number(document.getElementById("jobSize").value);
+      const picked = selectedShapes();
+      if (!picked.length) {
+        return [];
+      }
+
+      const sampleCount = Math.min(18, Math.max(6, Math.round(jobSize / 4)));
+      const tokens = [];
+      for (let index = 0; index < sampleCount; index++) {
+        const shape = picked[index % picked.length];
+        const repeatBias = copyDensity > 2 ? picked[Math.floor(Math.random() * Math.max(1, Math.min(picked.length, 4)))] : shape;
+        tokens.push(copyDensity > 2 ? repeatBias : shape);
+      }
+      return tokens;
+    }
+
+    function renderPreview() {
+      const copyDensity = Number(document.getElementById("copyDensity").value);
+      const copyLabel = copyDensityLabels[copyDensity];
+      const jobSize = Number(document.getElementById("jobSize").value);
+      const holeText = state.holePolicy === "avoid" ? "avoid holes" : state.holePolicy === "prefer" ? "prefer holes" : "mixed holes";
+      const rotationText = `${state.rotationPolicy}-direction rotation`;
+      const picked = selectedShapes();
+
+      document.getElementById("copyDensityValue").textContent = copyLabel;
+      document.getElementById("jobSizeValue").textContent = `${jobSize} objects`;
+      document.getElementById("weightValue").textContent = `${document.getElementById("weight").value}%`;
+      document.getElementById("previewTitle").textContent = document.getElementById("profileName").value || "Untitled recipe";
+      document.getElementById("previewSubtitle").textContent = `${jobSize} objects • ${holeText} • ${rotationText}`;
+
+      document.getElementById("previewChips").innerHTML = `
+        <span class="shape-tag">${picked.length} selected shapes</span>
+        <span class="shape-tag">${copyLabel}</span>
+        <span class="shape-tag">${rotationText}</span>
+      `;
+
+      const board = document.getElementById("sampleBoard");
+      const tokens = buildSampleTokens();
+      board.innerHTML = tokens.map((shape) => `
+        <div class="sample-token ${shape.hole ? "holey" : ""}">${escapeHtml(shape.name)}</div>
+      `).join("");
+    }
+
+    function renderPipeline() {
+      const stack = document.getElementById("pipelineStack");
+      stack.innerHTML = state.pipeline.map((recipe) => `
+        <article class="pipeline-card">
+          <div class="pipeline-top">
+            <div class="pipeline-name">${escapeHtml(recipe.name)}</div>
+            <div class="pipeline-weight">${recipe.weight}%</div>
+          </div>
+          <div class="hint">${escapeHtml(recipe.summary)}</div>
+          <div class="weight-bar"><div class="weight-fill" style="width:${recipe.weight}%"></div></div>
+        </article>
+      `).join("");
+      document.getElementById("pipelineStatus").textContent = `${state.pipeline.length} recipes active`;
+    }
+
+    function renderAll() {
+      renderFamilyFilters();
+      renderLibrary();
+      renderSelectedList();
+      renderPreview();
+      renderPipeline();
+    }
+
+    document.querySelectorAll("[data-bundle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const bundle = button.dataset.bundle;
+        if (bundle === "clear") {
+          state.selected.clear();
+        } else if (bundle === "letters") {
+          shapes.filter((shape) => shape.family === "letters").forEach((shape) => state.selected.add(shape.id));
+        } else if (bundle === "numbers") {
+          shapes.filter((shape) => shape.family === "numbers").forEach((shape) => state.selected.add(shape.id));
+        } else if (bundle === "simple") {
+          shapes.filter((shape) => shape.family === "simple").forEach((shape) => state.selected.add(shape.id));
+        } else if (bundle === "holey") {
+          state.selected.clear();
+          shapes.filter((shape) => shape.hole).forEach((shape) => state.selected.add(shape.id));
+        }
+        renderAll();
+      });
+    });
+
+    document.querySelectorAll("#holePolicy .toggle").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.holePolicy = button.dataset.value;
+        document.querySelectorAll("#holePolicy .toggle").forEach((item) => item.classList.toggle("active", item === button));
+        renderPreview();
+      });
+    });
+
+    document.querySelectorAll("#rotationPolicy .toggle").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.rotationPolicy = button.dataset.value;
+        document.querySelectorAll("#rotationPolicy .toggle").forEach((item) => item.classList.toggle("active", item === button));
+        renderPreview();
+      });
+    });
+
+    document.getElementById("copyDensity").addEventListener("input", renderPreview);
+    document.getElementById("jobSize").addEventListener("input", renderPreview);
+    document.getElementById("weight").addEventListener("input", renderPreview);
+    document.getElementById("profileName").addEventListener("input", renderPreview);
+
+    document.getElementById("addRecipe").addEventListener("click", () => {
+      const picked = selectedShapes();
+      state.pipeline.unshift({
+        name: document.getElementById("profileName").value || "Untitled recipe",
+        weight: Number(document.getElementById("weight").value),
+        summary: `${picked.length} shapes • ${copyDensityLabels[Number(document.getElementById("copyDensity").value)].toLowerCase()} • ${document.getElementById("jobSize").value} objects`
+      });
+      renderPipeline();
+    });
+
+    document.getElementById("cloneRecipe").addEventListener("click", () => {
+      document.getElementById("profileName").value = `${document.getElementById("profileName").value} Copy`;
+      renderPreview();
+    });
+
+    document.getElementById("resetRecipe").addEventListener("click", () => {
+      document.getElementById("profileName").value = "Alpha + Simple Starter Pack";
+      document.getElementById("profileNotes").value = "Balanced training mix for letters, numbers, and simple geometry. Good for everyday testing before denser industrial profiles.";
+      document.getElementById("copyDensity").value = 2;
+      document.getElementById("jobSize").value = 48;
+      document.getElementById("weight").value = 25;
+      state.selected = new Set(["A", "B", "O", "8", "1", "2", "3", "star", "triangle", "square"]);
+      state.holePolicy = "mixed";
+      state.rotationPolicy = "4";
+      document.querySelectorAll("#holePolicy .toggle").forEach((item) => item.classList.toggle("active", item.dataset.value === "mixed"));
+      document.querySelectorAll("#rotationPolicy .toggle").forEach((item) => item.classList.toggle("active", item.dataset.value === "4"));
+      renderAll();
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>

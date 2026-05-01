@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deepnest.io/ml/result.schema.json",
+  "title": "Deepnest Teacher Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "job_id",
+    "status",
+    "config",
+    "timings_ms",
+    "metrics",
+    "legality",
+    "placements"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "succeeded",
+        "failed"
+      ]
+    },
+    "failure_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stop_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "evaluation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "config": {
+      "type": "object"
+    },
+    "timings_ms": {
+      "type": "object",
+      "required": [
+        "wall_clock"
+      ],
+      "properties": {
+        "wall_clock": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "fitness",
+        "used_sheet_count",
+        "placed_part_count",
+        "expected_part_count",
+        "utilization_ratio",
+        "merged_line_length"
+      ],
+      "properties": {
+        "fitness": {
+          "type": "number"
+        },
+        "used_sheet_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "placed_part_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_part_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "utilization_ratio": {
+          "type": "number"
+        },
+        "merged_line_length": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    },
+    "legality": {
+      "type": "object",
+      "required": [
+        "solver_completed",
+        "all_parts_placed",
+        "overlap_free",
+        "within_sheet_bounds",
+        "legal"
+      ],
+      "properties": {
+        "solver_completed": {
+          "type": "boolean"
+        },
+        "all_parts_placed": {
+          "type": "boolean"
+        },
+        "overlap_free": {
+          "type": "boolean"
+        },
+        "within_sheet_bounds": {
+          "type": "boolean"
+        },
+        "legal": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "placements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "sheet_item_id",
+          "sheet_instance_id",
+          "part_item_id",
+          "part_instance_index",
+          "x",
+          "y",
+          "rotation"
+        ],
+        "properties": {
+          "sheet_item_id": {
+            "type": "string"
+          },
+          "sheet_instance_id": {
+            "type": "string"
+          },
+          "part_item_id": {
+            "type": "string"
+          },
+          "part_instance_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "rotation": {
+            "type": "number"
+          },
+          "merged_line_length": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

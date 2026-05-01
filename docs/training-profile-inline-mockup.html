@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deepnest++ Simple Training Profile Mockup</title>
+  <style>
+    :root {
+      --app-bg: #404247;
+      --topbar: #575960;
+      --panel: #f5f7f9;
+      --panel-line: #e2e8ed;
+      --text: #404247;
+      --muted: #818489;
+      --accent: #24c7ed;
+      --accent-strong: #19b0d4;
+      --positive: #1c9f5d;
+      --shadow: 0 22px 44px rgba(0, 0, 0, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font: normal 14px/1.4 "LatoLatinWeb", Helvetica, Arial, Verdana, sans-serif;
+      color: var(--text);
+      background: var(--app-bg);
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topnav {
+      height: 60px;
+      background: var(--topbar);
+      border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      color: #fff;
+    }
+
+    .topnav-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge {
+      padding: 6px 11px;
+      border-radius: 999px;
+      background: rgba(36, 199, 237, 0.16);
+      color: #9feeff;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .canvas {
+      flex: 1;
+      padding: 18px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .panel {
+      width: min(1180px, 100%);
+      background: var(--panel);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid var(--panel-line);
+    }
+
+    .panel-head {
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--panel-line);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(245, 247, 249, 0.92));
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 26px;
+      font-weight: 300;
+      color: #575960;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      max-width: 900px;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .panel-body {
+      padding: 18px 22px 20px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .profile-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .profile-row label,
+    .section-title {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--panel-line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--text);
+      padding: 12px 14px;
+      font: inherit;
+    }
+
+    .summary-chip {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--panel-line);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .shape-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px 20px;
+    }
+
+    .shape-row {
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(226, 232, 237, 0.8);
+    }
+
+    .shape-row:last-child,
+    .shape-grid > div:nth-last-child(-n + 3) .shape-row {
+      border-bottom: none;
+    }
+
+    .shape-preview {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--panel-line);
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: #323438;
+    }
+
+    .shape-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #3f4247;
+      line-height: 1.1;
+    }
+
+    .stepper {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid var(--panel-line);
+      border-radius: 999px;
+      padding: 3px;
+    }
+
+    .stepper button {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: #eef3f7;
+      color: #49505a;
+      font: inherit;
+      font-size: 17px;
+      cursor: pointer;
+    }
+
+    .stepper button:hover {
+      background: #dfe9ef;
+    }
+
+    .stepper-value {
+      min-width: 24px;
+      text-align: center;
+      font-weight: 700;
+      color: #3f4247;
+    }
+
+    .options {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px 24px;
+      align-items: start;
+      padding-top: 4px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .toggle-row span {
+      font-size: 15px;
+    }
+
+    .range-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mini-field {
+      background: #fff;
+      border: 1px solid var(--panel-line);
+      border-radius: 10px;
+      padding: 9px 11px;
+    }
+
+    .mini-field label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .mini-field input {
+      width: 100%;
+      border: none;
+      outline: none;
+      padding: 0;
+      background: transparent;
+      font: inherit;
+      color: #3f4247;
+    }
+
+    .segmented {
+      display: inline-flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .segmented button {
+      border: 1px solid var(--panel-line);
+      background: #fff;
+      color: #575960;
+      border-radius: 999px;
+      padding: 8px 13px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .segmented button.active {
+      background: rgba(36, 199, 237, 0.14);
+      border-color: rgba(36, 199, 237, 0.42);
+      color: #137d95;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-top: 10px;
+      border-top: 1px solid var(--panel-line);
+    }
+
+    .footer-summary {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      border-radius: 999px;
+      padding: 11px 18px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .button.secondary {
+      background: #e8edf2;
+      color: #50565f;
+    }
+
+    .button.primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .button.primary:hover {
+      background: var(--accent-strong);
+    }
+
+    @media (max-width: 900px) {
+      .shape-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .shape-grid > div:nth-last-child(-n + 2) .shape-row {
+        border-bottom: none;
+      }
+
+      .options,
+      .profile-row {
+        grid-template-columns: 1fr;
+      }
+
+      .footer {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .footer-actions {
+        display: flex;
+        gap: 10px;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .shape-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .shape-grid > div .shape-row {
+        border-bottom: 1px solid rgba(226, 232, 237, 0.8);
+      }
+
+      .shape-grid > div:last-child .shape-row {
+        border-bottom: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topnav">
+      <div class="topnav-title">
+        <div class="badge">Mockup only</div>
+        <div>Training Profile Builder</div>
+      </div>
+      <div>Simple, inline version for the current Deepnest++ UI</div>
+    </div>
+
+    <div class="canvas">
+      <section class="panel">
+        <div class="panel-head">
+          <div class="eyebrow">Training mix editor</div>
+          <h1>Mix profile</h1>
+          <p class="subtitle">Pick the shapes, set how many copies should appear, then decide whether the training jobs should use holes, vary sizes, and allow more rotation.</p>
+        </div>
+
+        <div class="panel-body">
+          <div class="profile-row">
+            <div>
+              <label for="profile-name">Profile name</label>
+              <input id="profile-name" type="text" value="Alpha Numeric Dense">
+            </div>
+            <div class="summary-chip" id="total-selected">0 shapes selected</div>
+          </div>
+
+          <div>
+            <div class="section-title">Shapes and copies</div>
+            <div class="shape-grid" id="shape-grid"></div>
+          </div>
+
+          <div class="options">
+            <div>
+              <div class="section-title">Shape behavior</div>
+              <label class="toggle-row">
+                <input id="use-holes" type="checkbox" checked>
+                <span>Use holes when the selected shape supports them</span>
+              </label>
+              <label class="toggle-row">
+                <input id="vary-sizes" type="checkbox" checked>
+                <span>Vary sizes inside the same training job</span>
+              </label>
+              <div class="range-grid">
+                <div class="mini-field">
+                  <label for="min-size">Min size</label>
+                  <input id="min-size" type="text" value="10%">
+                </div>
+                <div class="mini-field">
+                  <label for="max-size">Max size</label>
+                  <input id="max-size" type="text" value="150%">
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="section-title">Rotation</div>
+              <div class="segmented" id="rotation-picker">
+                <button type="button" data-rotation="2">2 directions</button>
+                <button type="button" class="active" data-rotation="4">4 directions</button>
+                <button type="button" data-rotation="8">8 directions</button>
+                <button type="button" data-rotation="16">16 directions</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <div class="footer-summary" id="footer-summary">
+              <div class="summary-chip">Copies: 12</div>
+              <div class="summary-chip">Holes: on</div>
+              <div class="summary-chip">Sizes: 10% to 150%</div>
+              <div class="summary-chip">Rotation: 4 directions</div>
+            </div>
+            <div class="footer-actions">
+              <button class="button secondary" type="button" id="reset-button">Reset</button>
+              <button class="button primary" type="button">Add profile to training pipeline</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const shapes = [
+      { id: "A", label: "A", name: "A", count: 1 },
+      { id: "B", label: "B", name: "B", count: 1 },
+      { id: "C", label: "C", name: "C", count: 0 },
+      { id: "D", label: "D", name: "D", count: 0 },
+      { id: "E", label: "E", name: "E", count: 0 },
+      { id: "O", label: "O", name: "O", count: 0 },
+      { id: "L", label: "L", name: "L", count: 1 },
+      { id: "T", label: "T", name: "T", count: 1 },
+      { id: "N", label: "N", name: "N", count: 0 },
+      { id: "8", label: "8", name: "8", count: 0 },
+      { id: "1", label: "1", name: "1", count: 0 },
+      { id: "2", label: "2", name: "2", count: 0 },
+      { id: "3", label: "3", name: "3", count: 0 },
+      { id: "star", label: "\u2605", name: "Star", count: 0 },
+      { id: "circle", label: "\u25cb", name: "Circle", count: 0 },
+      { id: "triangle", label: "\u25b3", name: "Triangle", count: 1 },
+      { id: "rectangle", label: "\u25ad", name: "Rectangle", count: 0 },
+      { id: "square", label: "\u25a1", name: "Square", count: 0 }
+    ];
+
+    const initialCounts = shapes.map((shape) => shape.count);
+
+    const defaultState = {
+      holes: true,
+      varySizes: true,
+      minSize: "10%",
+      maxSize: "150%",
+      rotation: "4"
+    };
+
+    const shapeGrid = document.getElementById("shape-grid");
+    const totalSelected = document.getElementById("total-selected");
+    const footerSummary = document.getElementById("footer-summary");
+    const useHoles = document.getElementById("use-holes");
+    const varySizes = document.getElementById("vary-sizes");
+    const minSize = document.getElementById("min-size");
+    const maxSize = document.getElementById("max-size");
+    const rotationPicker = document.getElementById("rotation-picker");
+    const resetButton = document.getElementById("reset-button");
+
+    function renderShapes() {
+      shapeGrid.innerHTML = shapes.map((shape, index) => `
+        <div>
+          <div class="shape-row">
+            <div class="shape-preview">${shape.label}</div>
+            <div class="shape-name">${shape.name}</div>
+            <div class="stepper" data-index="${index}">
+              <button type="button" data-action="decrease">-</button>
+              <div class="stepper-value">${shape.count}</div>
+              <button type="button" data-action="increase">+</button>
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function formatPercentValue(value, fallback) {
+      const raw = String(value || "").replace(/[^0-9.]/g, "");
+      const numeric = Number(raw);
+      const fallbackNumeric = Number(String(fallback || "").replace(/[^0-9.]/g, "")) || 0;
+      const safeValue = Number.isFinite(numeric) && raw !== "" ? numeric : fallbackNumeric;
+      const rounded = Number.isInteger(safeValue) ? String(safeValue) : safeValue.toFixed(1).replace(/\.0$/, "");
+      return `${rounded}%`;
+    }
+
+    function sanitizePercentEditing(value) {
+      return String(value || "").replace(/[^0-9.]/g, "");
+    }
+
+    function activeShapeCount() {
+      return shapes.filter((shape) => shape.count > 0).length;
+    }
+
+    function totalCopies() {
+      return shapes.reduce((sum, shape) => sum + shape.count, 0);
+    }
+
+    function renderSummary() {
+      const formattedMin = formatPercentValue(minSize.value, defaultState.minSize);
+      const formattedMax = formatPercentValue(maxSize.value, defaultState.maxSize);
+      totalSelected.textContent = `${activeShapeCount()} shapes selected`;
+      footerSummary.innerHTML = `
+        <div class="summary-chip">Copies: ${totalCopies()}</div>
+        <div class="summary-chip">Holes: ${useHoles.checked ? "on" : "off"}</div>
+        <div class="summary-chip">Sizes: ${varySizes.checked ? `${formattedMin} to ${formattedMax}` : "fixed"}</div>
+        <div class="summary-chip">Rotation: ${rotationPicker.querySelector(".active").dataset.rotation} directions</div>
+      `;
+    }
+
+    shapeGrid.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) {
+        return;
+      }
+
+      const stepper = button.closest(".stepper");
+      const index = Number(stepper.dataset.index);
+      const action = button.dataset.action;
+
+      if (action === "increase") {
+        shapes[index].count += 1;
+      } else {
+        shapes[index].count = Math.max(0, shapes[index].count - 1);
+      }
+
+      renderShapes();
+      renderSummary();
+    });
+
+    [useHoles, varySizes].forEach((input) => {
+      input.addEventListener("input", renderSummary);
+      input.addEventListener("change", renderSummary);
+    });
+
+    [minSize, maxSize].forEach((input) => {
+      input.addEventListener("focus", () => {
+        input.value = sanitizePercentEditing(input.value);
+      });
+
+      input.addEventListener("input", () => {
+        input.value = sanitizePercentEditing(input.value);
+        renderSummary();
+      });
+
+      input.addEventListener("blur", () => {
+        const fallback = input.id === "min-size" ? defaultState.minSize : defaultState.maxSize;
+        input.value = formatPercentValue(input.value, fallback);
+        renderSummary();
+      });
+    });
+
+    rotationPicker.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) {
+        return;
+      }
+
+      rotationPicker.querySelectorAll("button").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      renderSummary();
+    });
+
+    resetButton.addEventListener("click", () => {
+      shapes.forEach((shape, index) => {
+        shape.count = initialCounts[index];
+      });
+      useHoles.checked = defaultState.holes;
+      varySizes.checked = defaultState.varySizes;
+      minSize.value = defaultState.minSize;
+      maxSize.value = defaultState.maxSize;
+      rotationPicker.querySelectorAll("button").forEach((item) => {
+        item.classList.toggle("active", item.dataset.rotation === defaultState.rotation);
+      });
+      renderShapes();
+      renderSummary();
+    });
+
+    renderShapes();
+    renderSummary();
+  </script>
+</body>
+</html>

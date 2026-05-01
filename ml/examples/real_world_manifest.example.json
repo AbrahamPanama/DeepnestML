@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "campaign_id": "historical-q2",
+  "jobs": [
+    {
+      "job_id": "historical-q2-0000",
+      "canonical_job_path": "./jobs/historical-q2-0000.json",
+      "source_label": "source-0000",
+      "split": "smoke",
+      "tags": {
+        "material": "mild_steel",
+        "part_count_band": "medium",
+        "complexity_band": "mixed",
+        "operator_notes": "placeholder example entry"
+      }
+    },
+    {
+      "job_id": "historical-q2-0001",
+      "canonical_job_path": "./jobs/historical-q2-0001.json",
+      "source_label": "source-0001",
+      "split": "acceptance",
+      "tags": {
+        "material": "aluminum",
+        "part_count_band": "high",
+        "complexity_band": "concave"
+      }
+    }
+  ]
+}

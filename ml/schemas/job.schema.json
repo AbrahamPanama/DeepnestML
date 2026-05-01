@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deepnest.io/ml/job.schema.json",
+  "title": "Deepnest Canonical Job",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "job_id",
+    "source",
+    "random_seed",
+    "budget",
+    "config",
+    "items"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "job_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "random_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "budget": {
+      "type": "object",
+      "required": [
+        "max_evaluations"
+      ],
+      "properties": {
+        "max_evaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_runtime_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "config": {
+      "type": "object",
+      "required": [
+        "spacing",
+        "curveTolerance",
+        "rotations",
+        "populationSize",
+        "mutationRate",
+        "placementType",
+        "mergeLines",
+        "timeRatio",
+        "scale",
+        "simplify"
+      ],
+      "properties": {
+        "spacing": {
+          "type": "number"
+        },
+        "curveTolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rotations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "populationSize": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "mutationRate": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "threads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "placementType": {
+          "type": "string",
+          "enum": [
+            "gravity",
+            "box",
+            "convexhull"
+          ]
+        },
+        "mergeLines": {
+          "type": "boolean"
+        },
+        "timeRatio": {
+          "type": "number"
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "simplify": {
+          "type": "boolean"
+        },
+        "endpointTolerance": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "object",
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "polygon": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/point"
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": [
+        "item_id",
+        "kind",
+        "quantity",
+        "polygon"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "sheet",
+            "part"
+          ]
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "polygon": {
+          "$ref": "#/$defs/polygon"
+        },
+        "holes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/polygon"
+          }
+        },
+        "allowed_rotations": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

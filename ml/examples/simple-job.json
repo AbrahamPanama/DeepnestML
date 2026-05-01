@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0.0",
+  "job_id": "simple-job",
+  "source": "example",
+  "metadata": {
+    "description": "A tiny canonical job for teacher-runner smoke tests"
+  },
+  "random_seed": 1337,
+  "budget": {
+    "max_evaluations": 12
+  },
+  "config": {
+    "spacing": 0,
+    "curveTolerance": 0.3,
+    "rotations": 4,
+    "populationSize": 6,
+    "mutationRate": 10,
+    "threads": 1,
+    "placementType": "gravity",
+    "mergeLines": true,
+    "timeRatio": 0.5,
+    "scale": 72,
+    "simplify": false,
+    "endpointTolerance": 0.36
+  },
+  "items": [
+    {
+      "item_id": "sheet-rect",
+      "kind": "sheet",
+      "quantity": 1,
+      "polygon": [
+        { "x": 0, "y": 0 },
+        { "x": 480, "y": 0 },
+        { "x": 480, "y": 320 },
+        { "x": 0, "y": 320 }
+      ],
+      "holes": []
+    },
+    {
+      "item_id": "part-rect-a",
+      "kind": "part",
+      "quantity": 2,
+      "polygon": [
+        { "x": 0, "y": 0 },
+        { "x": 180, "y": 0 },
+        { "x": 180, "y": 80 },
+        { "x": 0, "y": 80 }
+      ],
+      "holes": []
+    },
+    {
+      "item_id": "part-l",
+      "kind": "part",
+      "quantity": 1,
+      "polygon": [
+        { "x": 0, "y": 0 },
+        { "x": 160, "y": 0 },
+        { "x": 160, "y": 40 },
+        { "x": 60, "y": 40 },
+        { "x": 60, "y": 160 },
+        { "x": 0, "y": 160 }
+      ],
+      "holes": []
+    }
+  ]
+}

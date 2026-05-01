@@ -1,0 +1,15 @@
+{
+  "name": "svg-gravity-improved-scoring",
+  "description": "SVG import, gravity nesting with experimental remnant-quality scoring, SVG export.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "gravity",
+    "improvedPlacementScoring": true,
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 2
+  }
+}
