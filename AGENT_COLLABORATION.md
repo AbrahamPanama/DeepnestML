@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-05-03 by Claude-Code): _dirty: `minkowski.cc` and `AGENT_COLLABORATION.md` modified by Claude-Code for the env-gated batch convolution experiment; `.claude/` is untracked and unrelated_.
+State (verified 2026-05-03 by Codex): _dirty: Codex rebuilt the ignored native addon for verification; `.claude/` is untracked and unrelated_.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,7 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Claude-Code | Minkowski batch convolution experiment (env-gated) | `minkowski.cc` (`convolve_two_point_sequences` only) | implemented in worktree, awaiting Mac-side rebuild + numbers | 2026-05-03 |
+| _none_ | _n/a_ | _n/a_ | _n/a_ | _n/a_ |
 
 ## Upcoming Work
 
@@ -124,6 +124,28 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-05-03 - Minkowski batch convolution experiment verified on Mac (Codex)
+
+- Fast-forwarded `main` to `4fb1c06` (`[claude-code] add env-gated batch convolution experiment`).
+- Rebuilt `build/Release/addon.node` against Electron `40.8.5` with `npx -y node-gyp@12 rebuild --target=40.8.5 --arch=arm64 --dist-url=https://electronjs.org/headers`.
+- Verification:
+  - Default path: `ELECTRON_RUN_AS_NODE=1 "dist/mac-arm64/Deepnest ML.app/Contents/MacOS/Deepnest ML" ml/tests/nfp_equivalence/run.js` passed 4/4 fixtures.
+  - Batch path: `DEEPNEST_BATCH_INSERT=1 ELECTRON_RUN_AS_NODE=1 "dist/mac-arm64/Deepnest ML.app/Contents/MacOS/Deepnest ML" ml/tests/nfp_equivalence/run.js` passed 4/4 fixtures.
+- 500-iteration profile after rebuild, default path:
+  - `rect-vs-rect`: native mean `0.049ms`, JS Clipper mean `0.068ms`, `timeVsNative=1.41x`.
+  - `concave-l-vs-rect`: native mean `0.058ms`, JS Clipper mean `0.065ms`, `timeVsNative=1.14x`.
+  - `irregular-vs-irregular`: native mean `0.134ms`, JS Clipper mean `0.110ms`, `timeVsNative=0.82x`.
+  - `wavy-96-vs-wavy-72`: native mean `156.788ms`, median `151.278ms`; JS Clipper mean `305.189ms`, median `293.808ms`, `timeVsNative=1.95x`.
+  - `rect-with-hole-vs-rect`: native with holes mean `0.076ms`; native without holes mean `0.041ms`, `timeVsNative=0.55x`.
+- 500-iteration profile with `DEEPNEST_BATCH_INSERT=1`:
+  - `rect-vs-rect`: native mean `0.053ms`, JS Clipper mean `0.073ms`, `timeVsNative=1.36x`.
+  - `concave-l-vs-rect`: native mean `0.069ms`, JS Clipper mean `0.068ms`, `timeVsNative=0.99x`.
+  - `irregular-vs-irregular`: native mean `0.115ms`, JS Clipper mean `0.101ms`, `timeVsNative=0.88x`.
+  - `wavy-96-vs-wavy-72`: native mean `152.641ms`, median `151.345ms`; JS Clipper mean `291.897ms`, median `285.712ms`, `timeVsNative=1.91x`.
+  - `rect-with-hole-vs-rect`: native with holes mean `0.094ms`; native without holes mean `0.061ms`, `timeVsNative=0.65x`.
+- Geometry check: the wavy fixture's raw native output changed from `169` to `170` points under batch mode, but canonicalized output matched exactly (`canonPts=168`, same bbox, same SHA-1 hash `5c12f75ee4b2e2d7efcdf9f37ce16fe0a11164b2`). Treat this as representation noise, not a correctness failure.
+- Recommendation: do **not** promote per-pair batching to default. It gives only a small wavy mean improvement (~2.6%) with effectively unchanged median and mixed/small-fixture regressions. The next experiment should move batching or timing instrumentation up to whole-NFP scope instead.
 
 ### 2026-05-03 - Minkowski batch convolution experiment (env-gated) (Claude-Code → Codex handoff)
 
@@ -173,7 +195,7 @@ Files touched:
 - `minkowski.cc` (one include + one static helper added; one function body split into a gated batch branch and the preserved default branch)
 - `AGENT_COLLABORATION.md` (this note + Active Work + Working Tree State)
 
-
+### 2026-05-01 - Native NFP profiling harness added (Codex)
 
 - Added `ml/tests/nfp_profile/run.js` and `ml/tests/nfp_profile/run.sh`.
 - The profile runs under Electron-as-Node, loads the built native addon, and compares native Boost NFP timings against the current JS Clipper fallback for simple and synthetic fixtures.
