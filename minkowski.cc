@@ -7,9 +7,22 @@
 #include <iostream>
 #include <sstream>
 #include <limits>
+#include <cstdlib>
 
 #undef min
 #undef max
+
+// Env-gated experiment: when DEEPNEST_BATCH_INSERT is set to anything other than
+// "" or "0", convolve_two_point_sequences accumulates quads into a local
+// polygon_set and merges into the caller's result once at the end. Default off
+// preserves byte-identical behavior with the pre-experiment build.
+static bool batch_insert_enabled() {
+  static const bool enabled = []{
+    const char* env = std::getenv("DEEPNEST_BATCH_INSERT");
+    return env && env[0] != '\0' && env[0] != '0';
+  }();
+  return enabled;
+}
 
 typedef boost::polygon::point_data<int> point;
 typedef boost::polygon::polygon_set_data<int> polygon_set;
@@ -126,6 +139,26 @@ void convolve_two_point_sequences(polygon_set& result, itrT1 ab, itrT1 ae, itrT2
   std::vector<point> vec;
   polygon poly;
   ++ab;
+
+  if (batch_insert_enabled()) {
+    polygon_set local;
+    for (; ab != ae; ++ab) {
+      point first_b = *bb;
+      point prev_b = *bb;
+      itrT2 tmpb = bb;
+      ++tmpb;
+      for (; tmpb != be; ++tmpb) {
+        convolve_two_segments(vec, std::make_pair(prev_b, *tmpb), std::make_pair(prev_a, *ab));
+        set_points(poly, vec.begin(), vec.end());
+        local.insert(poly);
+        prev_b = *tmpb;
+      }
+      prev_a = *ab;
+    }
+    result += local;
+    return;
+  }
+
   for (; ab != ae; ++ab) {
     point first_b = *bb;
     point prev_b = *bb;

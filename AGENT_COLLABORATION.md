@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-05-03 by Codex): _dirty: `.claude/` is untracked and unrelated to the current source/test baseline_.
+State (verified 2026-05-03 by Claude-Code): _dirty: `minkowski.cc` and `AGENT_COLLABORATION.md` modified by Claude-Code for the env-gated batch convolution experiment; `.claude/` is untracked and unrelated_.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,7 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| _none_ | _n/a_ | _n/a_ | _n/a_ | _n/a_ |
+| Claude-Code | Minkowski batch convolution experiment (env-gated) | `minkowski.cc` (`convolve_two_point_sequences` only) | implemented in worktree, awaiting Mac-side rebuild + numbers | 2026-05-03 |
 
 ## Upcoming Work
 
@@ -125,7 +125,55 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 
 Use newest notes at the top.
 
-### 2026-05-01 - Native NFP profiling harness added (Codex)
+### 2026-05-03 - Minkowski batch convolution experiment (env-gated) (Claude-Code → Codex handoff)
+
+Scope: smallest C++ change suggested by the post-baseline plan. Only `minkowski.cc` is touched, only inside `convolve_two_point_sequences`. Env-gated so a single rebuilt binary runs both old and new paths.
+
+What changed in `minkowski.cc`:
+- Added `#include <cstdlib>` and a static `batch_insert_enabled()` helper that reads `DEEPNEST_BATCH_INSERT` once via `std::getenv` (cached in a function-local static; thread-safe under C++11 magic-statics, which the existing build already relies on).
+- `convolve_two_point_sequences` now has two branches sharing identical input setup (`first_a`, `prev_a`, `vec`, `poly`, `++ab`):
+  - **Default (env unset / `0`):** byte-identical to the previous code — `result.insert(poly)` per quad inside the O(|A|×|B|) loop.
+  - **Batch (env set to anything else):** accumulates quads into a function-local `polygon_set local`, then `result += local` once at the end. Hypothesis: bulk-cleaning a fresh small set and merging once may amortize Boost.Polygon's sweepline housekeeping better than per-quad insertion into a growing `result`.
+- No other function was changed. `convolve_point_sequence_with_polygons` and `convolve_two_polygon_sets` still call `convolve_two_point_sequences` exactly as before, so the batching is per-(A-sequence × B-polygon)-pair, not per-NFP. If the per-pair batch wins, a follow-up experiment can lift it to whole-NFP scope.
+
+Why this shape:
+- Default-off keeps the path the equivalence harness has already validated 4/4 on. No `NFP_CACHE_VERSION` bump, no risk of silently invalidating warmed caches, no behavior change for users on the next rebuild.
+- One binary, two measurements. Lets Codex A/B without rebuilding twice.
+- The change is ~25 added lines plus one include. Easy to revert (single hunk).
+
+Verification done in this worktree (no native build available):
+- `node --check ml/tests/nfp_profile/run.js` — passes.
+- `node --check ml/tests/nfp_equivalence/run.js` — passes.
+- Re-read of `minkowski.cc` lines 1-30 and 131-175: both branches present, identical loop bodies inside, only the destination of `insert` and the trailing `result += local` differ.
+- `grep` confirms one `first_a` declaration (preserved as pre-existing latent dead variable; not introduced by this change), two `first_b` declarations (one per branch, also preserved), two `for (; ab != ae` loops (one per branch).
+
+Not verified here:
+- `npm run build:arm64` — would require `npm install` first (~300 MB Electron download + `electron-builder install-app-deps`); deferred to Codex on the Mac.
+- `bash ml/tests/nfp_equivalence/run.sh` — needs a fresh build of the addon to actually exercise the new code; the packaged 0.7.1 addon does not include the env gate.
+- `bash ml/tests/nfp_profile/run.sh` — same.
+
+What Codex needs to do on the Mac:
+1. **Rebuild the addon** with `npm run build:arm64` (or `npm run build` for current arch). Confirm `build/Release/addon.node` is a fresh `Mach-O 64-bit bundle arm64` matching today's mtime.
+2. **Equivalence regression (default path).** `bash ml/tests/nfp_equivalence/run.sh` must still pass 4/4. This protects against an accidental compile-time semantic break (e.g. if the new include or static helper somehow perturbed the default path).
+3. **Equivalence regression (batch path).** `DEEPNEST_BATCH_INSERT=1 bash ml/tests/nfp_equivalence/run.sh` must also pass 4/4. The math is identical — only the order of insertion and the merge point differ — so any divergence would indicate either a Boost.Polygon non-determinism or a real bug. If divergence, paste the failing fixture's native vs JS canonical rings into a follow-up note here.
+4. **Perf baseline reproduction.** `bash ml/tests/nfp_profile/run.sh 500` (no env). Should match the 500-iteration numbers recorded in the previous handoff note within reasonable jitter — confirms the rebuild itself didn't drift. The wavy-96/72 native mean should land near `168.641ms` / median `154.394ms`.
+5. **Perf experiment.** `DEEPNEST_BATCH_INSERT=1 bash ml/tests/nfp_profile/run.sh 500`. Record the same five-fixture table here. The fixture that actually answers the question is `wavy-96-vs-wavy-72` — anything < ~155ms median is a clear win, > ~170ms is a clear loss, in between is noise and we'd want a longer run. The microsecond-scale fixtures (`rect-vs-rect`, `concave-l-vs-rect`, `irregular-vs-irregular`, `rect-with-hole-vs-rect`) are sensitive to the constant-factor cost of constructing `polygon_set local` and the `result += local` merge — if they regress materially (say, > 1.5× baseline), the per-pair batching is too granular and the next experiment should batch at whole-NFP scope instead.
+6. **Decision.** Three outcomes:
+   - **Win on wavy with no material regression on small fixtures:** plumb the env default to ON (or just remove the gate and inline the batch path), update equivalence + profile baseline numbers in this file, ML checkpoint (`npm run ml:checkpoint -- --name minkowski-batch-convolution`), then hand back to a refactor follow-up to consider lifting batching to whole-NFP scope and to revisit the `irregular-vs-irregular` 0.92× regression.
+   - **No win on wavy:** revert the patch entirely; the next experiment moves up a level (whole-NFP batching, or phase-timing instrumentation to find where the 168 ms is actually spent).
+   - **Mixed (small-fixture regression):** keep the env gate as a flag, document the tradeoff, move to whole-NFP batching as the next experiment — small-fixture cost was the predicted failure mode of per-pair scope.
+
+ML-sensitive notes:
+- No checkpoint required for landing the env-gated change itself, because default behavior is byte-identical. Checkpoint is required only when (and if) batching is promoted to default-on per AGENT_COLLABORATION.md:74.
+- `addon.cc`, `binding.gyp`, `main/background.js`, and `main/minkowski-worker.js` are unchanged. Cache key format unchanged. `processHoles` toggle untouched.
+
+Rollback plan: revert the two `minkowski.cc` hunks (the include + helper near line 10, and the `convolve_two_point_sequences` body). The Active Work table claim and this Handoff Note can stay as a record of the experiment.
+
+Files touched:
+- `minkowski.cc` (one include + one static helper added; one function body split into a gated batch branch and the preserved default branch)
+- `AGENT_COLLABORATION.md` (this note + Active Work + Working Tree State)
+
+
 
 - Added `ml/tests/nfp_profile/run.js` and `ml/tests/nfp_profile/run.sh`.
 - The profile runs under Electron-as-Node, loads the built native addon, and compares native Boost NFP timings against the current JS Clipper fallback for simple and synthetic fixtures.
