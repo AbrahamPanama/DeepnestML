@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-05-01 by Codex): _clean after initial Git checkpoint_ — source/docs/test files are tracked in local Git; generated dependencies, packaged app artifacts, native build outputs, ML artifacts, checkpoints, logs, and local archives are ignored. Current app baseline remains `0.7.1`.
+State (verified 2026-05-03 by Codex): _dirty: `.claude/` is untracked and unrelated to the current source/test baseline_.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -124,6 +124,25 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-05-01 - Native NFP profiling harness added (Codex)
+
+- Added `ml/tests/nfp_profile/run.js` and `ml/tests/nfp_profile/run.sh`.
+- The profile runs under Electron-as-Node, loads the built native addon, and compares native Boost NFP timings against the current JS Clipper fallback for simple and synthetic fixtures.
+- Added a hole fixture that compares `native-boost` with holes enabled against `native-no-holes`, matching the product's `processHoles` concept.
+- Updated `ml/tests/nfp_equivalence/run.sh` to fall back to the packaged app binary when `node_modules/.bin/electron` is unavailable.
+- Verification:
+  - `node --check ml/tests/nfp_profile/run.js` passed.
+  - `bash ml/tests/nfp_equivalence/run.sh` passed 4/4 existing fixtures using the packaged Electron runtime.
+  - `bash ml/tests/nfp_profile/run.sh 20` completed successfully.
+  - `bash ml/tests/nfp_profile/run.sh 500` completed successfully on the Mac.
+- First signal from the 20-iteration profile: native Boost is clearly faster on the synthetic large wavy fixture (~151 ms vs ~277 ms), comparable on small irregular geometry, and hole processing adds measurable overhead even on simple polygons.
+- 500-iteration Mac baseline:
+  - `rect-vs-rect`: native mean `0.063ms`, JS Clipper mean `0.089ms`, `timeVsNative=1.43x`.
+  - `concave-l-vs-rect`: native mean `0.083ms`, JS Clipper mean `0.083ms`, `timeVsNative=1.00x`.
+  - `irregular-vs-irregular`: native mean `0.154ms`, JS Clipper mean `0.142ms`, `timeVsNative=0.92x`.
+  - `wavy-96-vs-wavy-72`: native mean `168.641ms`, median `154.394ms`; JS Clipper mean `267.410ms`, median `266.013ms`, `timeVsNative=1.59x`.
+  - `rect-with-hole-vs-rect`: native with holes mean `0.070ms`; native without holes mean `0.037ms`, `timeVsNative=0.53x`.
 
 ### 2026-05-01 - GitHub remote and license metadata configured (Codex)
 

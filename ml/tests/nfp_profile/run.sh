@@ -12,4 +12,4 @@ else
   exit 2
 fi
 
-ELECTRON_RUN_AS_NODE=1 "$ELECTRON_BIN" ml/tests/nfp_equivalence/run.js "$@"
+ELECTRON_RUN_AS_NODE=1 "$ELECTRON_BIN" ml/tests/nfp_profile/run.js "$@"
