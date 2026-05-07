@@ -243,6 +243,7 @@ window.onload = function () {
 			try{
 				var stepPlacement = placePartsStepRepeat(data.sheets, parts, data.config, index);
 				stepPlacement.index = data.index;
+				stepPlacement.localRefinement = createLocalRefinementStats(false);
 				ipcRenderer.send('background-response', stepPlacement);
 			}
 			catch(stepRepeatError){
@@ -385,6 +386,11 @@ window.onload = function () {
 		  	var placement = placeParts(data.sheets, parts, data.config, index);
 	
 			placement.index = data.index;
+			if(data.postProcessRefinement){
+				placement.postProcessRefinement = true;
+				placement.refinementToken = data.refinementToken;
+				placement.refinementBaseFitness = data.refinementBaseFitness;
+			}
 			ipcRenderer.send('background-response', placement);
 		  }
 		  
@@ -1177,6 +1183,359 @@ function improvedPlacementScore(baseScore, candidateBounds, sheetBounds, config)
 	);
 }
 
+function clonePlacementPosition(position){
+	return {
+		x: position.x,
+		y: position.y,
+		id: position.id,
+		source: position.source,
+		rotation: position.rotation
+	};
+}
+
+function localRefinementNormalizeDirection(direction){
+	var length = Math.sqrt(direction.x * direction.x + direction.y * direction.y);
+	if(!isFinite(length) || length <= 0){
+		return null;
+	}
+	return {
+		x: direction.x / length,
+		y: direction.y / length
+	};
+}
+
+function localRefinementCandidateAt(original, direction, distance){
+	var candidate = clonePlacementPosition(original);
+	candidate.x += direction.x * distance;
+	candidate.y += direction.y * distance;
+	return candidate;
+}
+
+function localRefinementShiftNfp(nfp, shift){
+	for(var i=0; i<nfp.length; i++){
+		nfp[i].x += shift.x;
+		nfp[i].y += shift.y;
+	}
+	if(nfp.children && nfp.children.length > 0){
+		for(var j=0; j<nfp.children.length; j++){
+			for(var k=0; k<nfp.children[j].length; k++){
+				nfp.children[j][k].x += shift.x;
+				nfp.children[j][k].y += shift.y;
+			}
+		}
+	}
+	return nfp;
+}
+
+function localRefinementPointAllowed(point, nfpList){
+	if(!nfpList || nfpList.length === 0){
+		return false;
+	}
+	for(var i=0; i<nfpList.length; i++){
+		var nfp = nfpList[i];
+		var inside = GeometryUtil.pointInPolygon(point, nfp);
+		// Boundary contact is allowed here, matching the existing placement solver:
+		// the NFP already encodes configured spacing, so a boundary point is exactly at clearance.
+		if(inside === false){
+			continue;
+		}
+		var blocked = false;
+		if(nfp.children && nfp.children.length > 0){
+			for(var j=0; j<nfp.children.length; j++){
+				if(GeometryUtil.pointInPolygon(point, nfp.children[j]) === true){
+					blocked = true;
+					break;
+				}
+			}
+		}
+		if(!blocked){
+			return true;
+		}
+	}
+	return false;
+}
+
+function localRefinementPointForbidden(point, nfp){
+	var inside = GeometryUtil.pointInPolygon(point, nfp);
+	if(inside !== true){
+		return false;
+	}
+	if(nfp.children && nfp.children.length > 0){
+		for(var i=0; i<nfp.children.length; i++){
+			var childInside = GeometryUtil.pointInPolygon(point, nfp.children[i]);
+			if(childInside === true || childInside === null){
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+function localRefinementForbiddenNfps(part, partIndex, placed, placements, config){
+	var forbidden = [];
+	for(var i=0; i<placed.length; i++){
+		if(i === partIndex){
+			continue;
+		}
+		var nfp = getOuterNfp(placed[i], part, false, config);
+		if(!nfp){
+			return null;
+		}
+		forbidden.push(localRefinementShiftNfp(clone(nfp), placements[i]));
+	}
+	return forbidden;
+}
+
+function localRefinementCandidateValid(part, candidate, sheetNfp, forbiddenNfps){
+	var point = {
+		x: part[0].x + candidate.x,
+		y: part[0].y + candidate.y
+	};
+	if(!localRefinementPointAllowed(point, sheetNfp)){
+		return false;
+	}
+	for(var i=0; i<forbiddenNfps.length; i++){
+		if(localRefinementPointForbidden(point, forbiddenNfps[i])){
+			return false;
+		}
+	}
+	return true;
+}
+
+function localRefinementMaxLegalSlide(part, original, direction, maxDistance, sheetNfp, forbiddenNfps){
+	var unit = localRefinementNormalizeDirection(direction);
+	if(!unit || !isFinite(maxDistance) || maxDistance <= 0){
+		return 0;
+	}
+	if(!localRefinementCandidateValid(part, original, sheetNfp, forbiddenNfps)){
+		return 0;
+	}
+
+	var samples = 16;
+	var lastValid = 0;
+	var firstInvalid = null;
+	for(var i=1; i<=samples; i++){
+		var distance = maxDistance * (i / samples);
+		var candidate = localRefinementCandidateAt(original, unit, distance);
+		if(localRefinementCandidateValid(part, candidate, sheetNfp, forbiddenNfps)){
+			lastValid = distance;
+		}
+		else{
+			firstInvalid = distance;
+			break;
+		}
+	}
+
+	if(firstInvalid === null){
+		return lastValid;
+	}
+
+	var low = lastValid;
+	var high = firstInvalid;
+	for(i=0; i<18; i++){
+		var mid = (low + high) / 2;
+		candidate = localRefinementCandidateAt(original, unit, mid);
+		if(localRefinementCandidateValid(part, candidate, sheetNfp, forbiddenNfps)){
+			low = mid;
+		}
+		else{
+			high = mid;
+		}
+	}
+	return low;
+}
+
+function localRefinementScore(sheet, placed, placements, config, sheetboundsForScoring){
+	var allpoints = [];
+	for(var i=0; i<placed.length; i++){
+		for(var j=0; j<placed[i].length; j++){
+			allpoints.push({
+				x: placed[i][j].x + placements[i].x,
+				y: placed[i][j].y + placements[i].y
+			});
+		}
+	}
+	if(allpoints.length === 0){
+		return null;
+	}
+
+	var bounds = GeometryUtil.getPolygonBounds(allpoints);
+	var score;
+	if(config.placementType == 'gravity'){
+		score = bounds.width * 2 + bounds.height;
+	}
+	else if(config.placementType == 'box'){
+		score = bounds.width * bounds.height;
+	}
+	else{
+		var hull = getHull(allpoints);
+		score = Math.abs(GeometryUtil.polygonArea(hull));
+		bounds = GeometryUtil.getPolygonBounds(allpoints);
+	}
+
+	return {
+		score: improvedPlacementScore(score, bounds, sheetboundsForScoring, config),
+		bounds: bounds
+	};
+}
+
+function localRefinementImproves(candidateScore, currentScore){
+	if(currentScore === null || typeof currentScore === 'undefined'){
+		return true;
+	}
+	var tolerance = Math.max(1e-7, Math.abs(currentScore) * 0.0001);
+	return candidateScore < currentScore - tolerance;
+}
+
+function createLocalRefinementStats(enabled){
+	return {
+		enabled: !!enabled,
+		ran: false,
+		sheetsChecked: 0,
+		movesTested: 0,
+		movesAccepted: 0,
+		scoreBefore: null,
+		scoreAfter: null
+	};
+}
+
+function mergeLocalRefinementStats(total, stats){
+	if(!total || !stats){
+		return total;
+	}
+	total.enabled = total.enabled || stats.enabled;
+	total.ran = total.ran || stats.ran;
+	total.sheetsChecked += stats.sheetsChecked || 0;
+	total.movesTested += stats.movesTested || 0;
+	total.movesAccepted += stats.movesAccepted || 0;
+	return total;
+}
+
+function recomputeSheetMergedData(placed, placements, config){
+	for(var i=0; i<placements.length; i++){
+		delete placements[i].mergedLength;
+		delete placements[i].mergedSegments;
+	}
+	if(!config.mergeLines){
+		return 0;
+	}
+
+	var total = 0;
+	var minlength = 0.5 * config.scale;
+	var tolerance = 0.1 * config.curveTolerance;
+	for(i=1; i<placed.length; i++){
+		var shiftedpart = shiftPolygon(placed[i], placements[i]);
+		var shiftedplaced = [];
+		for(var j=0; j<i; j++){
+			shiftedplaced.push(shiftPolygon(placed[j], placements[j]));
+		}
+		var merged = mergedLength(shiftedplaced, shiftedpart, minlength, tolerance);
+		if(merged && merged.totalLength){
+			placements[i].mergedLength = merged.totalLength;
+			placements[i].mergedSegments = merged.segments;
+			total += merged.totalLength;
+		}
+	}
+	return total;
+}
+
+function refineLocalPlacements(sheet, placed, placements, config, sheetboundsForScoring){
+	var stats = createLocalRefinementStats(config && config.localRefinement === true);
+	if(!config || config.localRefinement !== true || !placed || placed.length < 2){
+		return { moved: false, scoreState: null, stats: stats };
+	}
+
+	var sheetBounds = GeometryUtil.getPolygonBounds(sheet);
+	var maxSlideDistance = Math.sqrt(sheetBounds.width * sheetBounds.width + sheetBounds.height * sheetBounds.height);
+	var directions = [
+		{x: -1, y: 0},
+		{x: 0, y: -1},
+		{x: -1, y: -1},
+		{x: 1, y: 0},
+		{x: 0, y: 1},
+		{x: 1, y: -1},
+		{x: -1, y: 1},
+		{x: 1, y: 1}
+	];
+	var maxPasses = Math.max(1, Math.min(parseInt(config.localRefinementPasses, 10) || 5, 5));
+	var scoreState = localRefinementScore(sheet, placed, placements, config, sheetboundsForScoring);
+	var currentScore = scoreState ? scoreState.score : null;
+	stats.ran = true;
+	stats.sheetsChecked = 1;
+	stats.scoreBefore = currentScore;
+	var moved = false;
+
+	for(var pass=0; pass<maxPasses; pass++){
+		var passMoved = false;
+		for(var i=placed.length-1; i>=0; i--){
+			var part = placed[i];
+			if(!part || part.length === 0){
+				continue;
+			}
+
+			var sheetNfp = getInnerNfp(sheet, part, config);
+			if(!sheetNfp || sheetNfp.length === 0){
+				continue;
+			}
+
+			var forbiddenNfps = localRefinementForbiddenNfps(part, i, placed, placements, config);
+			if(!forbiddenNfps){
+				continue;
+			}
+
+			var original = placements[i];
+			var best = original;
+			var bestScore = currentScore;
+
+			for(var d=0; d<directions.length; d++){
+				var slideDistance = localRefinementMaxLegalSlide(part, original, directions[d], maxSlideDistance, sheetNfp, forbiddenNfps);
+				if(!isFinite(slideDistance) || slideDistance <= Math.max(1e-7, config.curveTolerance * 0.01)){
+					continue;
+				}
+				var unit = localRefinementNormalizeDirection(directions[d]);
+				if(!unit){
+					continue;
+				}
+				var candidate = localRefinementCandidateAt(original, unit, slideDistance);
+				stats.movesTested++;
+
+				placements[i] = candidate;
+				var candidateScoreState = localRefinementScore(sheet, placed, placements, config, sheetboundsForScoring);
+				placements[i] = original;
+
+				if(candidateScoreState && localRefinementImproves(candidateScoreState.score, bestScore)){
+					best = candidate;
+					bestScore = candidateScoreState.score;
+				}
+			}
+
+			if(best !== original){
+				placements[i] = best;
+				currentScore = bestScore;
+				stats.movesAccepted++;
+				passMoved = true;
+				moved = true;
+			}
+			else{
+				placements[i] = original;
+			}
+		}
+
+		if(!passMoved){
+			break;
+		}
+	}
+
+	scoreState = localRefinementScore(sheet, placed, placements, config, sheetboundsForScoring);
+	stats.scoreAfter = scoreState ? scoreState.score : currentScore;
+
+	return {
+		moved: moved,
+		scoreState: scoreState,
+		stats: stats
+	};
+}
+
 function rotatePolygon(polygon, degrees){
 	var rotated = [];
 	var angle = degrees * Math.PI / 180;
@@ -1595,6 +1954,8 @@ function placeParts(sheets, parts, config, nestindex){
 	
 	// total length of merged lines
 	var totalMerged = 0;
+	var localRefinement = createLocalRefinementStats(config && config.localRefinement === true);
+	var runLocalRefinement = config && config.localRefinement === true && config.localRefinementPostProcess === true;
 		
 	// rotate paths by given rotation
 	var rotated = [];
@@ -1620,6 +1981,7 @@ function placeParts(sheets, parts, config, nestindex){
 		
 		var placed = [];
 		var placements = [];
+		var sheetMergedBase = totalMerged;
 		
 		// open a new sheet
 		var sheet = sheets.shift();
@@ -1924,6 +2286,17 @@ function placeParts(sheets, parts, config, nestindex){
 			console.timeEnd('placement');
 		}
 		
+		if(runLocalRefinement){
+			var refinement = refineLocalPlacements(sheet, placed, placements, config, sheetboundsForScoring);
+			mergeLocalRefinementStats(localRefinement, refinement ? refinement.stats : null);
+			if(refinement && refinement.moved){
+				totalMerged = sheetMergedBase + recomputeSheetMergedData(placed, placements, config);
+				if(refinement.scoreState){
+					minarea = refinement.scoreState.score;
+				}
+			}
+		}
+
 		//if(minwidth){
 		fitness += (minwidth/sheetarea) + minarea;
 		//}
@@ -1955,7 +2328,7 @@ function placeParts(sheets, parts, config, nestindex){
 	// send finish progerss signal
 	ipcRenderer.send('background-progress', {index: nestindex, progress: -1});
 	
-	return {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged };
+	return {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged, localRefinement: localRefinement };
 }
 
 // clipperjs uses alerts for warnings

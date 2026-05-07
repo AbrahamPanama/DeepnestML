@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-05-03 by Codex): _dirty: Codex rebuilt the ignored native addon for verification; `.claude/` is untracked and unrelated_.
+State (verified 2026-05-05 by Codex): _dirty: ignored native addon was rebuilt previously for verification; `.claude/` is untracked and unrelated_.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -111,7 +111,7 @@ Park future tasks both agents should be aware of. Keep entries short. Move items
 | Group Step & Repeat fields | `main/index.html`, `main/style.css` | UI_AUDIT P1.1 — wrap fields in `.steprepeat-group` and toggle via single class instead of inline `display:none` per field |
 | Accessibility pass (landmarks, labels, dialog roles) | `main/index.html` | UI_AUDIT P2.1 — entire file has zero `aria-` / `role=` attributes |
 | Extend smoke battery to bitmap/DXF cases | `ml/app-smoke-main.js`, `ml/smoke/scenarios/` | Follow-up after first scenario battery: add PNG contour import fixture and DXF export/import coverage |
-| Local compaction pass | `main/background.js` | Next nesting-quality step: after initial placement, try small deterministic nudges/slide-left-down improvements before scoring a completed nest |
+| Local Refinement v2 rotations | `main/background.js` | After v1 translation-only testing, consider tiny legal angle probes like ±1/±2/±5 degrees with aggressive caching |
 
 ## Open Questions For User
 
@@ -124,6 +124,127 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-05-06 - Blank Local Refinement badge text fixed (Codex)
+
+- Fixed the Ractive helper chain that rendered the Local Refinement badge as an empty pill.
+- `getLocalRefinementStatus()` now reads `nests` directly instead of calling `this.getSelectedNest()` as if Ractive data functions were instance methods.
+- `getLocalRefinementLabel()` and `getLocalRefinementClass()` now retrieve/call `getLocalRefinementStatus` through `this.get(...)`.
+- The source app was restarted with `npm start` after the patch.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - inline renderer JS parse check passed.
+
+### 2026-05-06 - Local Refinement smoke observability added (Codex)
+
+- Added `localRefinement` and `localRefinementSummary` to app smoke reports in `completeSmokeSuccess(...)`.
+- Changed the smoke display callback to wait when the selected best nest has `localRefinement.pending === true`, so reports capture the completed post-process result instead of the temporary `refining` state.
+- Re-ran `svg-gravity-local-refinement-postprocess` after the change:
+  - `status: completed`,
+  - `usedSheetCount: 1`,
+  - `localRefinementSummary.enabled: true`,
+  - `localRefinementSummary.ran: true`,
+  - `movesTested: 6`,
+  - `movesAccepted: 0`.
+- This confirms the current smoke fixture is useful for wiring checks but not for proving compaction quality.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - inline renderer JS parse check passed.
+
+### 2026-05-06 - Local Refinement moved to best-nest post-process v2 (Codex)
+
+- Reworked Local Refinement so normal GA candidates are evaluated with `localRefinement` disabled in the worker payload.
+- When a new best nest appears and the user setting is enabled, `main/deepnest.js` submits a second `background-start` request for that same individual with `localRefinementPostProcess: true`.
+- Post-process responses are matched back to the pending nest with a refinement token, update the badge from `refining` to `checked` / `improved`, and do not mutate GA population fitness.
+- Background refinement now uses reverse placement order and slide-style maximum legal movement sampling instead of the old fixed step ladder.
+- `placeParts(...)` only runs `refineLocalPlacements(...)` when `config.localRefinementPostProcess === true`, keeping the GA hot path clean.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - inline renderer JS parse check passed.
+  - `bash ml/scripts/run_app_smoke_test.sh --scenario svg-gravity` passed.
+  - ad-hoc `svg-gravity-local-refinement-postprocess` smoke with `localRefinement: true` passed.
+  - `bash ml/scripts/run_boot_check.sh` passed.
+
+### 2026-05-06 - Local Refinement review follow-ups applied (Codex)
+
+- Addressed Claude's review concerns before checkpointing the feature:
+  - kept `minwidth` unchanged after Local Refinement so enabling the toggle does not switch the GA fitness term from the historical placement width to whole-sheet footprint width,
+  - stopped aggregating per-sheet `scoreBefore` / `scoreAfter` into meaningless cross-sheet totals,
+  - documented the boundary-contact behavior in the Local Refinement IFP check.
+- Scope stayed inside `main/background.js`; no geometry algorithm expansion or UI behavior change.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - inline renderer JS parse check passed.
+
+### 2026-05-06 - Local Refinement status badge made explicit (Codex)
+
+- Replaced the conditional fourth stats card with a persistent `#localrefinementstatus` pill in the nest header.
+- The badge now shows `off`, `enabled`, `not used`, `checked - 0 moves`, or `improved - N moves`, so the user can tell whether Local Refinement is disabled, armed, or actually affecting the selected nest.
+- Added visual states for off/enabled/checked/improved/muted in `main/style.css`.
+- The source app was restarted with `npm start` after the patch.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - inline renderer JS parse check passed.
+
+### 2026-05-05 - Local Refinement runtime indicator added (Codex)
+
+- Background placement results now include `localRefinement` metadata:
+  - `enabled`,
+  - `ran`,
+  - `sheetsChecked`,
+  - `movesTested`,
+  - `movesAccepted`,
+  - `scoreBefore`,
+  - `scoreAfter`.
+- The nest stats strip in `main/index.html` now shows a `local refinement` card only when the selected result has Local Refinement enabled.
+- Indicator states:
+  - `enabled` when the setting is on but no result metadata exists yet,
+  - `not used` when enabled but the pass could not run,
+  - `checked - 0 moves` when it ran but accepted no moves,
+  - `improved - N moves` when it accepted moves.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - inline renderer JS parse check passed.
+  - `bash ml/scripts/run_app_smoke_test.sh --scenario svg-gravity ...` completed with Local Refinement off.
+  - ad-hoc Local Refinement enabled smoke completed.
+  - `bash ml/scripts/run_boot_check.sh` passed.
+
+### 2026-05-05 - Local Refinement v1 landed behind toggle (Codex)
+
+- Added a default-off `localRefinement` setting in `main/index.html` and `main/deepnest.js`.
+- UI label: `Local refinement`; helper text describes it as an experimental translation-only jiggle pass after normal nesting.
+- Step & Repeat disables this setting in the UI and bypasses it in the engine because Step & Repeat uses its separate deterministic placement path.
+- Implemented `refineLocalPlacements(...)` in `main/background.js`:
+  - runs after a sheet has a legal placement from the existing solver,
+  - keeps order and rotations unchanged,
+  - tries bounded short translation moves in 8 directions for up to 2 passes,
+  - validates each candidate using current sheet IFP and pairwise NFPs,
+  - accepts only moves that improve the final footprint score,
+  - recomputes merged-line metadata if moved.
+- Default behavior is unchanged while `localRefinement` is false.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - `bash ml/scripts/run_app_smoke_test.sh --scenario svg-gravity ...` completed with Local Refinement off.
+  - Ad-hoc `svg-gravity-local-refinement` smoke completed with `localRefinement: true` and `mergeLines: false`.
+  - Ad-hoc `svg-gravity-local-refinement-merge` smoke completed with `localRefinement: true` and `mergeLines: true`.
+  - `bash ml/scripts/run_boot_check.sh` passed.
+
+### 2026-05-05 - Rolled back expanded GA seed population heuristics (Codex)
+
+- User reported significant regressions on most jobs from the expanded GA seed population change.
+- Stopped the running source app and reverted `main/deepnest.js` back to the previous seed behavior.
+- Removed the added `boxarea`, `fillratio`, `slenderness`, and large/small interleave seed logic.
+- Scope deliberately avoided `main/background.js`, NFP math, placement validity, exports, and UI settings.
+- Verification:
+  - `node --check main/deepnest.js` passed.
+  - `bash ml/scripts/run_app_smoke_test.sh --scenario svg-gravity ...` completed and exported non-empty SVG.
 
 ### 2026-05-03 - Minkowski batch convolution experiment verified on Mac (Codex)
 

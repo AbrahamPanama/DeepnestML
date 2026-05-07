@@ -411,6 +411,7 @@
 			  stepRepeatHorizontalAlignment: 'tight',
 			  stepRepeatVerticalAlignment: 'tight',
 			  improvedPlacementScoring: false,
+			  localRefinement: false,
 			  processHoles: true, // when true, NFP generation subtracts A's holes; when false, holes on A are ignored (faster for hole-free jobs)
 			  mergeLines: true, // whether to merge lines
 			  timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
@@ -456,7 +457,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'processHoles'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'processHoles'){
 							val = i.checked;
 						}
 					
@@ -561,7 +562,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'processHoles'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'processHoles'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -2715,6 +2716,7 @@
 							outputBytes = fs.existsSync(outputPath) ? fs.statSync(outputPath).size : 0;
 						}
 						catch (statError) {}
+						var localRefinement = selectedNest && selectedNest.localRefinement ? selectedNest.localRefinement : null;
 						var details = {
 							scenarioName: scenarioName,
 							outputFormat: outputFormat,
@@ -2724,6 +2726,14 @@
 							nestCount: DeepNest.nests.length,
 							usedSheetCount: selectedNest && selectedNest.placements ? selectedNest.placements.length : 0,
 							fitness: selectedNest ? selectedNest.fitness : null,
+							localRefinement: localRefinement,
+							localRefinementSummary: localRefinement ? {
+								enabled: !!localRefinement.enabled,
+								pending: !!localRefinement.pending,
+								ran: !!localRefinement.ran,
+								movesTested: Number(localRefinement.movesTested) || 0,
+								movesAccepted: Number(localRefinement.movesAccepted) || 0
+							} : null,
 							runtimePlacementType: window.DeepNestRuntimeConfig && window.DeepNestRuntimeConfig.placementType ? window.DeepNestRuntimeConfig.placementType : null,
 							mlMode: smokeMlMode || config.getSync('mlMode') || 'off',
 							mlRecommendation: window.DeepNestLastMLRecommendation || null,
@@ -2812,8 +2822,11 @@
 								if(completed || exporting || DeepNest.nests.length === 0){
 									return;
 								}
-								exporting = true;
 								var selectedNest = DeepNest.nests[0];
+								if(selectedNest && selectedNest.localRefinement && selectedNest.localRefinement.pending){
+									return;
+								}
+								exporting = true;
 								var exportedSvg = exportNest(selectedNest);
 								writeSmokeOutput(selectedNest, exportedSvg, timeoutHandle);
 							};
@@ -3372,6 +3385,64 @@
 					getColorBySource: function(id){
 						return 'hsl('+(360*(id/DeepNest.parts.length))+', 100%, 80%)';
 					},
+					getSelectedNest: function(){
+						var ne = this.get('nests') || [];
+						var selected = ne.filter(function(n){
+							return n.selected;
+						});
+						return selected.length > 0 ? selected.pop() : null;
+					},
+					getLocalRefinementStatus: function(){
+						var ne = this.get('nests') || [];
+						var selectedNests = ne.filter(function(n){
+							return n.selected;
+						});
+						var selected = selectedNests.length > 0 ? selectedNests.pop() : null;
+						var meta = selected && selected.localRefinement ? selected.localRefinement : null;
+						var enabled = meta ? !!meta.enabled : config.getSync('localRefinement') === true;
+						if(!enabled){
+							return 'off';
+						}
+						if(!meta){
+							return 'enabled';
+						}
+						if(meta.pending){
+							return 'refining';
+						}
+						if(!meta.ran){
+							return 'not used';
+						}
+						var moves = Number(meta.movesAccepted) || 0;
+						if(moves > 0){
+							return 'improved - ' + moves + ' ' + (moves === 1 ? 'move' : 'moves');
+						}
+						return 'checked - 0 moves';
+					},
+					getLocalRefinementLabel: function(){
+						var statusFunction = this.get('getLocalRefinementStatus');
+						var status = typeof statusFunction === 'function' ? statusFunction.call(this) : 'off';
+						return 'Local refinement: ' + status;
+					},
+					getLocalRefinementClass: function(){
+						var statusFunction = this.get('getLocalRefinementStatus');
+						var status = typeof statusFunction === 'function' ? statusFunction.call(this) : 'off';
+						if(status.indexOf('improved') === 0){
+							return 'is-improved';
+						}
+						if(status.indexOf('checked') === 0){
+							return 'is-checked';
+						}
+						if(status === 'enabled'){
+							return 'is-enabled';
+						}
+						if(status === 'refining'){
+							return 'is-enabled';
+						}
+						if(status === 'not used'){
+							return 'is-muted';
+						}
+						return 'is-off';
+					},
 					getPartsPlaced: function(){
 						var ne = this.get('nests');
 						var selected = ne.filter(function(n){
@@ -3842,7 +3913,10 @@
 					<div class="group"><h1>{{ getSelected().length > 0 ? getSelected()[0].placements.length : '-' }}</h1><span class="label">{{ getSelected().length > 0 ? (getSelected()[0].placements.length > 1 ? 'sheets used' : 'sheet used') : '' }}</span></div>
 					<div class="group"><h1>{{ getPartsPlaced() }}</h1><span class="label">parts placed</span></div>
 					<div class="group"><h1>{{ getTimeSaved() }}</h1><span class="label">laser time saved</span></div>
-					<div class="group"><h1>best nests so far</h1></div>
+					<div id="localrefinementstatus" class="{{ getLocalRefinementClass() }}">
+						<strong>{{ getLocalRefinementLabel() }}</strong>
+					</div>
+					<div class="group bestnests-title"><h1>best nests so far</h1></div>
 					<div id="nestlist">
 						{{#each nests:i}}
 						<span class="nest {{ selected ? "active" : "" }}" on-click="selectnest:{{this}}">
@@ -3950,6 +4024,11 @@
 							<dt class="steprepeat-disabled">Experimental scoring</dt>
 							<dd class="steprepeat-disabled">
 								<input type="checkbox" data-config="improvedPlacementScoring" /> <span class="radiolabel">Prefer cleaner remnants</span>
+							</dd>
+
+							<dt class="steprepeat-disabled">Local refinement</dt>
+							<dd class="steprepeat-disabled">
+								<input type="checkbox" data-config="localRefinement" /> <span class="radiolabel">Jiggle placed parts after nesting</span>
 							</dd>
 
 							<dt class="steprepeat-disabled">Process part holes</dt>
@@ -4384,6 +4463,11 @@
 				<div class="config_explain" id="explain_improvedPlacementScoring">
 					<h1>Experimental scoring</h1>
 					When enabled, Deepnest adds a small remnant-quality score while choosing between otherwise valid placements. It prefers compact footprints, avoids tiny unusable sliver gaps near sheet edges, and tries to leave larger continuous leftover areas. This is experimental and can be toggled off to compare with the classic scoring.
+				</div>
+
+				<div class="config_explain" id="explain_localRefinement">
+					<h1>Local refinement</h1>
+					After a normal nest is generated, Deepnest runs a small translation-only refinement pass on each sheet. It tries short, legal nudges around already placed parts and keeps a move only when the final footprint score improves. This is experimental and disabled by default.
 				</div>
 
 				<div class="config_explain" id="explain_processHoles">

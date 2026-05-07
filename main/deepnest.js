@@ -34,6 +34,7 @@
 			stepRepeatHorizontalAlignment: 'tight',
 			stepRepeatVerticalAlignment: 'tight',
 			improvedPlacementScoring: false,
+			localRefinement: false,
 			mergeLines: true,
 			timeRatio: 0.5,
 			scale: 72,
@@ -57,11 +58,112 @@
 		var best = null;
 		var workerTimer = null;
 		var progress = 0;
+		var activeWorkerPayloads = {};
+		var refinementCounter = 0;
 		
 		var progressCallback = null;
 		var displayCallback = null;
 		// a running list of placements
 		this.nests = [];
+
+		function copyConfigForWorker(source, enableLocalRefinement){
+			var workerConfig = {};
+			source = source || {};
+			for(var key in source){
+				if(Object.prototype.hasOwnProperty.call(source, key)){
+					workerConfig[key] = source[key];
+				}
+			}
+			workerConfig.localRefinement = enableLocalRefinement === true;
+			workerConfig.localRefinementPostProcess = enableLocalRefinement === true;
+			return workerConfig;
+		}
+
+		function createPendingLocalRefinementStats(){
+			return {
+				enabled: true,
+				pending: true,
+				ran: false,
+				sheetsChecked: 0,
+				movesTested: 0,
+				movesAccepted: 0,
+				scoreBefore: null,
+				scoreAfter: null
+			};
+		}
+
+		function requestLocalRefinementForBest(basePayload, userConfig){
+			if(!basePayload || basePayload.postProcessRefinement || !userConfig || userConfig.localRefinement !== true){
+				return;
+			}
+			if(GA && GA.deterministic){
+				return;
+			}
+			var originalPayload = activeWorkerPayloads[basePayload.index];
+			if(!originalPayload){
+				return;
+			}
+			var token = 'lr' + (++refinementCounter);
+			basePayload.localRefinement = createPendingLocalRefinementStats();
+			basePayload.localRefinement.token = token;
+
+			var refinePayload = {};
+			for(var key in originalPayload){
+				if(Object.prototype.hasOwnProperty.call(originalPayload, key)){
+					refinePayload[key] = originalPayload[key];
+				}
+			}
+			refinePayload.config = copyConfigForWorker(userConfig, true);
+			refinePayload.postProcessRefinement = true;
+			refinePayload.refinementToken = token;
+			refinePayload.refinementBaseFitness = basePayload.fitness;
+			ipcRenderer.send('background-start', refinePayload);
+		}
+
+		function handleLocalRefinementResponse(payload){
+			if(!payload || !payload.refinementToken){
+				return;
+			}
+			var index = -1;
+			for(var i=0; i<self.nests.length; i++){
+				var meta = self.nests[i].localRefinement;
+				if(meta && meta.token === payload.refinementToken){
+					index = i;
+					break;
+				}
+			}
+			if(index < 0){
+				return;
+			}
+			var existing = self.nests[index];
+			if(payload.error){
+				existing.localRefinement.pending = false;
+				existing.localRefinement.ran = false;
+				existing.localRefinement.error = payload.error;
+				if(displayCallback){
+					displayCallback();
+				}
+				return;
+			}
+			if(payload.localRefinement){
+				payload.localRefinement.enabled = true;
+				payload.localRefinement.pending = false;
+				payload.localRefinement.token = payload.refinementToken;
+			}
+			payload.selected = existing.selected;
+			self.nests.splice(index, 1);
+			var insertAt = 0;
+			while(insertAt < self.nests.length && self.nests[insertAt].fitness <= payload.fitness){
+				insertAt++;
+			}
+			self.nests.splice(insertAt, 0, payload);
+			if(self.nests.length > 10){
+				self.nests.pop();
+			}
+			if(displayCallback){
+				displayCallback();
+			}
+		}
 
 		function parseInlineStyle(styleText){
 			var map = {};
@@ -642,6 +744,10 @@
 			if(c.improvedPlacementScoring === true || c.improvedPlacementScoring === false){
 				config.improvedPlacementScoring = !!c.improvedPlacementScoring;
 			}
+
+			if(c.localRefinement === true || c.localRefinement === false){
+				config.localRefinement = !!c.localRefinement;
+			}
 			
 			if(c.mergeLines === true || c.mergeLines === false){
 				config.mergeLines = !!c.mergeLines;
@@ -1080,6 +1186,7 @@
 				}
 				GA = null;
 				this.working = false;
+				activeWorkerPayloads = {};
 				while(this.nests.length > 0){
 					this.nests.pop();
 				}
@@ -1167,6 +1274,10 @@
 			if(!this.working){
 				return;
 			}
+			if(payload && payload.postProcessRefinement){
+				handleLocalRefinementResponse(payload);
+				return;
+			}
 			if(payload && payload.error){
 				if(GA.population && GA.population[payload.index]){
 					GA.population[payload.index].processing = false;
@@ -1185,8 +1296,13 @@
 			GA.population[payload.index].fitness = payload.fitness;
 
 			// render placement
-			if(this.nests.length == 0 || this.nests[0].fitness > payload.fitness ){
+			var bestComparisonFitness = null;
+			if(this.nests.length > 0){
+				bestComparisonFitness = (typeof this.nests[0].refinementBaseFitness === 'number') ? this.nests[0].refinementBaseFitness : this.nests[0].fitness;
+			}
+			if(this.nests.length == 0 || bestComparisonFitness > payload.fitness ){
 				this.nests.unshift(payload);
+				requestLocalRefinementForBest(payload, config);
 
 				if(this.nests.length > 10){
 					this.nests.pop();
@@ -1338,8 +1454,21 @@
 						sources[j] = source;
 						children[j] = child;
 					}
-					
-					ipcRenderer.send('background-start', {index: i, sheets: sheets, sheetids: sheetids, sheetsources: sheetsources, sheetchildren: sheetchildren, individual: GA.population[i], config: config, ids: ids, sources: sources, children: children});
+
+					var workerPayload = {
+						index: i,
+						sheets: sheets,
+						sheetids: sheetids,
+						sheetsources: sheetsources,
+						sheetchildren: sheetchildren,
+						individual: GA.population[i],
+						config: copyConfigForWorker(config, false),
+						ids: ids,
+						sources: sources,
+						children: children
+					};
+					activeWorkerPayloads[i] = workerPayload;
+					ipcRenderer.send('background-start', workerPayload);
 					running++;					
 				}
 			}
@@ -1524,6 +1653,7 @@
 		
 		this.reset = function(){
 			GA = null;
+			activeWorkerPayloads = {};
 			while(this.nests.length > 0){
 				this.nests.pop();
 			}

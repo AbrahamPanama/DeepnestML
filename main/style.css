@@ -2288,6 +2288,50 @@ text-transform: uppercase;
 letter-spacing: 0.05em;
 }
 
+#localrefinementstatus{
+align-self: center;
+display: inline-flex;
+align-items: center;
+gap: 0.55em;
+min-height: 2.4em;
+padding: 0.55em 0.85em;
+border: 1px solid rgba(214, 222, 229, 0.92);
+border-radius: 999px;
+background: rgba(255, 255, 255, 0.9);
+box-shadow: 0 0.35em 1.1em rgba(42, 59, 76, 0.08);
+color: #647086;
+font-size: 0.88em;
+white-space: nowrap;
+}
+
+#localrefinementstatus strong{
+font-weight: 700;
+color: #39424D;
+text-transform: uppercase;
+letter-spacing: 0.06em;
+font-size: 0.78em;
+}
+
+#localrefinementstatus.is-off{
+opacity: 0.72;
+}
+
+#localrefinementstatus.is-enabled,
+#localrefinementstatus.is-checked{
+border-color: rgba(30, 188, 224, 0.42);
+background: rgba(231, 249, 253, 0.95);
+}
+
+#localrefinementstatus.is-improved{
+border-color: rgba(57, 181, 119, 0.5);
+background: rgba(229, 249, 238, 0.95);
+}
+
+#localrefinementstatus.is-muted{
+border-color: rgba(196, 203, 213, 0.9);
+background: rgba(247, 249, 251, 0.95);
+}
+
 #nestinfo .group:nth-child(4){
 width: 100%;
 min-width: 0;
@@ -2298,6 +2342,22 @@ box-shadow: none;
 }
 
 #nestinfo .group:nth-child(4) h1{
+font-size: 0.82em;
+color: #7B879E;
+letter-spacing: 0.08em;
+text-transform: uppercase;
+}
+
+#nestinfo .group.bestnests-title{
+width: 100%;
+min-width: 0;
+padding: 0;
+background: transparent;
+border: none;
+box-shadow: none;
+}
+
+#nestinfo .group.bestnests-title h1{
 font-size: 0.82em;
 color: #7B879E;
 letter-spacing: 0.08em;
