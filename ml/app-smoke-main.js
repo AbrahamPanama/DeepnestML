@@ -476,6 +476,8 @@ app.on('ready', function () {
 	var outputPath = outputValue ? resolveInputPath(outputValue, scenarioBaseDir) : defaultScenarioOutputPath(scenarioName, outputFormat);
 	var reportPath = reportValue ? resolveInputPath(reportValue, scenarioBaseDir) : defaultScenarioReportPath(scenarioName);
 	var sourceFormat = normalizeFormat(cliArgs.sourceFormat || scenario.sourceFormat, inputPath ? path.extname(inputPath).replace(/^\./, '') : 'svg');
+	var benchmarkMetaValue = cliArgs.benchmarkMetaPath || scenario.benchmarkMetaPath || scenario.benchmarkMeta || '';
+	var benchmarkMetaPath = benchmarkMetaValue ? resolveInputPath(benchmarkMetaValue, scenarioBaseDir) : '';
 
 	if (!inputPath || !outputPath) {
 		console.error('app smoke test requires --input and --output, or --scenario with an input');
@@ -494,6 +496,9 @@ app.on('ready', function () {
 		conversionOptions: scenario.conversionOptions || null,
 		expect: scenario.expect || {},
 		timeoutMs: cliArgs.timeoutMs || cliArgs.timeout || scenario.timeoutMs || '60000',
+		timeBudgetSec: cliArgs.timeBudgetSec || scenario.timeBudgetSec || '',
+		captureUtilization: cliArgs.captureUtilization || scenario.captureUtilization || false,
+		benchmarkMetaPath: benchmarkMetaPath,
 		mlMode: cliArgs.mlMode || scenario.mlMode || '',
 		mlModelPath: cliArgs.mlModelPath || scenario.mlModelPath || ''
 	};

@@ -1,0 +1,44 @@
+{
+  "label": "gardeyn0-240-probe",
+  "createdAt": "2026-06-11T02:21:24.028Z",
+  "gitCommit": "ad97fdad0dad3b43360610bdb3ac47ee38709568",
+  "gitDirty": true,
+  "engineFlags": {
+    "protocol": "sota-wp0",
+    "runsPerInstance": 1,
+    "timeBudgetSec": 240,
+    "baseConfig": {
+      "placementType": "gravity",
+      "spacing": 0,
+      "mergeLines": false,
+      "processHoles": true,
+      "populationSize": 10,
+      "mutationRate": 10,
+      "rotations": "<per-instance rotations>"
+    }
+  },
+  "artifactRoot": "/Users/abrahamsaenz/Desktop/Deepnest++/ml/artifacts/nest-benchmark/20260611T022124Z-gardeyn0-240-probe",
+  "instances": [
+    {
+      "name": "gardeyn0",
+      "file": "ml/benchmark/esicup/instances/gardeyn0.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.7624185702125277,
+          "usedLength": 57371.7239571,
+          "timeToBestSec": 88.306,
+          "fitness": 1749785421.1260185,
+          "placementsDigest": "b1ba55d3b9565e4e07b1db25ae9036c0f5b0edf8",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022124Z-gardeyn0-240-probe/gardeyn0/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022124Z-gardeyn0-240-probe/gardeyn0/run-01/export.svg"
+        }
+      ],
+      "median": 0.7624185702125277
+    }
+  ],
+  "aggregate": {
+    "meanMedianUtilization": 0.7624185702125277
+  }
+}

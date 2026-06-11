@@ -1,0 +1,142 @@
+{
+  "inputPath": "/Users/abrahamsaenz/Desktop/Deepnest++/testpart.svg",
+  "partCount": 5,
+  "sheet": {
+    "width": 4969.545,
+    "height": 1733.38
+  },
+  "metrics": {
+    "valid": true,
+    "acceptedMoves": 45,
+    "scoreBefore": 6957.0979,
+    "scoreAfter": 6835.373106381021,
+    "improvement": 121.72479361897877,
+    "bounds": {
+      "x": 1.3389305801642877,
+      "y": 0.35274526756319347,
+      "width": 3018.995310462165,
+      "height": 787.7814786142301,
+      "maxx": 3020.3342410423293,
+      "maxy": 788.1342238817932
+    },
+    "overlapPairs": 0,
+    "outsideParts": 0
+  },
+  "bestAttempt": 1,
+  "bestSeed": 6209,
+  "attempts": [
+    {
+      "attempt": 0,
+      "seed": 5200,
+      "valid": true,
+      "acceptedMoves": 48,
+      "scoreBefore": 6957.0979,
+      "scoreAfter": 6877.2744293265705,
+      "improvement": 79.82347067342926,
+      "bounds": {
+        "x": -2.2737367544323206e-13,
+        "y": 0,
+        "width": 3039.497224017965,
+        "height": 788.5999999999999,
+        "maxx": 3039.4972240179645,
+        "maxy": 788.5999999999999
+      },
+      "overlapPairs": 0,
+      "outsideParts": 0
+    },
+    {
+      "attempt": 1,
+      "seed": 6209,
+      "valid": true,
+      "acceptedMoves": 45,
+      "scoreBefore": 6957.0979,
+      "scoreAfter": 6835.373106381021,
+      "improvement": 121.72479361897877,
+      "bounds": {
+        "x": 1.3389305801642877,
+        "y": 0.35274526756319347,
+        "width": 3018.995310462165,
+        "height": 787.7814786142301,
+        "maxx": 3020.3342410423293,
+        "maxy": 788.1342238817932
+      },
+      "overlapPairs": 0,
+      "outsideParts": 0
+    },
+    {
+      "attempt": 2,
+      "seed": 7218,
+      "valid": true,
+      "acceptedMoves": 42,
+      "scoreBefore": 6957.0979,
+      "scoreAfter": 6842.328978897546,
+      "improvement": 114.76892110245353,
+      "bounds": {
+        "x": 2.0800759168548097,
+        "y": 0,
+        "width": 3022.3906600131236,
+        "height": 787.9049417488775,
+        "maxx": 3024.470735929978,
+        "maxy": 787.9049417488775
+      },
+      "overlapPairs": 0,
+      "outsideParts": 0
+    },
+    {
+      "attempt": 3,
+      "seed": 8227,
+      "valid": true,
+      "acceptedMoves": 75,
+      "scoreBefore": 6957.0979,
+      "scoreAfter": 6875.413589272102,
+      "improvement": 81.68431072789735,
+      "bounds": {
+        "x": 1.8287730732430418,
+        "y": 0.10160272399525638,
+        "width": 3039.1460932825717,
+        "height": 787.5090851525283,
+        "maxx": 3040.974866355815,
+        "maxy": 787.6106878765236
+      },
+      "overlapPairs": 0,
+      "outsideParts": 0
+    }
+  ],
+  "placements": [
+    {
+      "id": "part-0",
+      "sourceIndex": 0,
+      "x": 1509.7365518135623,
+      "y": 379.2226796889871,
+      "rotation": -4.675694543402642
+    },
+    {
+      "id": "part-1",
+      "sourceIndex": 1,
+      "x": 2748.3509392740784,
+      "y": 402.7904389820995,
+      "rotation": 6
+    },
+    {
+      "id": "part-2",
+      "sourceIndex": 2,
+      "x": 332.62850294549173,
+      "y": 393.90504396785894,
+      "rotation": 1.8559435294009745
+    },
+    {
+      "id": "part-3",
+      "sourceIndex": 3,
+      "x": 2147.1405903629898,
+      "y": 373.93379055035683,
+      "rotation": -6
+    },
+    {
+      "id": "part-4",
+      "sourceIndex": 4,
+      "x": 938.9193396529823,
+      "y": 374.3789652231833,
+      "rotation": 0
+    }
+  ]
+}

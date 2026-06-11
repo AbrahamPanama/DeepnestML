@@ -1,0 +1,85 @@
+{
+  "inputPath": "/Users/abrahamsaenz/Desktop/Deepnest++/testpart.svg",
+  "partCount": 5,
+  "sheet": {
+    "width": 4969.545,
+    "height": 1733.38
+  },
+  "metrics": {
+    "valid": true,
+    "acceptedMoves": 111,
+    "scoreBefore": 6957.0979,
+    "scoreAfter": 6812.065973831809,
+    "improvement": 145.0319261681907,
+    "bounds": {
+      "x": 5.2610251759949165,
+      "y": 0.6819124167955124,
+      "width": 3007.530402896023,
+      "height": 787.4078510925383,
+      "maxx": 3012.791428072018,
+      "maxy": 788.0897635093338
+    },
+    "overlapPairs": 0,
+    "outsideParts": 0
+  },
+  "bestAttempt": 0,
+  "bestSeed": 42,
+  "attempts": [
+    {
+      "attempt": 0,
+      "seed": 42,
+      "valid": true,
+      "acceptedMoves": 111,
+      "scoreBefore": 6957.0979,
+      "scoreAfter": 6812.065973831809,
+      "improvement": 145.0319261681907,
+      "bounds": {
+        "x": 5.2610251759949165,
+        "y": 0.6819124167955124,
+        "width": 3007.530402896023,
+        "height": 787.4078510925383,
+        "maxx": 3012.791428072018,
+        "maxy": 788.0897635093338
+      },
+      "overlapPairs": 0,
+      "outsideParts": 0
+    }
+  ],
+  "placements": [
+    {
+      "id": "part-0",
+      "sourceIndex": 0,
+      "x": 1517.7279915270503,
+      "y": 385.04171028388515,
+      "rotation": -3.5291864285245538
+    },
+    {
+      "id": "part-1",
+      "sourceIndex": 1,
+      "x": 2735.885070897937,
+      "y": 395.4364013161184,
+      "rotation": 4.238059097900987
+    },
+    {
+      "id": "part-2",
+      "sourceIndex": 2,
+      "x": 336.74699737325125,
+      "y": 393.94810545817626,
+      "rotation": 2.380310912616551
+    },
+    {
+      "id": "part-3",
+      "sourceIndex": 3,
+      "x": 2134.838622328452,
+      "y": 373.752050029764,
+      "rotation": -8
+    },
+    {
+      "id": "part-4",
+      "sourceIndex": 4,
+      "x": 943.547553297397,
+      "y": 380.39244471251595,
+      "rotation": 1.1038674423471093
+    }
+  ]
+}

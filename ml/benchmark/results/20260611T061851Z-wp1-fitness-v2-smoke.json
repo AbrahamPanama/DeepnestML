@@ -1,0 +1,72 @@
+{
+  "label": "wp1-fitness-v2-smoke",
+  "createdAt": "2026-06-11T06:18:51.678Z",
+  "gitCommit": "ad97fdad0dad3b43360610bdb3ac47ee38709568",
+  "gitDirty": true,
+  "engineFlags": {
+    "protocol": "sota-wp0",
+    "runsPerInstance": 1,
+    "timeBudgetSec": 10,
+    "fitnessVersion": 2,
+    "baseConfig": {
+      "placementType": "gravity",
+      "spacing": 0,
+      "mergeLines": false,
+      "processHoles": true,
+      "populationSize": 10,
+      "mutationRate": 10,
+      "rotations": "<per-instance rotations>",
+      "fitnessVersion": 2
+    }
+  },
+  "artifactRoot": "/Users/abrahamsaenz/Desktop/Deepnest++/ml/artifacts/nest-benchmark/20260611T061851Z-wp1-fitness-v2-smoke",
+  "instances": [
+    {
+      "name": "shapes0",
+      "file": "ml/benchmark/esicup/instances/shapes0.json",
+      "rotations": 1,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.16120748980179334,
+          "usedLength": 76.2915553,
+          "timeToBestSec": 6.45,
+          "fitness": 63567023.967836395,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 40.00400000000003,
+                  "width": 77.0115553,
+                  "x": -1.3322676295501878e-15,
+                  "y": -1.4210854715202004e-14
+                },
+                "metric": 0.9721379530342805,
+                "placementCount": 15,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40.004,
+                  "width": 79.792021,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 63567020.99569844,
+            "version": 2
+          },
+          "placementsDigest": "f158d49989637acbeb9cb75a96d313c4456ccf46",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061851Z-wp1-fitness-v2-smoke/shapes0/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061851Z-wp1-fitness-v2-smoke/shapes0/run-01/export.svg"
+        }
+      ],
+      "median": 0.16120748980179334
+    }
+  ],
+  "aggregate": {
+    "meanMedianUtilization": 0.16120748980179334
+  }
+}

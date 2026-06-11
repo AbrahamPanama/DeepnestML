@@ -371,11 +371,15 @@ function getPersistentNfpCachePath() {
 // background windows that caused races on manifest-v2.json (torn writes,
 // inconsistent LRU bookkeeping) and wasted work on pruneNfpCache(). Ownership
 // now lives here: one manifest, one pruner, serialized by the Node event loop.
-const NFP_CACHE_VERSION = 2;
-const NFP_CACHE_MANIFEST = 'manifest-v2.json';
+const NFP_CACHE_VERSION = 3;
+const NFP_CACHE_MANIFEST = 'manifest-v3.json';
 const NFP_CACHE_MAX_ENTRIES = 2500;
 const NFP_CACHE_MAX_BYTES = 128 * 1024 * 1024;
+const NFP_CACHE_MANIFEST_FLUSH_DELAY_MS = 500;
 let nfpCacheManifest = null;
+let nfpCacheTotalBytes = 0;
+let nfpCacheManifestDirty = false;
+let nfpCacheManifestFlushTimer = null;
 
 function ensureNfpCacheDirSync() {
   const dir = getPersistentNfpCachePath();
@@ -399,6 +403,7 @@ function loadNfpCacheManifest() {
       const loaded = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       if (loaded && loaded.version === NFP_CACHE_VERSION && loaded.entries) {
         nfpCacheManifest = loaded;
+        nfpCacheTotalBytes = calculateNfpCacheTotalBytes(nfpCacheManifest);
         return nfpCacheManifest;
       }
     }
@@ -407,6 +412,7 @@ function loadNfpCacheManifest() {
     // Fall through to fresh manifest.
   }
   nfpCacheManifest = { version: NFP_CACHE_VERSION, entries: {} };
+  nfpCacheTotalBytes = 0;
   return nfpCacheManifest;
 }
 
@@ -417,9 +423,52 @@ function writeNfpCacheManifestAtomic() {
   try {
     fs.writeFileSync(tmpPath, JSON.stringify(nfpCacheManifest));
     fs.renameSync(tmpPath, manifestPath);
+    return true;
   }
   catch (err) {
     console.warn('nfp cache manifest write failed:', err && err.message ? err.message : err);
+    return false;
+  }
+}
+
+function calculateNfpCacheTotalBytes(manifest) {
+  const entries = manifest && manifest.entries ? manifest.entries : {};
+  const keys = Object.keys(entries);
+  let totalBytes = 0;
+  for (let i = 0; i < keys.length; i++) {
+    totalBytes += Number(entries[keys[i]].bytes || 0);
+  }
+  return totalBytes;
+}
+
+function flushNfpCacheManifestIfDirty() {
+  if (!nfpCacheManifestDirty || !nfpCacheManifest) {
+    return;
+  }
+  if (writeNfpCacheManifestAtomic()) {
+    nfpCacheManifestDirty = false;
+  }
+}
+
+function cancelScheduledNfpCacheManifestFlush() {
+  if (!nfpCacheManifestFlushTimer) {
+    return;
+  }
+  clearTimeout(nfpCacheManifestFlushTimer);
+  nfpCacheManifestFlushTimer = null;
+}
+
+function scheduleNfpCacheManifestFlush() {
+  nfpCacheManifestDirty = true;
+  if (nfpCacheManifestFlushTimer) {
+    return;
+  }
+  nfpCacheManifestFlushTimer = setTimeout(function () {
+    nfpCacheManifestFlushTimer = null;
+    flushNfpCacheManifestIfDirty();
+  }, NFP_CACHE_MANIFEST_FLUSH_DELAY_MS);
+  if (typeof nfpCacheManifestFlushTimer.unref === 'function') {
+    nfpCacheManifestFlushTimer.unref();
   }
 }
 
@@ -427,10 +476,7 @@ function pruneNfpCacheIfNeeded() {
   const manifest = loadNfpCacheManifest();
   const dir = ensureNfpCacheDirSync();
   const keys = Object.keys(manifest.entries);
-  let totalBytes = 0;
-  for (let i = 0; i < keys.length; i++) {
-    totalBytes += Number(manifest.entries[keys[i]].bytes || 0);
-  }
+  let totalBytes = nfpCacheTotalBytes;
   if (keys.length <= NFP_CACHE_MAX_ENTRIES && totalBytes <= NFP_CACHE_MAX_BYTES) {
     return false;
   }
@@ -438,8 +484,9 @@ function pruneNfpCacheIfNeeded() {
     return Number(manifest.entries[a].lastAccess || 0) - Number(manifest.entries[b].lastAccess || 0);
   });
   let changed = false;
-  while (keys.length > 0 && (keys.length > NFP_CACHE_MAX_ENTRIES || totalBytes > NFP_CACHE_MAX_BYTES)) {
-    const victim = keys.shift();
+  let removed = 0;
+  for (let i = 0; i < keys.length && (keys.length - removed > NFP_CACHE_MAX_ENTRIES || totalBytes > NFP_CACHE_MAX_BYTES); i++) {
+    const victim = keys[i];
     const entry = manifest.entries[victim];
     if (!entry) {
       continue;
@@ -452,8 +499,10 @@ function pruneNfpCacheIfNeeded() {
     }
     totalBytes -= Number(entry.bytes || 0);
     delete manifest.entries[victim];
+    removed++;
     changed = true;
   }
+  nfpCacheTotalBytes = Math.max(0, totalBytes);
   return changed;
 }
 
@@ -482,8 +531,9 @@ function nfpCacheFind(key) {
   const dir = ensureNfpCacheDirSync();
   const filePath = path.join(dir, entry.file);
   if (!fs.existsSync(filePath)) {
+    nfpCacheTotalBytes = Math.max(0, nfpCacheTotalBytes - Number(entry.bytes || 0));
     delete manifest.entries[key];
-    writeNfpCacheManifestAtomic();
+    scheduleNfpCacheManifestFlush();
     return null;
   }
   try {
@@ -522,17 +572,69 @@ function nfpCacheInsert(key, nfp) {
   }
   try {
     fs.writeFileSync(path.join(dir, file), json);
+    const previous = manifest.entries[key];
+    if (previous) {
+      nfpCacheTotalBytes = Math.max(0, nfpCacheTotalBytes - Number(previous.bytes || 0));
+    }
+    const bytes = Buffer.byteLength(json, 'utf8');
     manifest.entries[key] = {
       file: file,
-      bytes: Buffer.byteLength(json, 'utf8'),
+      bytes: bytes,
       lastAccess: Date.now()
     };
+    nfpCacheTotalBytes += bytes;
     pruneNfpCacheIfNeeded();
-    writeNfpCacheManifestAtomic();
+    scheduleNfpCacheManifestFlush();
   }
   catch (err) {
     console.warn('nfp cache insert failed:', err && err.message ? err.message : err);
   }
+}
+
+function clearPersistentNfpCache() {
+  const dir = ensureNfpCacheDirSync();
+  let filesRemoved = 0;
+  let bytesRemoved = 0;
+
+  try {
+    const files = fs.readdirSync(dir);
+    for (let i = 0; i < files.length; i++) {
+      const filePath = path.join(dir, files[i]);
+      let stat = null;
+      try {
+        stat = fs.statSync(filePath);
+      }
+      catch (err) {
+        continue;
+      }
+      if (!stat.isFile()) {
+        continue;
+      }
+      try {
+        fs.unlinkSync(filePath);
+        filesRemoved++;
+        bytesRemoved += stat.size;
+      }
+      catch (err) {
+        console.warn('nfp cache clear skipped file:', err && err.message ? err.message : err);
+      }
+    }
+  }
+  catch (err) {
+    throw new Error('could not read NFP cache directory: ' + (err && err.message ? err.message : String(err)));
+  }
+
+  nfpCacheManifest = { version: NFP_CACHE_VERSION, entries: {} };
+  nfpCacheTotalBytes = 0;
+  cancelScheduledNfpCacheManifestFlush();
+  nfpCacheManifestDirty = false;
+  writeNfpCacheManifestAtomic();
+
+  return {
+    path: dir,
+    filesRemoved: filesRemoved,
+    bytesRemoved: bytesRemoved
+  };
 }
 
 function handleSettingsOperation(operation, args) {
@@ -867,6 +969,8 @@ app.on('activate', function () {
 });
 
 app.on('before-quit', function () {
+  cancelScheduledNfpCacheManifestFlush();
+  flushNfpCacheManifestIfDirty();
   if (minkowskiWorker && typeof minkowskiWorker.kill === 'function') {
     minkowskiWorker.kill();
     minkowskiWorker = null;
@@ -967,6 +1071,25 @@ ipcMain.on('nfp-cache-insert', function (event, message) {
     return;
   }
   nfpCacheInsert(message.key, message.nfp);
+});
+
+ipcMain.on('nfp-cache-clear-sync', function (event) {
+  try {
+    const result = clearPersistentNfpCache();
+    recreateBackgroundWindows();
+    event.returnValue = {
+      ok: true,
+      path: result.path,
+      filesRemoved: result.filesRemoved,
+      bytesRemoved: result.bytesRemoved
+    };
+  }
+  catch (err) {
+    event.returnValue = {
+      ok: false,
+      error: err && err.message ? err.message : String(err)
+    };
+  }
 });
 
 ipcMain.on('dialog-open-sync', function (event, options) {

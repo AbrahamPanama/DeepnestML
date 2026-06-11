@@ -1,0 +1,64 @@
+{
+  "label": "baseline-v0-240-gardeyn4-gate",
+  "createdAt": "2026-06-11T05:50:13.850Z",
+  "gitCommit": "ad97fdad0dad3b43360610bdb3ac47ee38709568",
+  "gitDirty": true,
+  "engineFlags": {
+    "protocol": "sota-wp0",
+    "runsPerInstance": 3,
+    "timeBudgetSec": 240,
+    "baseConfig": {
+      "placementType": "gravity",
+      "spacing": 0,
+      "mergeLines": false,
+      "processHoles": true,
+      "populationSize": 10,
+      "mutationRate": 10,
+      "rotations": "<per-instance rotations>"
+    }
+  },
+  "artifactRoot": "/Users/abrahamsaenz/Desktop/Deepnest++/ml/artifacts/nest-benchmark/20260611T055013Z-baseline-v0-240-gardeyn4-gate",
+  "instances": [
+    {
+      "name": "gardeyn4",
+      "file": "ml/benchmark/esicup/instances/gardeyn4.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.6311259008992794,
+          "usedLength": 5994.1911756,
+          "timeToBestSec": 122.487,
+          "fitness": 11362756.300879356,
+          "placementsDigest": "c6fe6048bdb9f14a6dee0f0c6db1759569d2a241",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T055013Z-baseline-v0-240-gardeyn4-gate/gardeyn4/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T055013Z-baseline-v0-240-gardeyn4-gate/gardeyn4/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.6311259008992794,
+          "usedLength": 5994.1911756,
+          "timeToBestSec": 123.634,
+          "fitness": 11362756.300879356,
+          "placementsDigest": "c6fe6048bdb9f14a6dee0f0c6db1759569d2a241",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T055013Z-baseline-v0-240-gardeyn4-gate/gardeyn4/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T055013Z-baseline-v0-240-gardeyn4-gate/gardeyn4/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.6311259008992794,
+          "usedLength": 5994.1911756,
+          "timeToBestSec": 151.227,
+          "fitness": 11362756.300879356,
+          "placementsDigest": "c6fe6048bdb9f14a6dee0f0c6db1759569d2a241",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T055013Z-baseline-v0-240-gardeyn4-gate/gardeyn4/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T055013Z-baseline-v0-240-gardeyn4-gate/gardeyn4/run-03/export.svg"
+        }
+      ],
+      "median": 0.6311259008992794
+    }
+  ],
+  "aggregate": {
+    "meanMedianUtilization": 0.6311259008992794
+  }
+}

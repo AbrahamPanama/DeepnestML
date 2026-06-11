@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Physics Nest Live</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #eef2f5;
+      color: #17202a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+      background: #eef2f5;
+    }
+
+    aside {
+      padding: 18px;
+      border-right: 1px solid #c8d1dc;
+      background: #f8fafc;
+    }
+
+    main {
+      min-width: 0;
+      padding: 18px;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #e0f2fe;
+      color: #075985;
+    }
+
+    .status.complete {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    dl {
+      margin: 18px 0 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px 16px;
+      font-size: 14px;
+    }
+
+    dt {
+      color: #516173;
+    }
+
+    dd {
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .progress {
+      height: 8px;
+      margin-top: 18px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #d7dee7;
+    }
+
+    .progress > div {
+      height: 100%;
+      width: 0;
+      background: #2563eb;
+      transition: width 160ms linear;
+    }
+
+    .stage {
+      margin-top: 18px;
+      color: #516173;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .sheet-wrap {
+      width: min(100%, 1200px);
+      min-height: 360px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #c8d1dc;
+      background: #f8fafc;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: calc(100vh - 36px);
+      background: #f8fafc;
+    }
+
+    .sheet {
+      fill: #f8fafc;
+      stroke: #64748b;
+      stroke-width: 2;
+    }
+
+    .part {
+      fill: rgba(37, 99, 235, 0.04);
+      stroke: #111827;
+      stroke-width: 2;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .part:nth-of-type(3n) {
+      stroke: #7c3aed;
+    }
+
+    .part:nth-of-type(3n + 1) {
+      stroke: #0f766e;
+    }
+
+    .part:nth-of-type(3n + 2) {
+      stroke: #b45309;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid #c8d1dc;
+      }
+
+      main {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside>
+    <h1>Physics Nest Live</h1>
+    <div id="status" class="status"><span class="dot"></span><span>Waiting</span></div>
+    <div class="progress"><div id="progress"></div></div>
+    <dl>
+      <dt>Attempt</dt><dd id="attempt">-</dd>
+      <dt>Iteration</dt><dd id="iteration">-</dd>
+      <dt>Accepted</dt><dd id="accepted">-</dd>
+      <dt>Score</dt><dd id="score">-</dd>
+      <dt>Best</dt><dd id="best">-</dd>
+      <dt>Overlap</dt><dd id="overlap">-</dd>
+      <dt>Outside</dt><dd id="outside">-</dd>
+    </dl>
+    <div id="stage" class="stage">Waiting for live state...</div>
+  </aside>
+  <main>
+    <div class="sheet-wrap">
+      <svg id="sheet" viewBox="0 0 100 100" role="img" aria-label="Live nesting arrangement">
+        <rect class="sheet" x="0" y="0" width="100" height="100"></rect>
+      </svg>
+    </div>
+  </main>
+  <script>
+    const statePath = new URLSearchParams(window.location.search).get('state') || 'out/live-state.json';
+    const els = {
+      status: document.getElementById('status'),
+      statusText: document.querySelector('#status span:last-child'),
+      progress: document.getElementById('progress'),
+      attempt: document.getElementById('attempt'),
+      iteration: document.getElementById('iteration'),
+      accepted: document.getElementById('accepted'),
+      score: document.getElementById('score'),
+      best: document.getElementById('best'),
+      overlap: document.getElementById('overlap'),
+      outside: document.getElementById('outside'),
+      stage: document.getElementById('stage'),
+      sheet: document.getElementById('sheet')
+    };
+
+    function fmt(value, digits = 2) {
+      return Number.isFinite(value) ? value.toFixed(digits) : '-';
+    }
+
+    function pathData(points) {
+      if (!points || points.length === 0) {
+        return '';
+      }
+      const start = points[0];
+      const rest = points.slice(1).map((point) => 'L ' + point.x + ' ' + point.y).join(' ');
+      return 'M ' + start.x + ' ' + start.y + ' ' + rest + ' Z';
+    }
+
+    function setStatus(state) {
+      els.status.classList.toggle('complete', state.status === 'complete');
+      els.status.classList.toggle('error', state.status === 'error');
+      els.statusText.textContent = state.status || 'running';
+    }
+
+    function render(state) {
+      if (!state || !state.sheet || !Array.isArray(state.layout)) {
+        return;
+      }
+
+      setStatus(state);
+      const attempt = typeof state.attempt === 'number' ? state.attempt + 1 : 1;
+      const attempts = state.attempts || 1;
+      const iteration = state.iteration || (state.status === 'complete' ? state.iterations || '-' : 0);
+      const iterations = state.iterations || '-';
+      const progress = Number.isFinite(state.iteration) && Number.isFinite(state.iterations) && state.iterations > 0
+        ? Math.max(0, Math.min(100, (state.iteration / state.iterations) * 100))
+        : state.status === 'complete' ? 100 : 0;
+
+      els.progress.style.width = progress + '%';
+      els.attempt.textContent = attempt + ' / ' + attempts;
+      els.iteration.textContent = iteration + ' / ' + iterations;
+      els.accepted.textContent = state.acceptedMoves || 0;
+      els.score.textContent = fmt(state.score);
+      els.best.textContent = typeof state.bestAttempt === 'number' ? String(state.bestAttempt + 1) : '-';
+      els.overlap.textContent = state.metrics ? state.metrics.overlapPairs : '0';
+      els.outside.textContent = state.metrics ? state.metrics.outsideParts : '0';
+      els.stage.textContent = (state.phase || 'running') + ' | updated ' + (state.updatedAt || '');
+
+      els.sheet.setAttribute('viewBox', '0 0 ' + state.sheet.width + ' ' + state.sheet.height);
+      els.sheet.innerHTML = '<rect class="sheet" x="0" y="0" width="' + state.sheet.width + '" height="' + state.sheet.height + '"></rect>';
+      state.layout.forEach((part) => {
+        (part.paths || []).forEach((polygon) => {
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('class', 'part');
+          path.setAttribute('d', pathData(polygon));
+          path.setAttribute('data-part-id', part.id || '');
+          els.sheet.appendChild(path);
+        });
+      });
+    }
+
+    async function poll() {
+      try {
+        const response = await fetch(statePath + '?t=' + Date.now(), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('No state yet');
+        }
+        render(await response.json());
+      }
+      catch (err) {
+        els.status.classList.add('error');
+        els.statusText.textContent = 'Waiting';
+        els.stage.textContent = 'Waiting for live state...';
+      }
+      setTimeout(poll, 250);
+    }
+
+    poll();
+  </script>
+</body>
+</html>

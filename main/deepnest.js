@@ -21,6 +21,7 @@
 			clipperScale: 10000000,
 			curveTolerance: 0.3, 
 			spacing: 0,
+			sheetMargin: 0,
 			rotations: 4,
 			populationSize: 10,
 			mutationRate: 10,
@@ -34,6 +35,7 @@
 			stepRepeatHorizontalAlignment: 'tight',
 			stepRepeatVerticalAlignment: 'tight',
 			improvedPlacementScoring: false,
+			fitnessVersion: 1,
 			localRefinement: false,
 			mergeLines: true,
 			timeRatio: 0.5,
@@ -691,6 +693,11 @@
 			if('spacing' in c){
 				config.spacing = parseFloat(c.spacing);
 			}
+
+			if('sheetMargin' in c){
+				var parsedSheetMargin = parseFloat(c.sheetMargin);
+				config.sheetMargin = isFinite(parsedSheetMargin) && parsedSheetMargin > 0 ? parsedSheetMargin : 0;
+			}
 			
 			if(c.rotations && parseInt(c.rotations) > 0){
 				config.rotations = parseInt(c.rotations);
@@ -743,6 +750,10 @@
 
 			if(c.improvedPlacementScoring === true || c.improvedPlacementScoring === false){
 				config.improvedPlacementScoring = !!c.improvedPlacementScoring;
+			}
+
+			if(c.fitnessVersion && parseInt(c.fitnessVersion, 10) > 0){
+				config.fitnessVersion = parseInt(c.fitnessVersion, 10) === 2 ? 2 : 1;
 			}
 
 			if(c.localRefinement === true || c.localRefinement === false){
@@ -1213,7 +1224,40 @@
 					offsetTree(parts[i].polygontree, 0.5*config.spacing, this.polygonOffset.bind(this), this.simplifyPolygon.bind(this));
 				}
 			}
-						
+
+			// inset every sheet's outer boundary by the configured sheet margin so
+			// parts keep their distance from the physical sheet edge. Sheet holes
+			// (children) are left untouched. Applied before IPC, so all placement
+			// engines (including Step & Repeat) respect the margin automatically.
+			this.lastStartError = null;
+			var sheetMarginValue = Number(config.sheetMargin);
+			if(isFinite(sheetMarginValue) && sheetMarginValue > 0 && !GeometryUtil.almostEqual(sheetMarginValue, 0)){
+				for(i=0; i<parts.length; i++){
+					if(!parts[i].sheet){
+						continue;
+					}
+					var marginInsetRings = this.polygonOffset(parts[i].polygontree, -sheetMarginValue);
+					var marginRing = null;
+					if(Array.isArray(marginInsetRings) && marginInsetRings.length > 0 && Array.isArray(marginInsetRings[0])){
+						marginRing = marginInsetRings[0];
+						var marginRingArea = Math.abs(GeometryUtil.polygonArea(marginRing));
+						for(var mi=1; mi<marginInsetRings.length; mi++){
+							var marginCandidateArea = Math.abs(GeometryUtil.polygonArea(marginInsetRings[mi]));
+							if(marginCandidateArea > marginRingArea){
+								marginRing = marginInsetRings[mi];
+								marginRingArea = marginCandidateArea;
+							}
+						}
+					}
+					if(!marginRing || marginRing.length < 3){
+						this.lastStartError = 'Sheet margin is too large for at least one sheet. Reduce the margin or use a larger sheet.';
+						return false;
+					}
+					// replace ring points in place, preserving children (sheet holes)
+					Array.prototype.splice.apply(parts[i].polygontree, [0, parts[i].polygontree.length].concat(marginRing));
+				}
+			}
+
 			// offset tree recursively
 			function offsetTree(t, offset, offsetFunction, simpleFunction, inside){
 				var simple = t;
@@ -1563,9 +1607,10 @@
 		// returns an array of SVG elements that represent the placement, for export or rendering
 		this.applyPlacement = function(placement){
 			var i, j, k;
-			var clone = [];
-			for(i=0; i<parts.length; i++){
-				clone.push(parts[i].cloneNode(false));
+			// Legacy path: current export/display code lives in index.html, but
+			// every placed instance still needs its own DOM clone if this is used.
+			function cloneSource(source){
+				return parts[source].cloneNode(false);
 			}
 			
 			var svglist = [];
@@ -1588,13 +1633,13 @@
 					// the original path could have transforms and stuff on it, so apply our transforms on a group
 					var partgroup = document.createElementNS(svg.namespaceURI, 'g');
 					partgroup.setAttribute('transform','translate('+p.x+' '+p.y+') rotate('+p.rotation+')');
-					partgroup.appendChild(clone[part.source]);
+					partgroup.appendChild(cloneSource(part.source));
 					
 					if(part.children && part.children.length > 0){
 						var flattened = _flattenTree(part.children, true);
 						for(k=0; k<flattened.length; k++){
 							
-							var c = clone[flattened[k].source];
+							var c = cloneSource(flattened[k].source);
 							if(flattened[k].hole){
 								c.setAttribute('class','hole');
 							}

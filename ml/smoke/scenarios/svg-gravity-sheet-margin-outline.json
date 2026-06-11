@@ -1,0 +1,17 @@
+{
+  "name": "svg-gravity-sheet-margin-outline",
+  "description": "SVG import, gravity nesting with a 50-unit sheet margin, SVG export including the sheet outline.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 2,
+    "rotations": 1,
+    "sheetMargin": 50,
+    "exportSheetOutline": true
+  }
+}

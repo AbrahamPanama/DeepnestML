@@ -1,0 +1,44 @@
+{
+  "label": "wp0-runner-smoke",
+  "createdAt": "2026-06-11T00:56:55.437Z",
+  "gitCommit": "ad97fdad0dad3b43360610bdb3ac47ee38709568",
+  "gitDirty": true,
+  "engineFlags": {
+    "protocol": "sota-wp0",
+    "runsPerInstance": 1,
+    "timeBudgetSec": 10,
+    "baseConfig": {
+      "placementType": "gravity",
+      "spacing": 0,
+      "mergeLines": false,
+      "processHoles": true,
+      "populationSize": 10,
+      "mutationRate": 10,
+      "rotations": "<per-instance rotations>"
+    }
+  },
+  "artifactRoot": "/Users/abrahamsaenz/Desktop/Deepnest++/ml/artifacts/nest-benchmark/20260611T005655Z-wp0-runner-smoke",
+  "instances": [
+    {
+      "name": "shapes0",
+      "file": "ml/benchmark/esicup/instances/shapes0.json",
+      "rotations": 1,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.16120748980179334,
+          "usedLength": 76.2915553,
+          "timeToBestSec": 4.875,
+          "fitness": 63570407.046943545,
+          "placementsDigest": "f158d49989637acbeb9cb75a96d313c4456ccf46",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T005655Z-wp0-runner-smoke/shapes0/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T005655Z-wp0-runner-smoke/shapes0/run-01/export.svg"
+        }
+      ],
+      "median": 0.16120748980179334
+    }
+  ],
+  "aggregate": {
+    "meanMedianUtilization": 0.16120748980179334
+  }
+}

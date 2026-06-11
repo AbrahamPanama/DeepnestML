@@ -1,9 +1,84 @@
 'use strict';
 
+var nativeAddon = null;
+var nativeAddonLoadAttempted = false;
+var nativeAddonLoadError = null;
+
+function pushUniqueNativeAddonCandidate(candidates, candidate){
+	if(!candidate || candidates.indexOf(candidate) >= 0){
+		return;
+	}
+	candidates.push(candidate);
+
+	var unpacked = candidate.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1');
+	if(unpacked !== candidate && candidates.indexOf(unpacked) < 0){
+		candidates.push(unpacked);
+	}
+}
+
+function buildNativeAddonCandidates(){
+	var path = require('path');
+	var candidates = [];
+
+	[
+		path.join(__dirname, '..', 'build', 'Release', 'addon'),
+		path.join(__dirname, '..', 'build', 'Release', 'addon.node'),
+		path.join(__dirname, '..', 'minkowski', 'Release', 'addon'),
+		path.join(__dirname, '..', 'minkowski', 'Release', 'addon.node')
+	].forEach(function(candidate){
+		pushUniqueNativeAddonCandidate(candidates, candidate);
+	});
+
+	if(process.resourcesPath){
+		[
+			path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'Release', 'addon'),
+			path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'Release', 'addon.node'),
+			path.join(process.resourcesPath, 'app.asar.unpacked', 'minkowski', 'Release', 'addon'),
+			path.join(process.resourcesPath, 'app.asar.unpacked', 'minkowski', 'Release', 'addon.node'),
+			path.join(process.resourcesPath, 'app', 'build', 'Release', 'addon'),
+			path.join(process.resourcesPath, 'app', 'build', 'Release', 'addon.node')
+		].forEach(function(candidate){
+			pushUniqueNativeAddonCandidate(candidates, candidate);
+		});
+	}
+
+	return candidates;
+}
+
+function loadBackgroundNativeAddon(){
+	if(nativeAddonLoadAttempted){
+		return nativeAddon;
+	}
+
+	nativeAddonLoadAttempted = true;
+	var candidates = buildNativeAddonCandidates();
+	var lastError = null;
+
+	for(var i=0; i<candidates.length; i++){
+		try {
+			nativeAddon = require(candidates[i]);
+			nativeAddonLoadError = null;
+			return nativeAddon;
+		}
+		catch(err){
+			lastError = err;
+		}
+	}
+
+	nativeAddon = null;
+	nativeAddonLoadError = lastError && lastError.message ? lastError.message : 'native-addon-unavailable';
+	return null;
+}
+
 function calculateNativeAddonNfp(ipcRenderer, A, B){
+	var addon = loadBackgroundNativeAddon();
+	if(addon && typeof addon.calculateNFP === 'function'){
+		return addon.calculateNFP({ A: A, B: B });
+	}
+
 	var response = ipcRenderer.sendSync('minkowski-calculate-nfp-sync', { A: A, B: B });
 	if(!response || response.ok !== true){
-		throw new Error(response && response.error ? response.error : 'native-addon-unavailable');
+		throw new Error(response && response.error ? response.error : (nativeAddonLoadError || 'native-addon-unavailable'));
 	}
 	return response.value;
 }
@@ -53,7 +128,7 @@ function cloneNfp(nfp, inner){
 // NFP_CACHE_VERSION is part of the cache key so a schema change invalidates
 // all persisted entries. The size / byte / manifest-path constants used to
 // live here too — they moved to main.js along with cache ownership.
-var NFP_CACHE_VERSION = 2;
+var NFP_CACHE_VERSION = 3;
 
 function hashString(value){
 	var hash = 2166136261;
@@ -483,7 +558,7 @@ window.onload = function () {
 // returns the square of the length of any merged lines
 // filter out any lines less than minlength long
 function mergedLength(parts, p, minlength, tolerance){
-	var min2 = minlength*minlength;
+	var minLengthSquared = minlength*minlength;
 	var totalLength = 0;
 	var segments = [];
 	
@@ -504,7 +579,7 @@ function mergedLength(parts, p, minlength, tolerance){
 		var Ax2 = (A2.x-A1.x)*(A2.x-A1.x);
 		var Ay2 = (A2.y-A1.y)*(A2.y-A1.y);
 		
-		if(Ax2+Ay2 < min2){
+		if(Ax2+Ay2 < minLengthSquared){
 			continue;
 		}
 		
@@ -538,7 +613,7 @@ function mergedLength(parts, p, minlength, tolerance){
 					var Bx2 = (B2.x-B1.x)*(B2.x-B1.x);
 					var By2 = (B2.y-B1.y)*(B2.y-B1.y);
 					
-					if(Bx2+By2 < min2){
+					if(Bx2+By2 < minLengthSquared){
 						continue;
 					}
 					
@@ -558,11 +633,11 @@ function mergedLength(parts, p, minlength, tolerance){
 					var min1 = Math.min(0, rotA2x);
 					var max1 = Math.max(0, rotA2x);
 					
-					var min2 = Math.min(rotB1.x, rotB2.x);
-					var max2 = Math.max(rotB1.x, rotB2.x);
+					var bMinX = Math.min(rotB1.x, rotB2.x);
+					var bMaxX = Math.max(rotB1.x, rotB2.x);
 					
 					// not overlapping
-					if(min2 >= max1 || max2 <= min1){
+					if(bMinX >= max1 || bMaxX <= min1){
 						continue;
 					}
 					
@@ -571,30 +646,30 @@ function mergedLength(parts, p, minlength, tolerance){
 					var relC2x = 0;
 					
 					// A is B
-					if(GeometryUtil.almostEqual(min1, min2) && GeometryUtil.almostEqual(max1, max2)){
+					if(GeometryUtil.almostEqual(min1, bMinX) && GeometryUtil.almostEqual(max1, bMaxX)){
 						len = max1-min1;
 						relC1x = min1;
 						relC2x = max1;
 					}
 					// A inside B
-					else if(min1 > min2 && max1 < max2){
+					else if(min1 > bMinX && max1 < bMaxX){
 						len = max1-min1;
 						relC1x = min1;
 						relC2x = max1;
 					}
 					// B inside A
-					else if(min2 > min1 && max2 < max1){
-						len = max2-min2;
-						relC1x = min2;
-						relC2x = max2;
+					else if(bMinX > min1 && bMaxX < max1){
+						len = bMaxX-bMinX;
+						relC1x = bMinX;
+						relC2x = bMaxX;
 					}
 					else{
-						len = Math.max(0, Math.min(max1, max2) - Math.max(min1, min2));
-						relC1x = Math.min(max1, max2);
-						relC2x = Math.max(min1, min2);		
+						len = Math.max(0, Math.min(max1, bMaxX) - Math.max(min1, bMinX));
+						relC1x = Math.min(max1, bMaxX);
+						relC2x = Math.max(min1, bMinX);
 					}
 					
-					if(len*len > min2){
+					if(len*len >= minLengthSquared){
 						totalLength += len;
 						
 						var relC1 = {x: relC1x * c2, y: relC1x * s2};
@@ -607,12 +682,14 @@ function mergedLength(parts, p, minlength, tolerance){
 					}
 				}
 			}
-			
-			if(B.children && B.children.length > 0){
-				var child = mergedLength(B.children, p, minlength, tolerance);
-				totalLength += child.totalLength;
-				segments = segments.concat(child.segments);
-			}
+		}
+	}
+
+	for(i=0; i<parts.length; i++){
+		if(parts[i].children && parts[i].children.length > 0){
+			var child = mergedLength(parts[i].children, p, minlength, tolerance);
+			totalLength += child.totalLength;
+			segments = segments.concat(child.segments);
 		}
 	}
 	
@@ -1118,6 +1195,83 @@ function getHull(polygon){
 	return hull;
 }
 
+function getFitnessVersion(config){
+	var version = config ? parseInt(config.fitnessVersion, 10) : 1;
+	return version === 2 ? 2 : 1;
+}
+
+function collectWorldPoints(placed, placements){
+	var points = [];
+	if(!placed || !placements){
+		return points;
+	}
+
+	for(var i=0; i<placed.length; i++){
+		if(!placed[i] || !placements[i]){
+			continue;
+		}
+		for(var j=0; j<placed[i].length; j++){
+			points.push({
+				x: placed[i][j].x + placements[i].x,
+				y: placed[i][j].y + placements[i].y
+			});
+		}
+	}
+
+	return points;
+}
+
+function calculateFitnessV2SheetMetric(sheet, placed, placements, placementType){
+	if(!sheet || !placed || !placements || placements.length === 0){
+		return null;
+	}
+
+	var points = collectWorldPoints(placed, placements);
+	if(points.length === 0){
+		return null;
+	}
+
+	var partBounds = GeometryUtil.getPolygonBounds(points);
+	var sheetBounds = GeometryUtil.getPolygonBounds(sheet);
+	var sheetArea = Math.abs(GeometryUtil.polygonArea(sheet));
+	var metricType = placementType === 'gravity' || placementType === 'box' || placementType === 'convexhull' ? placementType : 'convexhull';
+	var metric = 0;
+
+	if(metricType === 'gravity'){
+		var denominator = 2 * sheetBounds.width + sheetBounds.height;
+		metric = denominator > 0 ? (2 * partBounds.width + partBounds.height) / denominator : 1;
+	}
+	else if(metricType === 'box'){
+		metric = sheetArea > 0 ? (partBounds.width * partBounds.height) / sheetArea : 1;
+	}
+	else{
+		var hull = getHull(points);
+		metric = sheetArea > 0 ? Math.abs(GeometryUtil.polygonArea(hull)) / sheetArea : 1;
+	}
+
+	if(!isFinite(metric) || metric < 0){
+		metric = 1;
+	}
+
+	return {
+		type: metricType,
+		metric: metric,
+		placementCount: placements.length,
+		bounds: {
+			x: partBounds.x,
+			y: partBounds.y,
+			width: partBounds.width,
+			height: partBounds.height
+		},
+		sheetBounds: {
+			x: sheetBounds.x,
+			y: sheetBounds.y,
+			width: sheetBounds.width,
+			height: sheetBounds.height
+		}
+	};
+}
+
 function boundedUnit(value){
 	value = Number(value);
 	if(!isFinite(value)){
@@ -1558,6 +1712,44 @@ function rotatePolygon(polygon, degrees){
 	return rotated;
 };
 
+function normalizedRotation(degrees){
+	var rotation = Number(degrees) || 0;
+	rotation = rotation % 360;
+	if(rotation < 0){
+		rotation += 360;
+	}
+	return rotation;
+}
+
+function rotationRetryCount(config){
+	var count = config && parseInt(config.rotations, 10);
+	if(!count || count < 1){
+		return 1;
+	}
+	return count;
+}
+
+function rotationRetryStep(config){
+	return 360/rotationRetryCount(config);
+}
+
+function rotationRetryAngle(baseRotation, config, attemptIndex){
+	return normalizedRotation((Number(baseRotation) || 0) + rotationRetryStep(config)*attemptIndex);
+}
+
+function candidatePlacementIsBetter(currentScore, currentX, currentY, candidateScore, candidateX, candidateY){
+	if(currentScore === null){
+		return true;
+	}
+	if(candidateScore < currentScore && !GeometryUtil.almostEqual(candidateScore, currentScore)){
+		return true;
+	}
+	if(GeometryUtil.almostEqual(currentScore, candidateScore)){
+		return currentX === null || candidateX < currentX || (GeometryUtil.almostEqual(candidateX, currentX) && candidateY < currentY);
+	}
+	return false;
+}
+
 function buildTreeFromOuterNfpList(nfpList, A){
 	if(!nfpList || nfpList.length == 0){
 		return null;
@@ -1634,6 +1826,56 @@ function getOuterNfpWithGeometryUtil(A, B){
 	return outer;
 }
 
+function buildClipperNfpFromMinkowskiSolution(solution, B, scale){
+	if(!solution || solution.length == 0){
+		return null;
+	}
+
+	var clipperNfp = null;
+	var largestArea = null;
+	for(var i=0; i<solution.length; i++){
+		var n = toNestCoordinates(solution[i], scale);
+		var sarea = -GeometryUtil.polygonArea(n);
+		if(largestArea === null || largestArea < sarea){
+			clipperNfp = n;
+			largestArea = sarea;
+		}
+	}
+
+	if(!clipperNfp || clipperNfp.length == 0){
+		return null;
+	}
+
+	for(i=0; i<clipperNfp.length; i++){
+		clipperNfp[i].x += B[0].x;
+		clipperNfp[i].y += B[0].y;
+	}
+
+	return clipperNfp;
+}
+
+function getSheetHoleForbiddenNfps(A, B){
+	var holes = [];
+	if(!A.children || A.children.length == 0){
+		return holes;
+	}
+
+	for(var i=0; i<A.children.length; i++){
+		var holeNfp = GeometryUtil.noFitPolygon(A.children[i], B, false, false);
+		if(!holeNfp || holeNfp.length == 0){
+			return null;
+		}
+
+		var forbidden = buildTreeFromOuterNfpList(holeNfp, A.children[i]);
+		if(!forbidden){
+			return null;
+		}
+		holes.push(forbidden);
+	}
+
+	return holes;
+}
+
 function getInnerNfpWithGeometryUtil(A, B, config){
 	var nfp;
 	if(GeometryUtil.isRectangle(A, 0.001)){
@@ -1653,24 +1895,9 @@ function getInnerNfpWithGeometryUtil(A, B, config){
 		}
 	}
 
-	var holes = [];
-	if(A.children && A.children.length > 0){
-		var Bbounds = GeometryUtil.getPolygonBounds(B);
-		for(i=0; i<A.children.length; i++){
-			var Abounds = GeometryUtil.getPolygonBounds(A.children[i]);
-
-			if(Abounds.width > Bbounds.width && Abounds.height > Bbounds.height){
-				var holeNfp = GeometryUtil.noFitPolygon(A.children[i], B, true, false);
-				if(holeNfp && holeNfp.length > 0){
-					for(var j=0; j<holeNfp.length; j++){
-						if(GeometryUtil.polygonArea(holeNfp[j]) < 0){
-							holeNfp[j].reverse();
-						}
-						holes.push(holeNfp[j]);
-					}
-				}
-			}
-		}
+	var holes = getSheetHoleForbiddenNfps(A, B);
+	if(holes === null){
+		return null;
 	}
 
 	if(holes.length == 0){
@@ -1687,7 +1914,7 @@ function getInnerNfpWithGeometryUtil(A, B, config){
 	clipper.AddPaths(clipperNfp, ClipperLib.PolyType.ptSubject, true);
 
 	if(!clipper.Execute(ClipperLib.ClipType.ctDifference, finalNfp, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)){
-		return nfp;
+		return null;
 	}
 
 	if(finalNfp.length == 0){
@@ -1762,21 +1989,10 @@ function getOuterNfp(A, B, inside, config){
 					Bc[i].Y *= -1;
 				}
 				var solution = ClipperLib.Clipper.MinkowskiSum(Ac, Bc, true);
-				var clipperNfp;
-
-				var largestArea = null;
-				for(i=0; i<solution.length; i++){
-					var n = toNestCoordinates(solution[i], 10000000);
-					var sarea = -GeometryUtil.polygonArea(n);
-					if(largestArea === null || largestArea < sarea){
-						clipperNfp = n;
-						largestArea = sarea;
-					}
-				}
-
-				for(var i=0; i<clipperNfp.length; i++){
-					clipperNfp[i].x += B[0].x;
-					clipperNfp[i].y += B[0].y;
+				var clipperNfp = buildClipperNfpFromMinkowskiSolution(solution, B, 10000000);
+				if(!clipperNfp){
+					console.timeEnd('clipper');
+					return null;
 				}
 
 				nfp = [clipperNfp];
@@ -1956,6 +2172,14 @@ function placeParts(sheets, parts, config, nestindex){
 	var totalMerged = 0;
 	var localRefinement = createLocalRefinementStats(config && config.localRefinement === true);
 	var runLocalRefinement = config && config.localRefinement === true && config.localRefinementPostProcess === true;
+	var fitnessVersion = getFitnessVersion(config);
+	var useFitnessV2 = fitnessVersion === 2;
+	var fitnessBreakdown = useFitnessV2 ? {
+		version: 2,
+		sheets: 0,
+		sheetMetrics: [],
+		unplacedPenalty: 0
+	} : null;
 		
 	// rotate paths by given rotation
 	var rotated = [];
@@ -1982,6 +2206,8 @@ function placeParts(sheets, parts, config, nestindex){
 		var placed = [];
 		var placements = [];
 		var sheetMergedBase = totalMerged;
+		var minwidth = null;
+		var minarea = null;
 		
 		// open a new sheet
 		var sheet = sheets.shift();
@@ -1989,7 +2215,9 @@ function placeParts(sheets, parts, config, nestindex){
 		var sheetboundsForScoring = config.improvedPlacementScoring === true ? GeometryUtil.getPolygonBounds(sheet) : null;
 		totalsheetarea += sheetarea;
 		
-		fitness += sheetarea; // add 1 for each new sheet opened (lower fitness is better)
+		if(!useFitnessV2){
+			fitness += sheetarea; // add 1 for each new sheet opened (lower fitness is better)
+		}
 		
 		var clipCache = [];
 		//console.log('new sheet');
@@ -1998,31 +2226,33 @@ function placeParts(sheets, parts, config, nestindex){
 			part = parts[i];
 			
 			// inner NFP
-			var sheetNfp = null;				
-			// try all possible rotations until it fits
-			// (only do this for the first part of each sheet, to ensure that all parts that can be placed are, even if we have to to open a lot of sheets)
-			for(j=0; j<(360/config.rotations); j++){
+			var sheetNfp = null;
+			var originalPart = part;
+			var retryCount = rotationRetryCount(config);
+			// Try every configured orientation before treating this part as unplaceable on the current sheet.
+			for(j=0; j<retryCount; j++){
 				sheetNfp = getInnerNfp(sheet, part, config);
 				
 				if(sheetNfp){
 					break;
 				}
+
+				if(j+1 >= retryCount){
+					break;
+				}
 				
-				var r = rotatePolygon(part, 360/config.rotations);
-				r.rotation = part.rotation + (360/config.rotations);
+				var r = rotatePolygon(originalPart, rotationRetryStep(config)*(j+1));
+				r.rotation = rotationRetryAngle(originalPart.rotation, config, j+1);
 				r.source = part.source;
 				r.id = part.id;
 				
 				// rotation is not in-place
 				part = r;
 				parts[i] = r;
-				
-				if(part.rotation > 360){
-					part.rotation = part.rotation%360;
-				}
 			}
 			// part unplaceable, skip
 			if(!sheetNfp || sheetNfp.length == 0){
+				parts[i] = originalPart;
 				continue;
 			}
 						
@@ -2045,6 +2275,7 @@ function placeParts(sheets, parts, config, nestindex){
 				}
 				if(position === null){
 					console.log(sheetNfp);
+					continue;
 				}
 				placements.push(position);
 				placed.push(part);
@@ -2108,10 +2339,10 @@ function placeParts(sheets, parts, config, nestindex){
 			
 			clipCache[clipkey] = {
 				nfp: combinedNfp,
-				index: placed.length-1
+				index: placed.length
 			};
 			
-			console.log('save cache', placed.length-1);
+			console.log('save cache', placed.length);
 			
 			// difference with sheet polygon
 			var finalNfp = new ClipperLib.Paths();
@@ -2138,8 +2369,8 @@ function placeParts(sheets, parts, config, nestindex){
 						
 			// choose placement that results in the smallest bounding box/hull etc
 			// todo: generalize gravity direction
-			var minwidth = null;
-			var minarea = null;
+			minwidth = null;
+			minarea = null;
 			var minx = null;
 			var miny = null;
 			var nf, area, score, shiftvector, candidateBounds;
@@ -2164,6 +2395,19 @@ function placeParts(sheets, parts, config, nestindex){
 			}
 			else{
 				allpoints = getHull(allpoints);
+			}
+
+			var shiftedplaced = null;
+			var mergeMinLength = null;
+			var mergeTolerance = null;
+			if(config.mergeLines){
+				shiftedplaced = [];
+				for(m=0; m<placed.length; m++){
+					shiftedplaced.push(shiftPolygon(placed[m], placements[m]));
+				}
+				// don't check small lines, cut off at about 1/2 in
+				mergeMinLength = 0.5*config.scale;
+				mergeTolerance = 0.1*config.curveTolerance;
 			}
 			for(j=0; j<finalNfp.length; j++){
 				nf = finalNfp[j];
@@ -2228,15 +2472,7 @@ function placeParts(sheets, parts, config, nestindex){
 					if(config.mergeLines){
 						// if lines can be merged, subtract savings from area calculation						
 						var shiftedpart = shiftPolygon(part, shiftvector);
-						var shiftedplaced = [];
-						
-						for(m=0; m<placed.length; m++){
-							shiftedplaced.push(shiftPolygon(placed[m], placements[m]));
-						}
-						
-						// don't check small lines, cut off at about 1/2 in
-						var minlength = 0.5*config.scale;
-						var merged = mergedLength(shiftedplaced, shiftedpart, minlength, 0.1*config.curveTolerance);
+						var merged = mergedLength(shiftedplaced, shiftedpart, mergeMinLength, mergeTolerance);
 						area -= merged.totalLength*config.timeRatio;
 					}
 
@@ -2244,21 +2480,12 @@ function placeParts(sheets, parts, config, nestindex){
 					
 					//console.timeEnd('evalmerge');
 					
-					if(
-					minarea === null || 
-					score < minarea || 
-					(GeometryUtil.almostEqual(minarea, score) && (minx === null || shiftvector.x < minx)) ||
-					(GeometryUtil.almostEqual(minarea, score) && (minx !== null && GeometryUtil.almostEqual(shiftvector.x, minx) && shiftvector.y < miny))
-					){
+					if(candidatePlacementIsBetter(minarea, minx, miny, score, shiftvector.x, shiftvector.y)){
 						minarea = score;
-						minwidth = rectbounds ? rectbounds.width : 0;
+						minwidth = candidateBounds ? candidateBounds.width : 0;
 						position = shiftvector;
-						if(minx === null || shiftvector.x < minx){
-							minx = shiftvector.x;
-						}
-						if(miny === null || shiftvector.y < miny){
-							miny = shiftvector.y;
-						}
+						minx = shiftvector.x;
+						miny = shiftvector.y;
 						
 						if(config.mergeLines){
 							position.mergedLength = merged.totalLength;
@@ -2297,9 +2524,25 @@ function placeParts(sheets, parts, config, nestindex){
 			}
 		}
 
-		//if(minwidth){
-		fitness += (minwidth/sheetarea) + minarea;
-		//}
+		if(useFitnessV2 && placements && placements.length > 0){
+			var sheetMetric = calculateFitnessV2SheetMetric(sheet, placed, placements, config.placementType);
+			if(!sheetMetric){
+				sheetMetric = {
+					type: config.placementType || 'convexhull',
+					metric: 1,
+					placementCount: placements.length,
+					degenerate: true
+				};
+			}
+			sheetMetric.sheet = sheet.source;
+			sheetMetric.sheetid = sheet.id;
+			fitness += 2.0 + sheetMetric.metric;
+			fitnessBreakdown.sheets += 1;
+			fitnessBreakdown.sheetMetrics.push(sheetMetric);
+		}
+		else if(placements && placements.length > 0 && minwidth !== null && minarea !== null){
+			fitness += (minwidth/sheetarea) + minarea;
+		}
 		
 		for(i=0; i<placed.length; i++){
 			var index = parts.indexOf(placed[i]);
@@ -2312,7 +2555,15 @@ function placeParts(sheets, parts, config, nestindex){
 			allplacements.push({sheet: sheet.source, sheetid: sheet.id, sheetplacements: placements});
 		}
 		else{
-			break; // something went wrong
+			if(!useFitnessV2){
+				fitness -= sheetarea;
+			}
+			totalsheetarea -= sheetarea;
+			totalMerged = sheetMergedBase;
+			if(sheets.length == 0){
+				break;
+			}
+			continue;
 		}
 		
 		if(sheets.length == 0){
@@ -2322,13 +2573,22 @@ function placeParts(sheets, parts, config, nestindex){
 	
 	// there were parts that couldn't be placed
 	// scale this value high - we really want to get all the parts in, even at the cost of opening new sheets
+	var penaltySheetArea = totalsheetarea > 0 ? totalsheetarea : 1;
 	for(i=0; i<parts.length; i++){
-		fitness += 100000000*(Math.abs(GeometryUtil.polygonArea(parts[i]))/totalsheetarea);
+		var unplacedPenalty = 100000000*(Math.abs(GeometryUtil.polygonArea(parts[i]))/penaltySheetArea);
+		fitness += unplacedPenalty;
+		if(fitnessBreakdown){
+			fitnessBreakdown.unplacedPenalty += unplacedPenalty;
+		}
 	}
 	// send finish progerss signal
 	ipcRenderer.send('background-progress', {index: nestindex, progress: -1});
 	
-	return {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged, localRefinement: localRefinement };
+	var result = {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged, localRefinement: localRefinement };
+	if(fitnessBreakdown){
+		result.fitnessBreakdown = fitnessBreakdown;
+	}
+	return result;
 }
 
 // clipperjs uses alerts for warnings

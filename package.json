@@ -1,7 +1,7 @@
 {
   "name": "deepnest-ml",
   "productName": "Deepnest ML",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "ML-assisted deep nesting for laser and CNC workflows",
   "main": "main.js",
   "scripts": {
@@ -18,8 +18,11 @@
     "clean": "npx -y node-gyp@12 clean",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
+    "experiment:physics-nest": "node experiments/physics-nest/physics-nest.js",
+    "experiment:physics-nest:test": "node experiments/physics-nest/physics-nest.test.js",
     "ml:teacher": "node ml/cli/run_teacher.js",
     "ml:benchmark": "python3 ml/python/scripts/generate_benchmark_corpus.py",
+    "ml:nest-benchmark": "node ml/cli/run_benchmark.js",
     "ml:synthetic": "python3 ml/python/scripts/generate_synthetic_jobs.py",
     "ml:sweep": "python3 ml/python/scripts/run_config_sweep.py",
     "ml:pipeline": "python3 ml/python/scripts/run_training_pipeline.py",

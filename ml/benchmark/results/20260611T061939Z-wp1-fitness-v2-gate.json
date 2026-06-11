@@ -1,0 +1,1188 @@
+{
+  "label": "wp1-fitness-v2-gate",
+  "createdAt": "2026-06-11T06:19:39.655Z",
+  "gitCommit": "ad97fdad0dad3b43360610bdb3ac47ee38709568",
+  "gitDirty": true,
+  "engineFlags": {
+    "protocol": "sota-wp0",
+    "runsPerInstance": 3,
+    "timeBudgetSec": 240,
+    "fitnessVersion": 2,
+    "baseConfig": {
+      "placementType": "gravity",
+      "spacing": 0,
+      "mergeLines": false,
+      "processHoles": true,
+      "populationSize": 10,
+      "mutationRate": 10,
+      "rotations": "<per-instance rotations>",
+      "fitnessVersion": 2
+    }
+  },
+  "artifactRoot": "/Users/abrahamsaenz/Desktop/Deepnest++/ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate",
+  "instances": [
+    {
+      "name": "albano",
+      "file": "ml/benchmark/esicup/instances/albano.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.8397941462158184,
+          "usedLength": 10366.1907692,
+          "timeToBestSec": 180.658,
+          "fitness": 2.644502884964795,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 4868.4752475000005,
+                  "width": 10366.1907692,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.6445028849647951,
+                "placementCount": 24,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 4900,
+                  "width": 17410.932653,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "1202518466aabdec5f3ee88f8f8a8adf7e6694f8",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/albano/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/albano/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.8456877459225022,
+          "usedLength": 10293.9487636,
+          "timeToBestSec": 97.682,
+          "fitness": 2.6416591298231418,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 4900,
+                  "width": 10293.9487636,
+                  "x": -4.547473508864641e-13,
+                  "y": 0
+                },
+                "metric": 0.6416591298231417,
+                "placementCount": 24,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 4900,
+                  "width": 17410.932653,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "b082cdd70a33a0750b2aa77e9fa32ac5b67adda5",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/albano/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/albano/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.8538246221096265,
+          "usedLength": 10195.8483055,
+          "timeToBestSec": 42.786,
+          "fitness": 2.636719761676944,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 4900.000000000002,
+                  "width": 10195.8483055,
+                  "x": 0,
+                  "y": -9.094947017729282e-13
+                },
+                "metric": 0.6367197616769442,
+                "placementCount": 24,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 4900,
+                  "width": 17410.932653,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "a3b3a1a92f06b2f5a19b077aa40a4858116dfc58",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/albano/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/albano/run-03/export.svg"
+        }
+      ],
+      "median": 0.8456877459225022
+    },
+    {
+      "name": "dagli",
+      "file": "ml/benchmark/esicup/instances/dagli.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.5961308946723862,
+          "usedLength": 84.8387501,
+          "timeToBestSec": 129.826,
+          "fitness": 2.8756290514677847,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 60,
+                  "width": 84.8387501,
+                  "x": -1.1102230246251565e-16,
+                  "y": 0
+                },
+                "metric": 0.8756290514677849,
+                "placementCount": 30,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 60,
+                  "width": 101.15,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "8904ce4a2a41abf79323138f15245a6d2525c2b2",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/dagli/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/dagli/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.6070498364113819,
+          "usedLength": 83.3127644,
+          "timeToBestSec": 239.194,
+          "fitness": 2.864540699961876,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 60.000000000000014,
+                  "width": 83.38451280000002,
+                  "x": -8.881784197001252e-16,
+                  "y": 0
+                },
+                "metric": 0.864540699961876,
+                "placementCount": 30,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 60,
+                  "width": 101.15,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "fceb1e5bcc0df57182326ecee18c506a47008648",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/dagli/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/dagli/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.6092048495447596,
+          "usedLength": 83.0180522,
+          "timeToBestSec": 186.706,
+          "fitness": 2.861746490278307,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 60,
+                  "width": 83.0180522,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.8617464902783072,
+                "placementCount": 30,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 60,
+                  "width": 101.15,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "ad9f5363a5b12a44c07fac36108d1f1a65f43fea",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/dagli/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/dagli/run-03/export.svg"
+        }
+      ],
+      "median": 0.6070498364113819
+    },
+    {
+      "name": "jakobs1",
+      "file": "ml/benchmark/esicup/instances/jakobs1.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.41581633068877555,
+          "usedLength": 19.59804,
+          "timeToBestSec": 14.485,
+          "fitness": 13058621.78306378,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 39.995785299999994,
+                  "width": 19.59804,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.9998962791451724,
+                "placementCount": 23,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40.004,
+                  "width": 19.59804,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 13058618.7831675,
+            "version": 2
+          },
+          "placementsDigest": "91f7437e7459c6cb1c8ad63edc9c1d0a7c97111b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/jakobs1/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/jakobs1/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.41581633068877555,
+          "usedLength": 19.59804,
+          "timeToBestSec": 14.493,
+          "fitness": 13058621.78306378,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 39.995785299999994,
+                  "width": 19.59804,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.9998962791451724,
+                "placementCount": 23,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40.004,
+                  "width": 19.59804,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 13058618.7831675,
+            "version": 2
+          },
+          "placementsDigest": "91f7437e7459c6cb1c8ad63edc9c1d0a7c97111b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/jakobs1/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/jakobs1/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.41581633068877555,
+          "usedLength": 19.59804,
+          "timeToBestSec": 14.426,
+          "fitness": 13058621.78306378,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 39.995785299999994,
+                  "width": 19.59804,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.9998962791451724,
+                "placementCount": 23,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40.004,
+                  "width": 19.59804,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 13058618.7831675,
+            "version": 2
+          },
+          "placementsDigest": "91f7437e7459c6cb1c8ad63edc9c1d0a7c97111b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/jakobs1/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/jakobs1/run-03/export.svg"
+        }
+      ],
+      "median": 0.41581633068877555
+    },
+    {
+      "name": "shapes0",
+      "file": "ml/benchmark/esicup/instances/shapes0.json",
+      "rotations": 1,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.38311924254858065,
+          "usedLength": 77.5138051,
+          "timeToBestSec": 112.368,
+          "fitness": 51867042.8608751,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 40.00400000000003,
+                  "width": 77.5138051,
+                  "x": 0,
+                  "y": -1.4210854715202004e-14
+                },
+                "metric": 0.9771708176785463,
+                "placementCount": 25,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40.004,
+                  "width": 79.792021,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 51867039.883704275,
+            "version": 2
+          },
+          "placementsDigest": "2f2e183fb3d6f094098f91074ee6cfcc771185c2",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shapes0/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shapes0/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.39394504471691694,
+          "usedLength": 77.9218592,
+          "timeToBestSec": 228.125,
+          "fitness": 47581520.22376314,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 40.00400000000003,
+                  "width": 77.9218592,
+                  "x": 0,
+                  "y": -1.4210854715202004e-14
+                },
+                "metric": 0.9812597810844801,
+                "placementCount": 27,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40.004,
+                  "width": 79.792021,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 47581517.24250335,
+            "version": 2
+          },
+          "placementsDigest": "931efd052acc9bf17e1a3b518aad8b8beb367982",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shapes0/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shapes0/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.3851369809364647,
+          "usedLength": 78.4058187,
+          "timeToBestSec": 52.296,
+          "fitness": 49724281.549213186,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 40.00400000000003,
+                  "width": 78.4058187,
+                  "x": 0,
+                  "y": -1.4210854715202004e-14
+                },
+                "metric": 0.9861093652093647,
+                "placementCount": 26,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40.004,
+                  "width": 79.792021,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 49724278.563103825,
+            "version": 2
+          },
+          "placementsDigest": "de5c39206cd8808c0c1131a3feedccd3095975c3",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shapes0/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shapes0/run-03/export.svg"
+        }
+      ],
+      "median": 0.3851369809364647
+    },
+    {
+      "name": "shirts",
+      "file": "ml/benchmark/esicup/instances/shirts.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.5966959222994062,
+          "usedLength": 90.498356,
+          "timeToBestSec": 188.927,
+          "fitness": 2.86326840625,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 40.000000000000014,
+                  "width": 90.498356,
+                  "x": 0,
+                  "y": -1.4210854715202004e-14
+                },
+                "metric": 0.86326840625,
+                "placementCount": 99,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40,
+                  "width": 108,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "39bc5af621ee4d381712409849ef51da0c7b3787",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shirts/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shirts/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.5950723001714652,
+          "usedLength": 90.7452758,
+          "timeToBestSec": 18.118,
+          "fitness": 2.8720724671875,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 40,
+                  "width": 91.6252758,
+                  "x": -7.105427357601002e-15,
+                  "y": 0
+                },
+                "metric": 0.8720724671875,
+                "placementCount": 99,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40,
+                  "width": 108,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "cd193efbe4c21ce05ace2b217176007e0dc676a1",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shirts/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shirts/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.5915448937178739,
+          "usedLength": 91.2863936,
+          "timeToBestSec": 149.326,
+          "fitness": 2.86942495,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 40.000000000000014,
+                  "width": 91.2863936,
+                  "x": 0,
+                  "y": -1.4210854715202004e-14
+                },
+                "metric": 0.86942495,
+                "placementCount": 99,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 40,
+                  "width": 108,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "f018cf4bb32ee93592fb640a9d0fab183ffb88d5",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shirts/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/shirts/run-03/export.svg"
+        }
+      ],
+      "median": 0.5950723001714652
+    },
+    {
+      "name": "swim",
+      "file": "ml/benchmark/esicup/instances/swim.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.6438810370897482,
+          "usedLength": 6870.341882600001,
+          "timeToBestSec": 208.563,
+          "fitness": 2.823334969227024,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 5563.830131899999,
+                  "width": 6870.341882600001,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.8233349692270239,
+                "placementCount": 48,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 5752,
+                  "width": 8847.365713,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "b950c4e06b71f86e5133a046b9eadb7b0bbccb8e",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/swim/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/swim/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.6678763802997678,
+          "usedLength": 6623.5054675,
+          "timeToBestSec": 219.761,
+          "fitness": 2.8096935457216,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 5737.656168900005,
+                  "width": 6623.5054675,
+                  "x": 0,
+                  "y": -1.8189894035458565e-12
+                },
+                "metric": 0.8096935457216,
+                "placementCount": 48,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 5752,
+                  "width": 8847.365713,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "2463c6332a0dd3b4639d0809135c72a6b5245934",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/swim/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/swim/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.6468264560357097,
+          "usedLength": 6839.056775199999,
+          "timeToBestSec": 199.584,
+          "fitness": 2.8286917778592375,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 5752.000000000002,
+                  "width": 6839.056775199999,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.8286917778592376,
+                "placementCount": 48,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 5752,
+                  "width": 8847.365713,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "9d573bbaadfbd61f456b07a07a41a57c875f1c23",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/swim/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/swim/run-03/export.svg"
+        }
+      ],
+      "median": 0.6468264560357097
+    },
+    {
+      "name": "trousers",
+      "file": "ml/benchmark/esicup/instances/trousers.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.7804608664342662,
+          "usedLength": 279.0707476,
+          "timeToBestSec": 227.304,
+          "fitness": 2.6750697125774217,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 79.00000000000003,
+                  "width": 281.2307476,
+                  "x": 0,
+                  "y": -2.842170943040401e-14
+                },
+                "metric": 0.6750697125774214,
+                "placementCount": 64,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 79,
+                  "width": 435.607595,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "23c9509716e97563cd9667b9c27263fc957ea9e5",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/trousers/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/trousers/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.7790083138987243,
+          "usedLength": 279.5911078,
+          "timeToBestSec": 225.929,
+          "fitness": 2.676164959644562,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 79.00000000000003,
+                  "width": 281.7511078,
+                  "x": 0,
+                  "y": -2.842170943040401e-14
+                },
+                "metric": 0.6761649596445621,
+                "placementCount": 64,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 79,
+                  "width": 435.607595,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "517251ecbd832c9d929d0dfacef6daf244254f7b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/trousers/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/trousers/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.7869627273430986,
+          "usedLength": 276.7650739999999,
+          "timeToBestSec": 184.035,
+          "fitness": 2.669310497130655,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 79.00000000000003,
+                  "width": 278.49450060000004,
+                  "x": 0,
+                  "y": -2.842170943040401e-14
+                },
+                "metric": 0.6693104971306553,
+                "placementCount": 64,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 79,
+                  "width": 435.607595,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "f1966964b9b879f7b4a20ef2a2d1cda465f931a6",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/trousers/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/trousers/run-03/export.svg"
+        }
+      ],
+      "median": 0.7804608664342662
+    },
+    {
+      "name": "gardeyn1",
+      "file": "ml/benchmark/esicup/instances/gardeyn1.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.7931885460605498,
+          "usedLength": 18407.1995839,
+          "timeToBestSec": 64.655,
+          "fitness": 2.724659413875263,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 20000,
+                  "width": 18407.1995839,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.724659413875263,
+                "placementCount": 50,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 20000,
+                  "width": 29200.75975,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "bb1d281a0e08c37c9298c5559e8c5c931812487a",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn1/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn1/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.7938672596963665,
+          "usedLength": 18391.4624223,
+          "timeToBestSec": 20.574,
+          "fitness": 2.7242579634518433,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 20000,
+                  "width": 18391.4624223,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.7242579634518436,
+                "placementCount": 50,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 20000,
+                  "width": 29200.75975,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "de05a81ea15d1a3756e85405a623bc022fa702d1",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn1/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn1/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.7931885460605498,
+          "usedLength": 18407.1995839,
+          "timeToBestSec": 54.099,
+          "fitness": 2.724659413875263,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 20000,
+                  "width": 18407.1995839,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.724659413875263,
+                "placementCount": 50,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 20000,
+                  "width": 29200.75975,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "bb1d281a0e08c37c9298c5559e8c5c931812487a",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn1/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn1/run-03/export.svg"
+        }
+      ],
+      "median": 0.7931885460605498
+    },
+    {
+      "name": "gardeyn2",
+      "file": "ml/benchmark/esicup/instances/gardeyn2.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.800671626247072,
+          "usedLength": 53007.342097199995,
+          "timeToBestSec": 74.206,
+          "fitness": 2.645373504630738,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 10000,
+                  "width": 53008.07418989999,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.645373504630738,
+                "placementCount": 50,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 10000,
+                  "width": 84882.9496,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "11b4a06395d790c099e0c72fd41fe5402f2c5d14",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn2/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn2/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.800671626247072,
+          "usedLength": 53007.342097199995,
+          "timeToBestSec": 65.343,
+          "fitness": 2.645373504630738,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 10000,
+                  "width": 53008.07418989999,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.645373504630738,
+                "placementCount": 50,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 10000,
+                  "width": 84882.9496,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "11b4a06395d790c099e0c72fd41fe5402f2c5d14",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn2/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn2/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.800671626247072,
+          "usedLength": 53007.342097199995,
+          "timeToBestSec": 98.083,
+          "fitness": 2.645373504630738,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 10000,
+                  "width": 53008.07418989999,
+                  "x": 0,
+                  "y": 0
+                },
+                "metric": 0.645373504630738,
+                "placementCount": 50,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 10000,
+                  "width": 84882.9496,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "11b4a06395d790c099e0c72fd41fe5402f2c5d14",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn2/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn2/run-03/export.svg"
+        }
+      ],
+      "median": 0.800671626247072
+    },
+    {
+      "name": "gardeyn4",
+      "file": "ml/benchmark/esicup/instances/gardeyn4.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.6311259008992794,
+          "usedLength": 5994.1911756,
+          "timeToBestSec": 125.416,
+          "fitness": 2.8109723816980474,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 1500.0000000000005,
+                  "width": 5994.191175600001,
+                  "x": -9.094947017729282e-13,
+                  "y": -4.547473508864641e-13
+                },
+                "metric": 0.8109723816980473,
+                "placementCount": 80,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 1500,
+                  "width": 7566.178612,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "c6fe6048bdb9f14a6dee0f0c6db1759569d2a241",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn4/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn4/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.6311259008992794,
+          "usedLength": 5994.1911756,
+          "timeToBestSec": 149.132,
+          "fitness": 2.8109723816980474,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 1500.0000000000005,
+                  "width": 5994.191175600001,
+                  "x": -9.094947017729282e-13,
+                  "y": -4.547473508864641e-13
+                },
+                "metric": 0.8109723816980473,
+                "placementCount": 80,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 1500,
+                  "width": 7566.178612,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "c6fe6048bdb9f14a6dee0f0c6db1759569d2a241",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn4/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn4/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.6311259008992794,
+          "usedLength": 5994.1911756,
+          "timeToBestSec": 150.144,
+          "fitness": 2.8109723816980474,
+          "fitnessBreakdown": {
+            "sheetMetrics": [
+              {
+                "bounds": {
+                  "height": 1500.0000000000005,
+                  "width": 5994.191175600001,
+                  "x": -9.094947017729282e-13,
+                  "y": -4.547473508864641e-13
+                },
+                "metric": 0.8109723816980473,
+                "placementCount": 80,
+                "sheet": 0,
+                "sheetBounds": {
+                  "height": 1500,
+                  "width": 7566.178612,
+                  "x": 0,
+                  "y": 0
+                },
+                "sheetid": 0,
+                "type": "gravity"
+              }
+            ],
+            "sheets": 1,
+            "unplacedPenalty": 0,
+            "version": 2
+          },
+          "placementsDigest": "c6fe6048bdb9f14a6dee0f0c6db1759569d2a241",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn4/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T061939Z-wp1-fitness-v2-gate/gardeyn4/run-03/export.svg"
+        }
+      ],
+      "median": 0.6311259008992794
+    }
+  ],
+  "aggregate": {
+    "meanMedianUtilization": 0.6501036589807466
+  }
+}

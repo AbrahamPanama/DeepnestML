@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.7.1`
+- Current version: `0.7.2`
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.7.1-mac-arm64.dmg`
+- Local DMG artifact: `dist/Deepnest ML-0.7.2-mac-arm64.dmg`
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-05-05 by Codex): _dirty: ignored native addon was rebuilt previously for verification; `.claude/` is untracked and unrelated_.
+State (verified 2026-06-11 by Codex): _dirty: existing local edits remain in `main.js` and `main/index.html` (NFP cache clear feature); version metadata remains in `package.json` / `package-lock.json`; physics nesting prototype under `experiments/physics-nest/` plus npm experiment scripts; `testpart.svg` and `.claude/` untracked; Claude-Code added `docs/sota-nesting-implementation-plan.md` (untracked); Codex added active engine bug fixes in `main/background.js`, `main/deepnest.js`, cache version bump in `main.js`, tests in `ml/tests/engine_bugfixes/`, performance hot-path top-three fixes in `main/background.js` / `main.js`, and WP-0 benchmark corpus/converter/runner files under `ml/benchmark/`, `ml/cli/`, `ml/lib/`, `ml/scripts/`, and `ml/tests/`_.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,7 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| _none_ | _n/a_ | _n/a_ | _n/a_ | _n/a_ |
+| Codex | WP-1.1 fitness v2 gate investigation | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, `ml/tests/fitness_v2/`, `AGENT_COLLABORATION.md` | Blocked: flag-on gate failed; do not proceed to WP-1.2 yet | 2026-06-11 |
 
 ## Upcoming Work
 
@@ -111,7 +111,8 @@ Park future tasks both agents should be aware of. Keep entries short. Move items
 | Group Step & Repeat fields | `main/index.html`, `main/style.css` | UI_AUDIT P1.1 — wrap fields in `.steprepeat-group` and toggle via single class instead of inline `display:none` per field |
 | Accessibility pass (landmarks, labels, dialog roles) | `main/index.html` | UI_AUDIT P2.1 — entire file has zero `aria-` / `role=` attributes |
 | Extend smoke battery to bitmap/DXF cases | `ml/app-smoke-main.js`, `ml/smoke/scenarios/` | Follow-up after first scenario battery: add PNG contour import fixture and DXF export/import coverage |
-| Local Refinement v2 rotations | `main/background.js` | After v1 translation-only testing, consider tiny legal angle probes like ±1/±2/±5 degrees with aggressive caching |
+| Local Refinement v2 rotations | `main/background.js` | After v1 translation-only testing, consider tiny legal angle probes like ±1/±2/±5 degrees with aggressive caching — superseded by WP-2.3 of the SOTA plan below |
+| SOTA nesting engine (WP-0 … WP-4) | `docs/sota-nesting-implementation-plan.md` | Phased plan: benchmark harness → fitness v2 → separate-and-compact refinement (replaces slide Local Refinement) → `deepsearch` placement type → ML routing. Every WP lands behind a default-off flag with equivalence + benchmark gates. Claim individual WPs from the plan's §10 table |
 
 ## Open Questions For User
 
@@ -124,6 +125,333 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-06-11 - Sheet margin setting + export sheet outline option (Claude-Code)
+
+Two user-requested features, both default-preserving (margin 0, outline off ⇒ behavior unchanged):
+
+- **Sheet margin** (`sheetMargin`, default 0, unit-converted like spacing via `data-conversion`):
+  - `main/index.html`: defaultconfig key, Settings row under "Space between parts", `explain_sheetMargin` card.
+  - `main/deepnest.js`: defaultconfig + config-merge parse; in `start()`, after the existing spacing offsets, every sheet's outer ring is inset by the margin via `polygonOffset(tree, -margin)` (largest-area piece kept, ring replaced in place, children/holes untouched). Applied before IPC, so gravity/box/hull AND Step & Repeat all respect it with no engine changes. If the inset collapses a sheet, `start()` sets `DeepNest.lastStartError` and returns `false`.
+  - Both `DeepNest.start` callers now handle `false`: the UI path reverts workspace state and shows the error; the teacher path calls `fail('start_rejected', ...)`.
+- **Export sheet outline** (`exportSheetOutline`, default false, checkbox in Settings near merge lines):
+  - `main/index.html`: defaultconfig key, both checkbox save/load lists, Settings row, explain card; `exportNest` revives the previously commented-out sheet-element block, gated by the flag — sheet `svgelements` are cloned per sheet group as stroke-only nodes with `class="sheetoutline"` (images skipped). Applies to SVG/DXF/PDF export paths since they all go through `exportNest`.
+- New permanent smoke scenario `ml/smoke/scenarios/svg-gravity-sheet-margin-outline.json` (gravity, rotations 1, margin 50, outline on) added to `ml/scripts/run_smoke_battery.sh`.
+- Verification:
+  - `node --check main/deepnest.js` passed; inline `main/index.html` script parse passed; `bash ml/scripts/run_boot_check.sh` passed.
+  - Full smoke battery passed BEFORE the battery addition (defaults unchanged) and AFTER with the new scenario included.
+  - Geometric proof from the new scenario's export: sheet 1200×800 at origin, margin 50 ⇒ all three parts' world bounds start at exactly x=50/y=50 (gravity packs against the inset boundary); export contains the sheet rect with `class="sheetoutline"`. Baseline svg-gravity export contains zero `sheetoutline` nodes (default off).
+  - Too-large margin (10000 on an 800-high sheet): nest refuses to start; ad-hoc smoke reported `failed/timeout` with no crash and no partial placements.
+- ML-sensitive files touched (`main/index.html`, `main/deepnest.js`) but defaults preserve teacher behavior; no checkpoint taken. The margin is config-driven and geometry-keyed NFP caching makes margined sheets distinct cache entries automatically.
+- Known limitations recorded: margin insets the sheet outer ring only (sheet holes are not expanded by the margin); with mergeLines enabled the exported sheet outline participates in common-line merge processing like any other geometry.
+
+### 2026-06-11 - SOTA WP-0/WP-1.1 implementation review (Claude-Code)
+
+Independent verification of the Codex WP-0 + WP-1.1 batches against `docs/sota-nesting-implementation-plan.md`. Verdict: **implementation is correct and process-compliant; the WP-1.1 gate failure is a plan defect, not an implementation defect.**
+
+Verified correct (by code read + re-execution):
+- Fitness v2 matches the plan formula exactly: v1 `fitness += sheetarea` suppressed under v2 (`main/background.js:2218-2220`); per-sheet `2.0 + metric` accumulated after refinement (`:2527-2541`); gravity/box/hull metrics as specified (`:1240-1250`); unplaced penalty preserved with guarded denominator; `fitnessBreakdown` additive; candidate-level scoring untouched; flag defaults to 1 everywhere (`main/index.html:416`, `main/deepnest.js:37,749-750`).
+- WP-0 converter: `utilizationFromPlacements` uses original un-inflated polygons rotated per placement, `usedLength = maxX − sheetBounds.x`, trueArea sum (`ml/lib/esicup-convert.js:448-479`) — per plan. Runner preset exact (gravity/spacing 0/mergeLines false/processHoles true/pop 10/mut 10/per-instance rotations); report schema matches plan §WP-0.3.
+- Gate numbers reproduce independently from the result JSONs: baseline 65.300%, v2 65.010%, delta −0.290pp across the 10 gate instances (gardeyn4 via the supplement file). All three new test suites pass; `node --check` clean on all touched files.
+
+Review findings (action items):
+1. **Plan §8.3 engine-equivalence harness was not built** (`ml/tests/engine_equivalence/` does not exist). Flag-off equivalence was inferred from the smoke battery passing, which does not compare placements. The runner already emits `placementsDigest` per run — build the golden-digest harness before WP-1.2 lands.
+2. **The WP-1.1 +0.5pp gate could not structurally pass on this corpus.** All benchmark instances are single-sheet strips; on a single sheet, v1's discriminating term (last-part `2W+H` + negligible `W/sheetarea`) and v2's metric (`(2W+H)/(2SW+SH)`) are monotone transforms of essentially the same scalar, so GA selection ranking is near-identical and v2 cannot add signal. The observed deltas are GA run noise: swim's −1.957pp sits inside v2's own 2.400pp 3-run spread; jakobs1/gardeyn2/gardeyn4 are fully deterministic (0.000 spread and 0.000 delta). v2's real value per the plan is multi-sheet comparability + serving as WP-2/WP-3's layoutMetric. **Recommended plan revision:** WP-1.1 gate becomes non-regression (mean delta ≥ −0.5pp, satisfied at −0.290) + the fitness_v2 unit tests + a multi-sheet comparability check; keep default at 1 until WP-2 consumes it; proceed to WP-1.2.
+3. Minor: report-schema drift (`median` is an object in the main baseline but a raw number in the gardeyn4 supplement — consolidate before results accumulate); no explicit `spacing===0` assert in the runner (preset hard-codes 0, de facto fine); `rotationsForMeta` takes the max across items, so mixed-orientation instances would over-permit rotations for stricter items (document in ATTRIBUTION; uniform for current corpus); gardeyn3's `no_nest_before_time_budget` failure at 240s is itself an engine-capacity data point worth keeping visible.
+4. Several instances show 0.000 3-run spread, i.e. 240s yields deterministic results (best nest = early deterministic seed individual). Benchmark sensitivity is limited; consider recording generations-completed per run in the report to aid interpretation.
+
+### 2026-06-11 - SOTA WP-1.1 fitness v2 implemented, gate failed (Codex)
+
+- Implemented default-off `fitnessVersion` plumbing:
+  - `main/index.html`: hidden default `fitnessVersion: 1`; app smoke reports include `fitnessBreakdown`.
+  - `main/deepnest.js`: worker config accepts only version `1` or `2`.
+  - `main/background.js`: `fitnessVersion === 2` changes only aggregate fitness, not candidate scoring. It computes `2.0 + sheetMetric` per used sheet after optional refinement, preserves the unplaced penalty formula, and attaches `fitnessBreakdown = {version, sheets, sheetMetrics, unplacedPenalty}`.
+  - `ml/cli/run_benchmark.js`: added `--fitness-version 2` and persists run-level `fitnessBreakdown`.
+  - `ml/tests/fitness_v2/run.js`: added targeted helper math tests.
+- Verification:
+  - `node --check main/background.js`, `main/deepnest.js`, `ml/cli/run_benchmark.js`, `ml/tests/fitness_v2/run.js` passed.
+  - `node ml/tests/fitness_v2/run.js` passed.
+  - `node ml/tests/engine_bugfixes/run.js` passed.
+  - Filtered inline JS parse for `main/index.html` passed.
+  - `node --check ml/app-smoke-main.js` passed.
+  - `bash ml/scripts/run_boot_check.sh` passed.
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-wp1-fitness-v1 bash ml/scripts/run_smoke_battery.sh` passed all scenarios with flag off.
+  - Flag-on smoke benchmark passed: `ml/benchmark/results/20260611T061851Z-wp1-fitness-v2-smoke.json` contains `fitnessBreakdown`.
+- WP-1.1 gate result: `ml/benchmark/results/20260611T061939Z-wp1-fitness-v2-gate.json` on the 10 stable baseline instances, 3 runs each, 240s, `fitnessVersion=2`.
+  - Baseline mean median utilization: 65.300%.
+  - v2 mean median utilization: 65.010%.
+  - Delta: -0.290pp. Gate required at least +0.5pp, so the flag-on gate failed.
+- Investigation note:
+  - `GeneticAlgorithm.randomWeightedIndividual` is rank-based after sorting by fitness; it does not use fitness magnitude.
+  - For complete one-sheet `gravity` jobs, v2 is mostly rank-equivalent to v1 because v1's final `minarea` is the same `2*width+height` signal, just unnormalized. After the earlier engine bug fixes, this WP no longer obviously adds selection signal for those jobs.
+  - The main regressions were `shapes0` (-1.578pp), `swim` (-1.957pp), and `shirts` (-0.418pp). Do not proceed to WP-1.2 until the plan is revised or the v2 signal is adjusted and re-gated.
+
+### 2026-06-11 - SOTA WP-0 benchmark harness + baseline gate (Codex)
+
+- Added the WP-0 ESICUP/Jagua benchmark corpus and attribution under `ml/benchmark/esicup/`, the SVG/meta converter in `ml/lib/esicup-convert.js`, converter tests under `ml/tests/esicup_convert/`, and the benchmark runner/script in `ml/cli/run_benchmark.js` / `ml/scripts/run_nesting_benchmark.sh`.
+- Extended the app smoke path (`ml/app-smoke-main.js`, `main/index.html`) with time-budgeted best-nest export, utilization capture, time-to-best, and placement digests. Added `npm run ml:nest-benchmark`.
+- Verification passed before baseline capture: `node --check` for touched JS files, converter tests, inline `main/index.html` script parse, `bash ml/scripts/run_boot_check.sh`, and smoke battery with `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-wp0-runner`.
+- Baseline capture: 120s full run failed at `gardeyn0`; 240s full run wrote `ml/benchmark/results/20260611T022554Z-baseline-v0-240.json` but stopped at `gardeyn3` run 2 with `no_nest_before_time_budget`. Same-budget gate supplement `ml/benchmark/results/20260611T055013Z-baseline-v0-240-gardeyn4-gate.json` completed `gardeyn4`.
+- WP-0 gate status: combined 240s baseline has 17 complete instances and 10 stable instances at <=1.5pp 3-run utilization spread. Full corpus is not complete; the current engine failed `gardeyn3` run 2 before a nest was available within 240s.
+- Created ML checkpoint before WP-1.1 edits: `20260611-060343-sota-wp1-fitness-pre` from run `20260409-232133-overnight`; checkpoint path is `ml/artifacts/checkpoints/20260611-060343-sota-wp1-fitness-pre` (~6.2 GB).
+
+### 2026-06-10 - WP-0.1/WP-0.2 benchmark corpus + converter implemented (Codex)
+
+- Claimed and implemented the first SOTA work package: `WP-0 benchmark corpus + converter`.
+- Added `ml/benchmark/esicup/instances/` with 23 jagua-rs JSON instances:
+  - Classic set: `albano`, `blaz1`, `dagli`, `fu`, `jakobs1`, `jakobs2`, `mao`, `marques`, `shapes0`, `shapes1`, `shirts`, `swim`, `trousers`.
+  - Gardeyn 90-degree set: `gardeyn0` through `gardeyn9`.
+- Added `ml/benchmark/esicup/ATTRIBUTION.md` with source URLs, source commit hashes, and license/provenance notes:
+  - `JeroenGar/jagua-rs` source commit `43e81373ef5ff403df708dea60162eed236dd251`.
+  - `ESICUP/datasets` source commit `154a8f006a8e72f65d734f2d1e36777f678f31f8`.
+- Added `ml/lib/esicup-convert.js`:
+  - `instanceToSvg(instanceJson, opts) -> { svgText, meta }`.
+  - Expands demand into per-copy SVG paths, emits the strip sheet first, preserves source metadata, supports `simple_polygon`, `polygon`, and `rectangle` jagua shapes.
+  - Computes `strip_length_estimate = 2 * totalArea / strip_height` when not overridden.
+  - `utilizationFromPlacements(meta, placements, partsBySource) -> { utilization, usedLength }`.
+- Added `ml/tests/esicup_convert/run.js` with a hand-written 2-item instance, orientation mapping checks, hole-area preservation, and utilization calculation.
+- Verification:
+  - `node --check ml/lib/esicup-convert.js` passed.
+  - `node --check ml/tests/esicup_convert/run.js` passed.
+  - `node ml/tests/esicup_convert/run.js` passed.
+  - Corpus conversion smoke passed: 23 instances, 1,375 expanded demanded copies.
+  - `bash ml/scripts/run_boot_check.sh` passed.
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-wp0-converter bash ml/scripts/run_smoke_battery.sh` passed all scenarios.
+- Notes:
+  - Continuous-rotation `_c` Gardeyn variants were intentionally not copied for WP-0 because current Deepnest++ benchmark plumbing maps allowed orientations into the existing discrete `rotations` setting.
+  - No engine behavior changed in this WP.
+
+### 2026-06-10 - Performance hot-path top-three fixes implemented (Codex)
+
+- Implemented the top three performance findings from the Claude-Code hot-path hunt; intentionally did not take on findings 4-10 in this batch.
+- `main/background.js` native NFP path:
+  - Added a per-background-renderer native addon loader using the same development, asar-unpacked, and resources path families as the existing main/utility-process loaders.
+  - `calculateNativeAddonNfp` now calls `addon.calculateNFP({ A, B })` directly inside each background renderer when available.
+  - Kept the existing synchronous main-process IPC path as a fallback when the renderer cannot load the addon locally.
+- `main.js` persistent NFP cache:
+  - Added one-time running byte-total calculation when the manifest loads.
+  - `nfpCacheInsert` updates the in-memory manifest and byte total immediately, prunes against the running total, and schedules a debounced manifest flush instead of rewriting the full manifest on every insert.
+  - `pruneNfpCacheIfNeeded` no longer rescans all entry bytes for every insert and no longer uses `keys.shift()` in the eviction loop.
+  - `before-quit` now cancels any pending timer and flushes dirty manifest state synchronously.
+  - Cache clearing cancels pending flushes and resets the running byte total before writing the empty manifest.
+- `main/background.js` mergeLines scoring hot loop:
+  - Hoisted `shiftedplaced` construction outside the candidate-position loop; only the candidate part shift remains per candidate.
+  - This is intended to preserve scoring/output semantics while removing repeated placed-geometry allocations.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main.js` passed.
+  - `node --check ml/tests/engine_bugfixes/run.js` passed.
+  - `node ml/tests/engine_bugfixes/run.js` passed.
+  - `bash ml/scripts/run_boot_check.sh` passed.
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-performance-hotpaths bash ml/scripts/run_smoke_battery.sh` passed all scenarios.
+  - `bash ml/tests/nfp_equivalence/run.sh` passed 4 fixtures.
+  - `bash ml/tests/nfp_profile/run.sh` completed; notable baseline: wavy native mean 146.971ms vs JS Clipper 262.865ms.
+- No new ML checkpoint or bakeoff was run for this performance batch because the changes are intended to preserve nesting/NFP outputs; bakeoff still requires explicit `--manifest`, `--model`, and `--output-dir` inputs if the team wants a full acceptance gate.
+
+### 2026-06-10 - Active engine bug-fix batch implemented (Codex)
+
+- Created pre-fix ML checkpoint before engine edits:
+  - `npm run ml:checkpoint -- --name engine-bugfixes-pre`
+  - checkpoint `20260610-222930-engine-bugfixes-pre`
+  - manifest `ml/artifacts/checkpoints/20260610-222930-engine-bugfixes-pre/manifest.json`
+- Fixed `main/background.js` engine bugs:
+  - `mergedLength` no longer corrupts its min-length threshold via `min2` reuse.
+  - `mergedLength` counts hole-child shared edges once instead of once per candidate segment.
+  - Empty Clipper `MinkowskiSum` fallback returns `null` instead of throwing/stalling the GA.
+  - Rotation retry now attempts exactly `config.rotations` orientations with `360/config.rotations` spacing.
+  - Degenerate first-placement IFPs no longer push `null` placements.
+  - `clipCache.index` now stores the already-unioned placed count.
+  - Candidate tie-break anchors now track the current accepted candidate.
+  - Per-sheet `minwidth`/`minarea` are explicitly reset at sheet open, and sheet fitness is only added when valid values exist.
+  - Empty sheets no longer abandon later sheets; their sheet-area bookkeeping is reverted before continuing.
+  - Unplaced penalty denominator is guarded when no sheet receives placements.
+  - Sheet holes now subtract outer forbidden NFPs from the sheet IFP and fail closed if the forbidden hole region or subtraction cannot be computed.
+- Bumped persistent NFP cache version:
+  - `main/background.js`: `NFP_CACHE_VERSION = 3`
+  - `main.js`: `NFP_CACHE_VERSION = 3`, `manifest-v3.json`
+- Fixed legacy `main/deepnest.js.applyPlacement` to clone source DOM nodes per placed instance; this path is still legacy/no-current-caller.
+- Added focused Node regression tests in `ml/tests/engine_bugfixes/run.js`, including the sheet-hole subtraction fail-closed path.
+- Verification:
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - `node --check main.js` passed.
+  - `node --check ml/tests/engine_bugfixes/run.js` passed.
+  - `node ml/tests/engine_bugfixes/run.js` passed.
+  - Initial `bash ml/scripts/run_boot_check.sh` failed because `node_modules/electron/dist/Electron.app/Contents/MacOS/Electron` was missing.
+  - Repaired missing dependency artifact with `node node_modules/electron/install.js`.
+  - `bash ml/scripts/run_boot_check.sh` then passed.
+  - After final fail-closed tightening, reran `bash ml/scripts/run_boot_check.sh`; passed.
+  - After final fail-closed tightening, reran `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-engine-bugfixes bash ml/scripts/run_smoke_battery.sh`; passed all scenarios.
+- Bakeoff was not run: this repo's `npm run ml:bakeoff` requires explicit `--manifest`, `--model`, and `--output-dir` inputs, and none were provided for this batch.
+
+### 2026-06-10 - Performance bug hunt (Claude-Code)
+
+Read-only pass over the engine hot paths. Ranked findings, all verified by direct code reads (no code changed):
+
+1. **Native NFP computation runs synchronously ON the Electron main process and serializes all workers.** `ipcMain.on('minkowski-calculate-nfp-sync')` (`main.js:1058-1083`) calls `addon.calculateNFP(...)` inline in the sync handler; the production path (`tryNativeOuterNfp` → `calculateNativeAddonNfp`, `main/background.js:3-9`) reaches it via `ipcRenderer.sendSync`. Consequences: (a) the whole app (UI, all windows) blocks during every native NFP — the wavy-class baseline in this file is ~150 ms *per NFP*; (b) the N background worker windows (CPU-cores setting, up to 8) all funnel through this single main-thread handler, so NFP generation is effectively single-threaded and the threads setting buys nothing in NFP-heavy phases; (c) each call pays double structured-clone of polygon payloads on main. Irony: a fully async utility-process path already exists (`requestMinkowskiWorker`, `ipcMain.handle('minkowski-calculate-nfp')`, `main/minkowski-worker.js`) but the production path does not use it. Fix directions: load the addon directly in each background renderer (original Deepnest pattern; nodeIntegration is on, needs the asar-unpacked path candidates from `loadNativeAddon`), or route per-worker utility processes; either takes main out of the hot path.
+2. **Full NFP-manifest rewrite + prune scan on every cache insert, sync on main.** `nfpCacheInsert` (`main.js:504-536`) runs `pruneNfpCacheIfNeeded()` (O(entries) byte-sum each call; at capacity an O(n log n) sort plus O(n) `keys.shift()` per eviction, `main.js:426-458`) and `writeNfpCacheManifestAtomic()` (JSON.stringify of the whole ≤2500-entry manifest + writeFileSync + renameSync, `main.js:413-424`) for EVERY inserted NFP. Warming a fresh job = hundreds of inserts × full manifest rewrite (quadratic I/O), on the same main thread as finding 1. At steady-state capacity every insert pays the full prune. Fix: debounced manifest flush (timer + quit hook), running byte total, batched eviction.
+3. **`shiftedplaced` rebuilt for every candidate position in mergeLines scoring.** `main/background.js:2230-2235` re-shifts ALL placed polygons inside the per-candidate loop although placements are invariant there — O(candidates × Σ placed vertices) allocations per part placement. Hoist above the `finalNfp` loops; only `shiftedpart` varies.
+4. **Convex-hull mode: 3 hull computations per candidate where ~1 is needed.** `main/background.js:2219-2222` calls `getHull(localpoints)` twice (once for area, once for `shiftvector.hull`) plus `getHull(sheet)` — invariant per sheet — for every candidate, attaching hull arrays to every candidate object (GC churn).
+5. **Cache-key fingerprints recomputed O(n²) per individual.** Every `getOuterNfp` call re-runs `polygonSignatureText` (toFixed(5) per coordinate + string join + FNV hash, `main/background.js:75-126`) for BOTH polygons; per part it fingerprints the same `part` polygon `placed.length` times. Memoize the fingerprint on the polygon object (coords are immutable after the rotation copy).
+6. **db.find miss path: sync IPC + sync disk read on main, per pair per worker window.** `main/background.js:186-191` + `main.js:999/473-502`: first touch of each NFP pair in each of the up-to-8 worker windows = sendSync → main `readFileSync` + JSON.parse → two renderer-side deep clones (warm + return). Combined with findings 1-2, main is the global chokepoint. Mitigate via async prefetch/batched warmup.
+7. **Rotation-retry loop waste** (perf face of the previously reported bound bug): `rotations=1` ⇒ 360 `rotatePolygon` allocations + 360 fingerprint/IFP lookups per part that doesn't fit (`main/background.js:2004`).
+8. **Hot-loop console logging**: `main/background.js:1928` logs the entire inner-NFP structure per insert; `:2114` logs per part; `console.time('placement')` has no matching `timeEnd` on the early `continue` paths (warn spam). Free removals.
+9. **Slide-refinement overhead when enabled**: per pass it deep-clones every pair NFP and recomputes the full-layout score per direction (8×) — O(8·n²·v) per sheet for a pass that historically accepts ~0 moves (superseded by SOTA plan WP-2).
+10. (Architectural, matches SOTA plan) `background-start` payloads re-serialize full quantity-expanded polygon trees per individual per generation (`main/deepnest.js:1444-1470`); workers could cache geometry by source and receive only order/rotation.
+
+### 2026-06-10 - Placement-logic bug hunt addendum (Claude-Code)
+
+Focused read-only pass over `placeParts` and its helpers (candidate selection, clipCache, first-placement, refinement validity). New findings, by inspection (no code changed):
+
+1. **Stale tie-break anchors in candidate selection** — `main/background.js:2247-2261`. `minx`/`miny` are only ever decreased and are not reset when a strictly-better-scoring candidate is accepted, so they track the minimum x/y over ALL accepted candidates rather than the coordinates of the currently selected `position`. Among equal-score candidates (collinear NFP edges, common in gravity mode), the tie-break compares against an anchor that may belong to a long-rejected candidate — e.g. accept A(score 10, x=5), then B(score 9, x=8) (minx stays 5), then C(score 9, x=6) is rejected because 6 > 5 even though the live position has x=8. Placement keeps the worse-x candidate.
+2. **Cross-sheet fitness leak via per-part accumulators** — `main/background.js:2141-2144` declares `minwidth/minarea/minx/miny` per part iteration (function-scoped `var`), but parts that exit early (no-IFP `continue` at `:2026`, first-placement `continue` at `:2052`) skip the reset. A sheet whose only placement is its first part reaches `fitness += (minwidth/sheetarea) + minarea` (`:2301`) with values left over from the PREVIOUS sheet's last candidate — GA fitness noise for single-part sheets and sparse layouts. (Mechanism behind the defect already flagged in the SOTA plan WP-1.1.)
+3. **Zero-placement sheet aborts all remaining sheets** — `main/background.js:2311-2316`. If a freshly opened sheet receives no placements, the `else break;` abandons the entire remaining sheet list. With heterogeneous sheet sizes (small sheet ordered first, remaining parts only fit the larger later sheet), parts are charged the unplaced penalty and silently dropped from the nest even though a later sheet fits them.
+4. **`clipCache` off-by-one re-union** — `main/background.js:2109-2112` stores `index: placed.length-1` but the union already covers `placed[0..length-1]`; every reuse re-unions the last placed part's NFP (idempotent, so correctness is unaffected — wasted Clipper work only). Should store `placed.length`.
+5. **First-placement can push a null position** — `main/background.js:2046-2050`: if the sheet IFP exists but its rings are degenerate/empty, `position` stays null, is logged, and is still pushed into `placements`; later `placements[j].x` throws, stalling the GA individual (same stall class as the Clipper-fallback crash in the previous note). Theoretical trigger, cheap guard.
+6. (Note) The comment at `:2003` says rotation retry applies "only ... for the first part of each sheet" but the loop runs for every part; behavior is benign, the comment is wrong. The `360/config.rotations` loop bound defect from the previous note also lives here.
+
+Local-refinement validity helpers (`localRefinementPointAllowed/Forbidden/CandidateValid/MaxLegalSlide`, `recomputeSheetMergedData`) checked: reference-point convention, NFP-children semantics, boundary-contact policy, and merged-data recompute-on-move are all consistent; no new defects found there beyond the structural max-slide limitation already documented in the SOTA plan.
+
+### 2026-06-10 - Engine bug hunt: confirmed defects in committed code (Claude-Code)
+
+Read-only analysis of the active engine path; no code changed. Two bugs were confirmed empirically by extracting `mergedLength` into a Node harness with the real `GeometryUtil`:
+
+1. **`mergedLength` threshold corruption (`min2` shadowing)** — `main/background.js:486` sets `var min2 = minlength*minlength`, but `main/background.js:561` re-uses `var min2 = Math.min(rotB1.x, rotB2.x)` in the same function scope. After the first collinear candidate, the min-length threshold is a coordinate. Reproduced both failure directions: a 2-unit shared edge with `minlength=3` IS merged (got 2, expected 0), and a valid 5-unit shared edge is MISSED after an unrelated far collinear edge sets `min2=100` (got 0, expected 5). Affects mergeLines candidate scoring credit (`:2240`) and exported merged segments.
+2. **`mergedLength` hole-children multiplication** — the `B.children` recursion (`main/background.js:611-615`) sits inside the `for i over p` segment loop, so child contributions are added once per segment of `p`. Reproduced: one 2-unit shared edge with a hole returns `totalLength=8` and 4 duplicate segments for a 4-vertex part (expected 2, 1 segment). Inflates merge credit by ~p.length× for hole-bearing placed parts.
+3. **ClipperLib fallback crash path** — `main/background.js:1764-1777`: if `MinkowskiSum` returns an empty solution, `clipperNfp` stays undefined and `clipperNfp.length` throws; the exception escapes `placeParts`, the GA individual never clears `processing`, and the nest stalls. Reachable when the native addon is unavailable and the hole-free JS fallback runs on degenerate geometry.
+4. **Rotation-retry loop bound** — `main/background.js:2004` loops `360/config.rotations` times instead of `config.rotations` times. The UI allows rotations up to 32 (`main/index.html:3996`); for rotations ≥ 19 not all orientations are tried, so a first-part-on-sheet may be dropped as unplaceable despite a fitting allowed rotation. For small values it wastes up to 360 redundant NFP retry iterations.
+5. **Sheet-hole exclusion subtracts the wrong region** — `getInnerNfpWithGeometryUtil` (`main/background.js:1656-1695`) subtracts the hole's inner-fit region (part fully inside hole) instead of the hole's outer NFP (any overlap), and skips holes smaller than the part entirely (`Abounds > Bbounds` gate). Parts can straddle sheet cutouts. Likely inherited from upstream Deepnest; only affects sheets imported with interior holes.
+6. (Low / dead code) `applyPlacement` (`main/deepnest.js:1564`) appends one shared clone per `source`, so quantity>1 would move the same DOM node between groups leaving earlier instances empty — currently has no callers (export reimplemented in index.html); trap if revived.
+
+Repro harness: `/tmp/mergedlength-src.js` extraction + inline node script (see session). Fixes intentionally NOT applied — items 1-2 change mergeLines scoring (ML-sensitive; checkpoint + bakeoff required), and the user has not requested fixes yet.
+
+### 2026-06-10 - SOTA nesting engine implementation plan authored (Claude-Code)
+
+- Added `docs/sota-nesting-implementation-plan.md`: a self-contained, phased plan to move the engine from constructive GA placement to the state-of-the-art construct → separate → compact paradigm (Guided Local Search over NFP-derived penetration depth, shrink-and-separate compaction), written so a less-capable implementing agent can execute it work-package by work-package.
+- Phases: WP-0 ESICUP benchmark harness + frozen baseline; WP-1 fitness v2 + NFP edge sampling (flagged); WP-2 `SeparationUtil` module + shrink–separate refinement replacing the slide-based Local Refinement internals (badge/stats contract preserved); WP-3 `deepsearch` placement type (native GLS; optional sparrow sidecar behind a license gate); WP-4 ML routing/ordering on top.
+- Research basis: Umetani 2009 GLS, Gomes & Oliveira 2006 LP compaction, Elkeran 2013 guided cuckoo search, Gardeyn 2025 "sparrow" (arXiv 2509.13329, current best-known results, open source).
+- Diagnosis recorded in the plan: GA fitness uses last-candidate residue per sheet (`main/background.js:2301`) and is nearly signal-free; candidate positions are NFP vertices only; slide-based Local Refinement cannot generate improving moves in contact-packed layouts (matches the observed `movesTested: 6, movesAccepted: 0`).
+- No engine, UI, or ML code was changed. Only this file and the new plan doc.
+- Next agent: claim `WP-0 benchmark corpus + converter` from the plan's §10 table.
+
+### 2026-05-26 - Physics nest live viewer (Codex)
+
+- Added `experiments/physics-nest/live-viewer.html`, a browser viewer that polls `out/live-state.json` and redraws the sheet while the CLI runs.
+- Extended `experiments/physics-nest/physics-nest.js` with:
+  - `--trace PATH` to write live state JSON.
+  - `--trace-every N` to control trace update cadence.
+  - live frames for attempt start, jostle progress, best-so-far, and complete states.
+- Updated `experiments/physics-nest/README.md` with live viewer commands.
+- Started a local static server on `http://localhost:8765/` using `python3 -m http.server`.
+- Attempted to open the in-app browser, but localhost navigation was blocked by the browser client; opened the live viewer in the system browser instead.
+- Ran a visible 32-attempt live search:
+  - Output: `experiments/physics-nest/out/live-visible-run.svg`
+  - Report: `experiments/physics-nest/out/live-visible-run.json`
+  - Live state: `experiments/physics-nest/out/live-state.json`
+  - `bestAttempt: 23`
+  - `bestSeed: 30507`
+  - `valid: true`
+  - `overlapPairs: 0`
+  - `outsideParts: 0`
+  - `acceptedMoves: 120`
+  - `scoreAfter: 6796.781355074058`
+- Verification:
+  - `node --check experiments/physics-nest/physics-nest.js` passed.
+  - `node --check experiments/physics-nest/physics-nest.test.js` passed.
+  - `npm run experiment:physics-nest:test` passed.
+
+### 2026-05-26 - Physics nest best-of shake run (Codex)
+
+- Extended `experiments/physics-nest/physics-nest.js` with `--best-of` / `--restarts` multi-shake search plus CLI knobs for `--gravity`, `--shake`, and `--rotation-step`.
+- The best-of search revalidates each attempt through the same Clipper positive-area overlap and outside-sheet checks, then keeps the lowest-score legal arrangement.
+- Updated `experiments/physics-nest/physics-nest.test.js` to assert best-of records all attempts, keeps the lowest score, and remains valid.
+- Updated `experiments/physics-nest/README.md` with a best-of command example.
+- Generated `experiments/physics-nest/out/testpart-physics-best.svg` and `.json` from:
+  - `npm run experiment:physics-nest -- --input testpart.svg --output experiments/physics-nest/out/testpart-physics-best.svg --json experiments/physics-nest/out/testpart-physics-best.json --best-of 32 --iterations 220 --shake 30 --gravity 22 --rotation-step 3 --part-scale 1 --seed 4200`
+- Best result:
+  - `bestAttempt: 12`
+  - `bestSeed: 16308`
+  - `valid: true`
+  - `overlapPairs: 0`
+  - `outsideParts: 0`
+  - `scoreAfter: 6796.710579939128`
+  - Regenerated current one-shot `testpart-physics.json` score was `6812.065973831809`, so the multi-shake search improved the score by `15.355393892680697`.
+- Verification:
+  - `node --check experiments/physics-nest/physics-nest.js` passed.
+  - `node --check experiments/physics-nest/physics-nest.test.js` passed.
+  - `npm run experiment:physics-nest:test` passed.
+
+### 2026-05-26 - Physics/jostle CLI nesting prototype (Codex)
+
+- Added isolated prototype files under `experiments/physics-nest/`:
+  - `physics-nest.js` CLI and module.
+  - `physics-nest.test.js` focused collision/layout test suite.
+  - `README.md` usage and accuracy notes.
+  - `out/testpart-physics.svg` / `.json` and `out/testpart-physics-spacing2.svg` / `.json` generated from the user's `testpart.svg` sample.
+- Added npm entry points:
+  - `npm run experiment:physics-nest`
+  - `npm run experiment:physics-nest:test`
+- Prototype behavior:
+  - Parses SVG `<path>` and `<polygon>` parts, flattens curves, normalizes rigid parts, seeds a legal grid, then tries physics-like translation/rotation jostle moves.
+  - Every accepted move is gated by Clipper boolean validation. Any positive-area part overlap or sheet escape is rejected.
+  - `--spacing` now enforces conservative clearance by offsetting collision validation geometry.
+  - `--clipper-scale` exposes integer collision precision; default is `10000`.
+- Verification:
+  - `node --check experiments/physics-nest/physics-nest.js` passed.
+  - `node --check experiments/physics-nest/physics-nest.test.js` passed.
+  - `npm run experiment:physics-nest:test` passed.
+  - `npm run experiment:physics-nest -- --input testpart.svg --output experiments/physics-nest/out/testpart-physics.svg --json experiments/physics-nest/out/testpart-physics.json --iterations 140 --part-scale 1` passed with `valid: true`, `partCount: 5`, `overlapPairs: 0`, and `outsideParts: 0` in the JSON report.
+  - `node experiments/physics-nest/physics-nest.js --input testpart.svg --output experiments/physics-nest/out/testpart-physics-spacing2.svg --json experiments/physics-nest/out/testpart-physics-spacing2.json --iterations 40 --part-scale 1 --spacing 2` passed with `valid: true`, `overlapPairs: 0`, and `outsideParts: 0`.
+- Test coverage includes part scale variation (`0.35`, `0.55`, `0.8`, `1.0`, `1.25`, `1.5`), direct positive overlap rejection, edge-touch allowance, 0.0005-unit overlap rejection, 0.001-unit gap allowance, spacing-clearance rejection, outside-sheet rejection, and cubic curve flattening.
+- Notes:
+  - This does not alter the active Electron import -> nest -> export path yet.
+  - Collision is exact for flattened polygons at configured Clipper precision. Source SVG curves are approximated before collision checks; for tighter safety use lower `--curve-tolerance` and/or nonzero `--spacing`.
+  - The motion heuristic is intentionally simple and should be treated as a post-process experiment, not a replacement for NFP-based placement.
+
+### 2026-05-25 - Version 0.7.2 local build (Codex)
+
+- Bumped `package.json` app version from `0.7.1` to `0.7.2`.
+- Aligned root `package-lock.json` app metadata to `deepnest-ml` / `0.7.2` without changing dependency versions.
+- Rebuilt native addon for Electron arm64 with `npm run build:arm64`.
+- Packaged local macOS arm64 app and DMG with `npm run dist`.
+- Produced:
+  - `dist/mac-arm64/Deepnest ML.app`
+  - `dist/Deepnest ML-0.7.2-mac-arm64.dmg`
+  - `dist/Deepnest ML-0.7.2-mac-arm64.dmg.blockmap`
+- Verified `package.json`, `CFBundleShortVersionString`, and `CFBundleVersion` all report `0.7.2`.
+- Verification:
+  - `node --check main.js` passed.
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - `package-lock.json` JSON parse check passed.
+- Notes:
+  - `electron-builder` completed successfully with ad-hoc signing and no notarization, matching existing local build expectations.
+  - `electron-builder` logged a non-fatal JSON parse warning for a BOM-prefixed JSON file during packaging; the DMG and blockmap were still generated.
+  - No GUI smoke run was performed.
+
+### 2026-05-25 - Multi-agent codebase exploration (Codex)
+
+- Performed a read-only app-code exploration with two completed explorer agents:
+  - UI/controller path: `main.js`, `main/index.html`, `main/deepnest.js`, `main/background-dispatcher.js`.
+  - Background geometry/NFP path: `main/background.js`, `main/util/geometryutil.js`, `addon.cc`, `minkowski.cc`.
+- A third import/export explorer was closed after timeout; Codex covered import/export locally.
+- No source code files were changed. Only this coordination file was updated.
+- Findings were summarized to the user: active runtime is visible renderer -> main dispatcher -> hidden background renderers -> native Minkowski addon; highest-risk areas remain import part extraction, spacing offsets, NFP/cache semantics, placement scoring, export reconstruction, and smoke/teacher automation listeners.
+- Verification: static code-path inspection only; no Electron GUI or smoke run was performed for this exploration.
+
+### 2026-05-07 - Clear NFP cache setting added (Codex)
+
+- Added a main-process `nfp-cache-clear-sync` IPC handler that deletes files in the persistent user-data NFP cache, resets the main-owned manifest, and recreates hidden background workers so in-memory worker cache state is discarded too.
+- Added a Settings row under Nesting configuration: `NFP cache -> Clear NFP cache`.
+- The clear action refuses to run while a nest is active and shows a message asking the user to stop/reset first, avoiding silent interruption of an in-progress job.
+- Added hover help explaining that the cache speeds repeated jobs and should be cleared when long sessions feel stale or when a cold geometry rebuild is desired.
+- Verification:
+  - `node --check main.js` passed.
+  - `node --check main/background.js` passed.
+  - `node --check main/deepnest.js` passed.
+  - executable inline renderer JS parse check passed.
+  - `bash ml/scripts/run_boot_check.sh` passed.
+  - The destructive clear action itself was not clicked during verification, to avoid clearing the user's existing cache without an explicit manual test.
 
 ### 2026-05-06 - Blank Local Refinement badge text fixed (Codex)
 

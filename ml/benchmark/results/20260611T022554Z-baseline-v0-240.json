@@ -1,0 +1,634 @@
+{
+  "label": "baseline-v0-240",
+  "createdAt": "2026-06-11T02:25:54.752Z",
+  "gitCommit": "ad97fdad0dad3b43360610bdb3ac47ee38709568",
+  "gitDirty": true,
+  "engineFlags": {
+    "protocol": "sota-wp0",
+    "runsPerInstance": 3,
+    "timeBudgetSec": 240,
+    "baseConfig": {
+      "placementType": "gravity",
+      "spacing": 0,
+      "mergeLines": false,
+      "processHoles": true,
+      "populationSize": 10,
+      "mutationRate": 10,
+      "rotations": "<per-instance rotations>"
+    }
+  },
+  "artifactRoot": "/Users/abrahamsaenz/Desktop/Deepnest++/ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240",
+  "instances": [
+    {
+      "name": "albano",
+      "file": "ml/benchmark/esicup/instances/albano.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.8458831462551961,
+          "usedLength": 10291.5708453,
+          "timeToBestSec": 172.351,
+          "fitness": 85339053.14151123,
+          "placementsDigest": "8b1768f579d050013c4f3de687d93ade9ba49a35",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/albano/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/albano/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.8412322692723649,
+          "usedLength": 10348.4693164,
+          "timeToBestSec": 46.947,
+          "fitness": 85339141.7899393,
+          "placementsDigest": "6918a70704006ac072a4489fefbb9a5a7d384654",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/albano/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/albano/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.8431320697676787,
+          "usedLength": 10325.151466399997,
+          "timeToBestSec": 180.785,
+          "fitness": 85339040.86322582,
+          "placementsDigest": "2673a7420c646d3991a74d03bb5c21268db4131c",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/albano/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/albano/run-03/export.svg"
+        }
+      ],
+      "median": 0.8431320697676787
+    },
+    {
+      "name": "blaz1",
+      "file": "ml/benchmark/esicup/instances/blaz1.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.39152379212427796,
+          "usedLength": 42.8198503,
+          "timeToBestSec": 237.021,
+          "fitness": 29805526.304823168,
+          "placementsDigest": "e3eedc317cce986970234fedf7337a1a13605e3b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/blaz1/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/blaz1/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.39230216944460455,
+          "usedLength": 42.8198503,
+          "timeToBestSec": 178.758,
+          "fitness": 28502640.894922186,
+          "placementsDigest": "8ea683bdd75e8e65158b210493d8c76bdb996464",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/blaz1/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/blaz1/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.3188371022953279,
+          "usedLength": 43.1734263,
+          "timeToBestSec": 193.544,
+          "fitness": 33323307.57673493,
+          "placementsDigest": "eababae37411a5c8658f21c42f1a6097b3948855",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/blaz1/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/blaz1/run-03/export.svg"
+        }
+      ],
+      "median": 0.39152379212427796
+    },
+    {
+      "name": "dagli",
+      "file": "ml/benchmark/esicup/instances/dagli.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.5966030907538914,
+          "usedLength": 84.7716024,
+          "timeToBestSec": 167.706,
+          "fitness": 6298.557172768759,
+          "placementsDigest": "d42d6f5eea8bf4b87c8d9ff4294f793d7f297032",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/dagli/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/dagli/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.6056451062469529,
+          "usedLength": 83.5059996,
+          "timeToBestSec": 201.733,
+          "fitness": 6296.025758633119,
+          "placementsDigest": "d9a3e42bfe26cb499725488832485ef490bd377c",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/dagli/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/dagli/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.5981153831901329,
+          "usedLength": 84.5572634,
+          "timeToBestSec": 238.907,
+          "fitness": 6298.128459451738,
+          "placementsDigest": "e108e53c82d90ebadf2858b5120f17e3aca68cea",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/dagli/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/dagli/run-03/export.svg"
+        }
+      ],
+      "median": 0.5981153831901329
+    },
+    {
+      "name": "fu",
+      "file": "ml/benchmark/esicup/instances/fu.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.8142042938563286,
+          "usedLength": 35,
+          "timeToBestSec": 221.671,
+          "fitness": 2274.0161751617757,
+          "placementsDigest": "9188f8a2bd6b7cbbc42db52ae9ad4ebfda06458a",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/fu/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/fu/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.8635500086355001,
+          "usedLength": 33,
+          "timeToBestSec": 92.785,
+          "fitness": 2270.0152518007485,
+          "placementsDigest": "e23d16cec2b93b569b625f8403ef10f19a30ea82",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/fu/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/fu/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.8381514789697502,
+          "usedLength": 34,
+          "timeToBestSec": 76.194,
+          "fitness": 2271.068345081262,
+          "placementsDigest": "a101394c124d7804bf6dc73ecc96aa2ff2f80531",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/fu/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/fu/run-03/export.svg"
+        }
+      ],
+      "median": 0.8381514789697502
+    },
+    {
+      "name": "jakobs1",
+      "file": "ml/benchmark/esicup/instances/jakobs1.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.41581633068877555,
+          "usedLength": 19.59804,
+          "timeToBestSec": 14.545,
+          "fitness": 13059482.000022462,
+          "placementsDigest": "91f7437e7459c6cb1c8ad63edc9c1d0a7c97111b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs1/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs1/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.41581633068877555,
+          "usedLength": 19.59804,
+          "timeToBestSec": 14.116,
+          "fitness": 13059482.000022462,
+          "placementsDigest": "91f7437e7459c6cb1c8ad63edc9c1d0a7c97111b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs1/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs1/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.41581633068877555,
+          "usedLength": 19.59804,
+          "timeToBestSec": 13.986,
+          "fitness": 13059482.000022462,
+          "placementsDigest": "91f7437e7459c6cb1c8ad63edc9c1d0a7c97111b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs1/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs1/run-03/export.svg"
+        }
+      ],
+      "median": 0.41581633068877555
+    },
+    {
+      "name": "jakobs2",
+      "file": "ml/benchmark/esicup/instances/jakobs2.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.5160576537198324,
+          "usedLength": 37.3951826,
+          "timeToBestSec": 200.739,
+          "fitness": 2846.5927441960525,
+          "placementsDigest": "244e07a0b52b0255514519c02b992b6fcd21a209",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs2/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs2/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.500000005,
+          "usedLength": 38.596140000000005,
+          "timeToBestSec": 211.165,
+          "fitness": 2846.719121565857,
+          "placementsDigest": "7f79afa40cfac436564763fc88aae4fa8e938aa2",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs2/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs2/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.5078439524468605,
+          "usedLength": 38,
+          "timeToBestSec": 171.984,
+          "fitness": 2848.0210366366914,
+          "placementsDigest": "63f850ecf24984bce352e500439f15b0346f3ab5",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs2/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/jakobs2/run-03/export.svg"
+        }
+      ],
+      "median": 0.5078439524468605
+    },
+    {
+      "name": "mao",
+      "file": "ml/benchmark/esicup/instances/mao.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.7365941055480842,
+          "usedLength": 2001.0578959,
+          "timeToBestSec": 63.092,
+          "fitness": 7523786.116157996,
+          "placementsDigest": "66c089930b13afaa7efd8b9077b97c81737c2a06",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/mao/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/mao/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.7786768667596122,
+          "usedLength": 1892.912855,
+          "timeToBestSec": 116.551,
+          "fitness": 7523521.546970909,
+          "placementsDigest": "d4e2ecfbb536149189b9666a003ab5d000f6669e",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/mao/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/mao/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.7441559490085,
+          "usedLength": 1980.7238697000003,
+          "timeToBestSec": 229.567,
+          "fitness": 7523684.789161291,
+          "placementsDigest": "1b8ab8a8a464861a460ea19615f5d2b5d5d81ceb",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/mao/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/mao/run-03/export.svg"
+        }
+      ],
+      "median": 0.7441559490085
+    },
+    {
+      "name": "marques",
+      "file": "ml/benchmark/esicup/instances/marques.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.7007393460280049,
+          "usedLength": 98.7144183,
+          "timeToBestSec": 131.408,
+          "fitness": 14689.435713485336,
+          "placementsDigest": "b99ae9643aff67841a68990ab4c245394935f158",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/marques/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/marques/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.7193985631596377,
+          "usedLength": 96.1540382,
+          "timeToBestSec": 156.443,
+          "fitness": 14688.872026326175,
+          "placementsDigest": "99f29da62e05f71ddf3d41b3dfc36253350ac54d",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/marques/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/marques/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.6839210704240704,
+          "usedLength": 101.1419006,
+          "timeToBestSec": 229.897,
+          "fitness": 14689.667769597645,
+          "placementsDigest": "2c0b7051cf708d9296df31d5b3622956f3fe9cc1",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/marques/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/marques/run-03/export.svg"
+        }
+      ],
+      "median": 0.7007393460280049
+    },
+    {
+      "name": "shapes0",
+      "file": "ml/benchmark/esicup/instances/shapes0.json",
+      "rotations": 1,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.4065577544209792,
+          "usedLength": 73.7828758,
+          "timeToBestSec": 80.27,
+          "fitness": 51943890.80666302,
+          "placementsDigest": "7e41128261a63753f4f0902559058509ce743d48",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes0/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes0/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.40091903065253237,
+          "usedLength": 74.8205947,
+          "timeToBestSec": 202.134,
+          "fitness": 51943890.30231862,
+          "placementsDigest": "e335dca8d75499e6dffe25b696fd278b6c8533fa",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes0/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes0/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.40091903065253237,
+          "usedLength": 74.8205947,
+          "timeToBestSec": 73.535,
+          "fitness": 51943890.30231863,
+          "placementsDigest": "6d18c137da3121024f0870779f75b88f3af880fc",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes0/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes0/run-03/export.svg"
+        }
+      ],
+      "median": 0.40091903065253237
+    },
+    {
+      "name": "shapes1",
+      "file": "ml/benchmark/esicup/instances/shapes1.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.2982750962969679,
+          "usedLength": 79.4489065,
+          "timeToBestSec": 228.491,
+          "fitness": 41662546.653476834,
+          "placementsDigest": "d83cd75d1ce9a6f409ad2e8b87d673dfa53f0a52",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes1/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes1/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.4288078136224276,
+          "usedLength": 77.1830393,
+          "timeToBestSec": 236.329,
+          "fitness": 41377008.4302831,
+          "placementsDigest": "37e5cfe4a9341f903f44d7aaaca3795a133f849c",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes1/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes1/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.27276418198840385,
+          "usedLength": 77.3484629,
+          "timeToBestSec": 220.725,
+          "fitness": 44153559.68106662,
+          "placementsDigest": "5162a4e08d92d73d5234816ca46dbea0f90e90cb",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes1/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shapes1/run-03/export.svg"
+        }
+      ],
+      "median": 0.2982750962969679
+    },
+    {
+      "name": "shirts",
+      "file": "ml/benchmark/esicup/instances/shirts.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.5889553227948132,
+          "usedLength": 91.68776970000002,
+          "timeToBestSec": 96.452,
+          "fitness": 4543.396763420764,
+          "placementsDigest": "541b2eb95562fc0425005f7042a8921fd2b9386d",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shirts/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shirts/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.5992538583675446,
+          "usedLength": 90.1120606,
+          "timeToBestSec": 229.131,
+          "fitness": 4539.971662773287,
+          "placementsDigest": "6b30882bc232fd61b4273eef947eb44b8b09dda3",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shirts/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shirts/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.6030884211655749,
+          "usedLength": 89.5391092,
+          "timeToBestSec": 219.511,
+          "fitness": 4542.733899309259,
+          "placementsDigest": "16182c0564078ceaa4b2f3de6bc65db3d261faee",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shirts/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/shirts/run-03/export.svg"
+        }
+      ],
+      "median": 0.5992538583675446
+    },
+    {
+      "name": "swim",
+      "file": "ml/benchmark/esicup/instances/swim.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.6663941849310941,
+          "usedLength": 6638.237482499997,
+          "timeToBestSec": 237.722,
+          "fitness": 50909076.05627144,
+          "placementsDigest": "d7d43df84757f1e3a3db242b5287b7445633f63a",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/swim/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/swim/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.6668522336327624,
+          "usedLength": 6633.6777976,
+          "timeToBestSec": 232.448,
+          "fitness": 50909055.53275255,
+          "placementsDigest": "d0b1dba81283975ba80abab252493341909979a1",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/swim/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/swim/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.6632782628306843,
+          "usedLength": 6669.4223291,
+          "timeToBestSec": 226.516,
+          "fitness": 50909106.635850556,
+          "placementsDigest": "f42c07d1218a0208b0006fdaa1ffe4c591714e39",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/swim/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/swim/run-03/export.svg"
+        }
+      ],
+      "median": 0.6663941849310941
+    },
+    {
+      "name": "trousers",
+      "file": "ml/benchmark/esicup/instances/trousers.json",
+      "rotations": 2,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.7782049414871884,
+          "usedLength": 279.87974099999997,
+          "timeToBestSec": 175.53,
+          "fitness": 35052.647632751345,
+          "placementsDigest": "4bbae0308b71fed6a81e2714fa58e23686d4fd1b",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/trousers/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/trousers/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.7799196214971346,
+          "usedLength": 279.26441580000005,
+          "timeToBestSec": 212.44,
+          "fitness": 35051.91038983981,
+          "placementsDigest": "96909cb036908b00b94cbe700e4a77c30fd5d061",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/trousers/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/trousers/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.7903570263644473,
+          "usedLength": 275.5764676,
+          "timeToBestSec": 173.22,
+          "fitness": 35044.855416136816,
+          "placementsDigest": "ba773aeb65eeb904c117b497cb079be2e7ebb19f",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/trousers/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/trousers/run-03/export.svg"
+        }
+      ],
+      "median": 0.7799196214971346
+    },
+    {
+      "name": "gardeyn0",
+      "file": "ml/benchmark/esicup/instances/gardeyn0.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.760673062379144,
+          "usedLength": 57503.37420020001,
+          "timeToBestSec": 78.734,
+          "fitness": 1749785318.3058882,
+          "placementsDigest": "0dfbe5627eb2b1c6bb135c16d7b4516dd52c5d32",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn0/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn0/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.8043711900732545,
+          "usedLength": 54379.4560146,
+          "timeToBestSec": 65.363,
+          "fitness": 1749779349.8924305,
+          "placementsDigest": "8a583294398bbf2afcb12dc0b29781bd03ec3a67",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn0/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn0/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.8060366096705598,
+          "usedLength": 54267.098076199996,
+          "timeToBestSec": 229.202,
+          "fitness": 1749779248.5214758,
+          "placementsDigest": "0ca946d68b65fe2a0c4f0bf124469452577d82a1",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn0/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn0/run-03/export.svg"
+        }
+      ],
+      "median": 0.8043711900732545
+    },
+    {
+      "name": "gardeyn1",
+      "file": "ml/benchmark/esicup/instances/gardeyn1.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.7931885460605498,
+          "usedLength": 18407.1995839,
+          "timeToBestSec": 62.35,
+          "fitness": 584072009.3991994,
+          "placementsDigest": "bb1d281a0e08c37c9298c5559e8c5c931812487a",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn1/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn1/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.8010695558287811,
+          "usedLength": 18226.1075443,
+          "timeToBestSec": 238.893,
+          "fitness": 584071421.9681495,
+          "placementsDigest": "c9da333b8753fe541b9d6de2cfc4a888fa2ce3ec",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn1/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn1/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.7946511721859706,
+          "usedLength": 18373.319496699998,
+          "timeToBestSec": 17.508,
+          "fitness": 584071789.0808208,
+          "placementsDigest": "3494ec9e28ee1701b04edab7d9ef69cec0fef9f5",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn1/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn1/run-03/export.svg"
+        }
+      ],
+      "median": 0.7946511721859706
+    },
+    {
+      "name": "gardeyn2",
+      "file": "ml/benchmark/esicup/instances/gardeyn2.json",
+      "rotations": 4,
+      "runs": [
+        {
+          "runIndex": 1,
+          "utilization": 0.800671626247072,
+          "usedLength": 53007.342097199995,
+          "timeToBestSec": 126.032,
+          "fitness": 848945512.1484424,
+          "placementsDigest": "11b4a06395d790c099e0c72fd41fe5402f2c5d14",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn2/run-01/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn2/run-01/export.svg"
+        },
+        {
+          "runIndex": 2,
+          "utilization": 0.800671626247072,
+          "usedLength": 53007.342097199995,
+          "timeToBestSec": 109.065,
+          "fitness": 848945512.1484424,
+          "placementsDigest": "11b4a06395d790c099e0c72fd41fe5402f2c5d14",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn2/run-02/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn2/run-02/export.svg"
+        },
+        {
+          "runIndex": 3,
+          "utilization": 0.800671626247072,
+          "usedLength": 53007.342097199995,
+          "timeToBestSec": 96.007,
+          "fitness": 848945512.1484424,
+          "placementsDigest": "11b4a06395d790c099e0c72fd41fe5402f2c5d14",
+          "reportPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn2/run-03/report.json",
+          "outputPath": "ml/artifacts/nest-benchmark/20260611T022554Z-baseline-v0-240/gardeyn2/run-03/export.svg"
+        }
+      ],
+      "median": 0.800671626247072
+    }
+  ],
+  "aggregate": {
+    "meanMedianUtilization": 0.6364958801547218
+  }
+}

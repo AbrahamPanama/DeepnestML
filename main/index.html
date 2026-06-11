@@ -38,8 +38,10 @@
 		const fs = require('graceful-fs');
 		const request = require('request');
 		const http = require('http');
+		const crypto = require('crypto');
 		const path = require('path');
 		const liveML = require('../ml/live/live-inference');
+		const esicupConvert = require('../ml/lib/esicup-convert');
 		const io = require('../ml/lib/io');
 		const jobSvg = require('../ml/lib/job-svg');
 		const resultUtils = require('../ml/lib/result-utils');
@@ -397,6 +399,7 @@
 			  units: 'inch',
 			  scale: 72, // actual stored value will be in units/inch
 			  spacing: 0,
+			  sheetMargin: 0, // inset from the sheet edge; parts never nest inside the margin
 			  curveTolerance: 0.72, // store distances in native units
 			  rotations: 4,
 			  threads: 4,
@@ -411,8 +414,10 @@
 			  stepRepeatHorizontalAlignment: 'tight',
 			  stepRepeatVerticalAlignment: 'tight',
 			  improvedPlacementScoring: false,
+			  fitnessVersion: 1,
 			  localRefinement: false,
 			  processHoles: true, // when true, NFP generation subtracts A's holes; when false, holes on A are ignored (faster for hole-free jobs)
+			  exportSheetOutline: false, // when true, exports include the sheet boundary with the nested parts
 			  mergeLines: true, // whether to merge lines
 			  timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
 			  simplify: false,
@@ -457,7 +462,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'processHoles'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'processHoles' || key == 'exportSheetOutline'){
 							val = i.checked;
 						}
 					
@@ -562,7 +567,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'processHoles'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'processHoles' || key == 'exportSheetOutline'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -698,7 +703,7 @@
 				});
 			}
 			
-			document.querySelectorAll('#config input, #config select').forEach(function(e){
+			document.querySelectorAll('#config input, #config select, #config a[data-config]').forEach(function(e){
 				e.onmouseover = function(event){
 					var inputid = e.getAttribute('data-config');
 					if(inputid){
@@ -755,6 +760,15 @@
 							updateForm(val);
 						});
 					});
+					return false;
+				};
+			}
+
+			var clearnfpcache = document.querySelector('#clearnfpcache');
+			if(clearnfpcache){
+				clearnfpcache.onclick = function(e){
+					e.preventDefault();
+					clearNfpCache();
 					return false;
 				};
 			}
@@ -2064,6 +2078,35 @@
 			var deleteCache = function() {
 			  return;
 			};
+
+			function formatCacheBytes(bytes){
+				if(!bytes || bytes < 0){
+					return '0 B';
+				}
+				if(bytes < 1024){
+					return bytes + ' B';
+				}
+				if(bytes < 1024 * 1024){
+					return (bytes / 1024).toFixed(1) + ' KB';
+				}
+				return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+			}
+
+			function clearNfpCache(){
+				if(DeepNest && DeepNest.working){
+					message('Stop or reset the active nest before clearing the NFP cache.', true);
+					return false;
+				}
+
+				var response = ipcRenderer.sendSync('nfp-cache-clear-sync');
+				if(!response || !response.ok){
+					message('Could not clear NFP cache: ' + (response && response.error ? response.error : 'unknown error'), true);
+					return false;
+				}
+
+				message('NFP cache cleared: ' + response.filesRemoved + ' files, ' + formatCacheBytes(response.bytesRemoved) + '. Background workers were restarted.');
+				return true;
+			}
 			
 			function getNestReadinessError(){
 				if(DeepNest.parts.length === 0){
@@ -2122,7 +2165,16 @@
 				updateWorkspaceState('nesting', true, true);
 				document.querySelector('#nest').className = 'active';
 				deleteCache();
-				DeepNest.start(null, getNestDisplayCallback().bind(window));
+				var nestStartResult = DeepNest.start(null, getNestDisplayCallback().bind(window));
+				if(nestStartResult === false){
+					document.querySelectorAll('li.progress').forEach(function(p){
+						p.className = 'progress';
+					});
+					updateWorkspaceState('inspect', false, false);
+					document.querySelector('#nest').className = '';
+					message(DeepNest.lastStartError || 'Could not start the nest.', true);
+					return false;
+				}
 				return true;
 			}
 
@@ -2496,7 +2548,10 @@
 				if(typeof activeConfig.curveTolerance === 'undefined'){
 					activeConfig.curveTolerance = config.getSync('curveTolerance');
 				}
-			
+				if(typeof activeConfig.exportSheetOutline === 'undefined'){
+					activeConfig.exportSheetOutline = config.getSync('exportSheetOutline');
+				}
+
 				var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 				
 				var svgwidth = 0;
@@ -2505,13 +2560,19 @@
 				// create elements if they don't exist, show them otherwise
 				n.placements.forEach(function(s){
 					var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-					svg.appendChild(group);					
-					/*DeepNest.parts[s.sheet].svgelements.forEach(function(e){
-						var node = e.cloneNode(false);
-						node.setAttribute('stroke', '#000');
-						node.setAttribute('fill', 'none');
-						group.appendChild(node);
-					});*/
+					svg.appendChild(group);
+					if(activeConfig.exportSheetOutline === true || activeConfig.exportSheetOutline === 'true'){
+						DeepNest.parts[s.sheet].svgelements.forEach(function(e){
+							if(e.tagName == 'image'){
+								return;
+							}
+							var node = e.cloneNode(false);
+							node.setAttribute('stroke', '#000');
+							node.setAttribute('fill', 'none');
+							node.setAttribute('class', 'sheetoutline');
+							group.appendChild(node);
+						});
+					}
 					
 					var sheetbounds = DeepNest.parts[s.sheet].bounds;
 					
@@ -2620,9 +2681,18 @@
 					var sourceFormat = payload && payload.sourceFormat ? String(payload.sourceFormat).toLowerCase() : (inputPath ? path.extname(inputPath).replace(/^\./, '').toLowerCase() : 'svg');
 					var configOverrides = payload && payload.configOverrides ? payload.configOverrides : {};
 					var timeoutMs = payload && payload.timeoutMs ? Number(payload.timeoutMs) : 60000;
+					var timeBudgetSec = payload && payload.timeBudgetSec ? Number(payload.timeBudgetSec) : 0;
+					var timeBudgetMs = timeBudgetSec > 0 ? timeBudgetSec * 1000 : 0;
+					var captureUtilization = payload && (payload.captureUtilization === true || payload.captureUtilization === 'true' || payload.captureUtilization === 1 || payload.captureUtilization === '1');
+					var benchmarkMetaPath = payload && payload.benchmarkMetaPath ? String(payload.benchmarkMetaPath) : '';
+					var benchmarkMeta = null;
 					var smokeMlMode = payload && payload.mlMode ? String(payload.mlMode) : '';
 					var smokeMlModelPath = payload && payload.mlModelPath ? String(payload.mlModelPath) : '';
 					var startedAt = Date.now();
+					var nestStartedAt = 0;
+					var timeToBestSec = null;
+					var bestFitnessSeen = null;
+					var budgetHandle = null;
 					var completed = false;
 					var exporting = false;
 
@@ -2631,6 +2701,10 @@
 						return;
 					}
 					completed = true;
+					if(budgetHandle){
+						clearTimeout(budgetHandle);
+						budgetHandle = null;
+					}
 					window.__deepnestDisplayCallbackOverride = null;
 					try {
 						ipcRenderer.send('background-stop');
@@ -2665,6 +2739,54 @@
 							details: details || {}
 						};
 						fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+					}
+
+					function roundedPlacementNumber(value){
+						var number = Number(value);
+						if(!isFinite(number)){
+							number = 0;
+						}
+						return Math.round(number * 1000000) / 1000000;
+					}
+
+					function placementsDigest(placements){
+						var normalized = [];
+						if(Array.isArray(placements)){
+							for(var i=0; i<placements.length; i++){
+								var sheet = placements[i] || {};
+								var sheetplacements = Array.isArray(sheet.sheetplacements) ? sheet.sheetplacements : [];
+								var normalizedSheet = {
+									sheet: sheet.sheet,
+									sheetid: sheet.sheetid,
+									sheetplacements: []
+								};
+								for(var j=0; j<sheetplacements.length; j++){
+									var part = sheetplacements[j] || {};
+									normalizedSheet.sheetplacements.push({
+										id: part.id,
+										source: part.source,
+										x: roundedPlacementNumber(part.x),
+										y: roundedPlacementNumber(part.y),
+										rotation: roundedPlacementNumber(part.rotation)
+									});
+								}
+								normalized.push(normalizedSheet);
+							}
+						}
+						return crypto.createHash('sha1').update(JSON.stringify(normalized)).digest('hex');
+					}
+
+					function updateBestTiming(){
+						if(!DeepNest.nests || DeepNest.nests.length === 0 || !DeepNest.nests[0]){
+							return;
+						}
+						var currentFitness = Number(DeepNest.nests[0].fitness);
+						if(bestFitnessSeen === null || currentFitness < bestFitnessSeen){
+							bestFitnessSeen = currentFitness;
+							if(nestStartedAt > 0){
+								timeToBestSec = (Date.now() - nestStartedAt) / 1000;
+							}
+						}
 					}
 
 					function writeSmokeOutput(selectedNest, exportedSvg, timeoutHandle){
@@ -2726,6 +2848,7 @@
 							nestCount: DeepNest.nests.length,
 							usedSheetCount: selectedNest && selectedNest.placements ? selectedNest.placements.length : 0,
 							fitness: selectedNest ? selectedNest.fitness : null,
+							fitnessBreakdown: selectedNest && selectedNest.fitnessBreakdown ? selectedNest.fitnessBreakdown : null,
 							localRefinement: localRefinement,
 							localRefinementSummary: localRefinement ? {
 								enabled: !!localRefinement.enabled,
@@ -2739,8 +2862,53 @@
 							mlRecommendation: window.DeepNestLastMLRecommendation || null,
 							mlDiagnostic: window.DeepNestLastMLDiagnostic || null
 						};
+						if(timeToBestSec !== null){
+							details.timeToBestSec = timeToBestSec;
+						}
+						if(selectedNest && selectedNest.placements){
+							details.placementsDigest = placementsDigest(selectedNest.placements);
+						}
+						if(captureUtilization){
+							try {
+								if(!benchmarkMeta){
+									throw new Error('missing benchmark metadata');
+								}
+								var utilization = esicupConvert.utilizationFromPlacements(benchmarkMeta, selectedNest ? selectedNest.placements : []);
+								details.utilization = utilization.utilization;
+								details.usedLength = utilization.usedLength;
+							}
+							catch(utilizationError){
+								details.utilizationError = utilizationError && utilizationError.message ? utilizationError.message : String(utilizationError);
+							}
+						}
 						writeReport('completed', details);
 						finish('completed', details);
+					}
+
+					function exportBestAvailable(timeoutHandle){
+						if(completed || exporting){
+							return;
+						}
+						updateBestTiming();
+						if(!DeepNest.nests || DeepNest.nests.length === 0){
+							writeReport('failed', { reason: 'no_nest_before_time_budget', timeBudgetSec: timeBudgetSec });
+							finish('failed', { reason: 'no_nest_before_time_budget', timeBudgetSec: timeBudgetSec });
+							return;
+						}
+						var selectedNest = DeepNest.nests[0];
+						if(selectedNest && selectedNest.localRefinement && selectedNest.localRefinement.pending){
+							budgetHandle = setTimeout(function(){
+								exportBestAvailable(timeoutHandle);
+							}, 250);
+							return;
+						}
+						exporting = true;
+						try {
+							DeepNest.stop(true);
+						}
+						catch(stopError) {}
+						var exportedSvg = exportNest(selectedNest);
+						writeSmokeOutput(selectedNest, exportedSvg, timeoutHandle);
 					}
 
 					function importSmokeInput(data, filename, dirpath, callback){
@@ -2774,6 +2942,15 @@
 							writeReport('failed', { reason: 'missing_paths' });
 							finish('failed', { reason: 'missing_paths' });
 						return;
+					}
+
+					if(captureUtilization){
+						if(!benchmarkMetaPath){
+							writeReport('failed', { reason: 'missing_benchmark_meta_path' });
+							finish('failed', { reason: 'missing_benchmark_meta_path' });
+							return;
+						}
+						benchmarkMeta = JSON.parse(fs.readFileSync(benchmarkMetaPath, 'utf8'));
 					}
 
 					var timeoutHandle = setTimeout(function(){
@@ -2822,6 +2999,10 @@
 								if(completed || exporting || DeepNest.nests.length === 0){
 									return;
 								}
+								updateBestTiming();
+								if(timeBudgetMs > 0){
+									return;
+								}
 								var selectedNest = DeepNest.nests[0];
 								if(selectedNest && selectedNest.localRefinement && selectedNest.localRefinement.pending){
 									return;
@@ -2836,6 +3017,13 @@
 								mlModelPath: smokeMlModelPath || undefined,
 								configOverrides: configOverrides
 							});
+							nestStartedAt = Date.now();
+							if(timeBudgetMs > 0){
+								budgetHandle = setTimeout(function(){
+									budgetHandle = null;
+									exportBestAvailable(timeoutHandle);
+								}, timeBudgetMs);
+							}
 						});
 					}
 					catch (error){
@@ -3205,7 +3393,13 @@
 					ipcRenderer.on('background-progress', onProgress);
 					ipcRenderer.on('background-response', onBackgroundResponse);
 
-					DeepNest.start(null, function noopDisplayCallback() {});
+					var teacherStartResult = DeepNest.start(null, function noopDisplayCallback() {});
+					if(teacherStartResult === false){
+						fail('start_rejected', {
+							message: DeepNest.lastStartError || 'nest start rejected'
+						});
+						return;
+					}
 				}
 				catch (error){
 					fail('uncaught_exception', {
@@ -3947,7 +4141,12 @@
 					<dd>
 						<input type="number" value="0" min="0" step="any" data-config="spacing" data-conversion="true" required /> <i><span class="unit-label">inch</span></i>
 					</dd>
-					
+
+					<dt>Sheet margin</dt>
+					<dd>
+						<input type="number" value="0" min="0" step="any" data-config="sheetMargin" data-conversion="true" required /> <i><span class="unit-label">inch</span></i>
+					</dd>
+
 					<dt>Curve tolerance</dt>
 					<dd>
 						<input type="number" value="0.3" min="0" step="any" data-config="curveTolerance" data-conversion="true" required /> <i><span class="unit-label">inch</span></i>
@@ -4036,6 +4235,11 @@
 								<input type="checkbox" data-config="processHoles" /> <span class="radiolabel">Subtract interior cutouts during NFP</span>
 							</dd>
 
+							<dt class="steprepeat-disabled">NFP cache</dt>
+							<dd class="steprepeat-disabled">
+								<a href="#" id="clearnfpcache" data-config="nfpCache">Clear NFP cache</a> <span class="radiolabel">Restart cached geometry calculations</span>
+							</dd>
+
 						<dt>CPU cores</dt>
 					<dd>
 						<input type="number" value="4" step="1" min="1" max="8" data-config="threads" required />
@@ -4083,7 +4287,12 @@
 						<dd class="steprepeat-disabled">
 							<input type="checkbox" checked="checked" data-config="mergeLines" />
 						</dd>
-						
+
+						<dt>Export sheet outline</dt>
+						<dd>
+							<input type="checkbox" data-config="exportSheetOutline" /> <span class="radiolabel">Include the sheet boundary in exported files</span>
+						</dd>
+
 						<dt class="steprepeat-disabled">Optimization ratio</dt>
 						<dd class="steprepeat-disabled">
 							<input type="number" value="0.5" min="0" max="1" step="any" data-config="timeRatio" required />
@@ -4157,8 +4366,18 @@
 				Whether to work in metric or imperial. This affects display only, and not import or export.
 			</div>
 			
+			<div class="config_explain" id="explain_sheetMargin">
+				<h1>Sheet margin</h1>
+				Keeps all nested parts at least this distance away from the sheet edge. The margin is applied to the sheet boundary before nesting, so every placement strategy (including Step &amp; Repeat) respects it. It works independently of part spacing: spacing controls part-to-part clearance, the margin controls part-to-edge clearance. If the margin is so large that a sheet has no usable area left, the nest will refuse to start with an error message.
+			</div>
+
+			<div class="config_explain" id="explain_exportSheetOutline">
+				<h1>Export sheet outline</h1>
+				When enabled, exported SVG, DXF, and PDF files include the sheet boundary geometry around each nested layout, so the output shows the parts positioned on the actual sheet. The outline is exported as a stroke-only path. When disabled, exports contain only the nested parts, matching the previous behavior.
+			</div>
+
 			<div class="config_explain" id="explain_spacing">
-				
+
 				<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 				 width="551.291px" height="285px" viewBox="-5 -5 561.291 295" enable-background="new 0 0 551.291 285" xml:space="preserve">
 			<path fill="none" stroke="#B5BCC9" stroke-width="2" stroke-miterlimit="10" d="M255.119,0H14.173C6.346,0,0,6.346,0,14.174
@@ -4473,6 +4692,11 @@
 				<div class="config_explain" id="explain_processHoles">
 					<h1>Process part holes</h1>
 					When enabled, Deepnest&rsquo;s NFP engine subtracts a part&rsquo;s interior cutouts so other parts may be nested inside them. Disable this for jobs that have no hole-nestable geometry to skip the extra polygon subtraction work and speed up NFP generation. Disabling has no effect on jobs whose parts have no interior cutouts.
+				</div>
+
+				<div class="config_explain" id="explain_nfpCache">
+					<h1>NFP cache</h1>
+					Deepnest stores no-fit-polygon geometry between runs so repeated jobs start faster. Clear this cache if long sessions begin to feel sluggish or if you want the next nest to rebuild geometry from scratch. This also restarts hidden background workers.
 				</div>
 				
 				<div class="config_explain" id="explain_rotations">
