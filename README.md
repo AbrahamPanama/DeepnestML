@@ -8,10 +8,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ## Current Local Release
 
-- **Version:** `0.7.1`
+- **Version:** `0.7.3`
 - **Product name:** `Deepnest ML`
 - **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
-- **macOS local build:** `dist/Deepnest ML-0.7.1-mac-arm64.dmg`
+- **macOS local build:** `dist/Deepnest ML-0.7.3-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
 
@@ -25,12 +25,40 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Tune PNG contours with offset, detail, smoothing, corner smoothness, alpha cutoff, cleanup, and physical-size controls.
 - Import sticker-style PDFs as composite parts when the PDF contains raster artwork paired with an existing vector contour.
 - Keep PDF artwork as bitmap print artwork and keep the PDF contour as a separate stroke-only cut path.
-- Export SVG, PDF, and DXF, with save dialogs appending missing file extensions.
+- Export SVG, PDF, DXF, and per-sheet TIFF through a unified export modal.
+- Export TIFFs for print/RIP workflows with artwork-only outline filtering, optional top-edge indicator marks, optional sheet numbering, DPI presets/custom DPI, RGB/CMYK color handling, ICC profile embedding/conversion, transparent RGB output, and TIFF compression choices.
 - Use the standard compact nesting modes or the deterministic **Step & Repeat** optimization mode for print/template layouts.
 - Route outer NFP generation through the native Boost addon first, with JS fallbacks and an optional hole-processing toggle.
+- Run opt-in local-refinement experiments and engine benchmark checks from the included `ml/` harnesses.
 - Run in a unified light workspace where the parts list remains visible while nesting runs in the main workspace pane.
 
 ## Recent 0.7.x Highlights
+
+### 0.7.3: Unified Export Modal + TIFF Output
+
+The export workflow now uses one modal for all export formats:
+
+- **SVG/PDF/DXF** continue to use the existing vector export paths.
+- **TIFF** exports one raster file per sheet for print/RIP software.
+- TIFF output supports 150/300/600/custom DPI, white or transparent RGB background, LZW/raw/ZIP compression, ICC embedding for RGB, and CMYK conversion through a selected ICC profile.
+- Export-time outline controls can keep everything, keep artwork only, or keep artwork plus colored engrave strokes while dropping black cut outlines.
+- Optional top indicators and sheet-number stamps help operators orient printed sheets.
+
+The 0.7.3 local macOS artifact is:
+
+```text
+dist/Deepnest ML-0.7.3-mac-arm64.dmg
+```
+
+### Smart Refinement And Benchmark Foundations
+
+This release also lands the local-refinement v3 groundwork and benchmark infrastructure:
+
+- `main/util/separation.js` contains the separation/refinement helper primitives used by the smart engine experiments.
+- `docs/local-refinement-v3-plan.md` records the current smart-refinement plan, gate history, and known limitations.
+- `docs/sota-nesting-implementation-plan.md` records the broader benchmark-first nesting engine plan.
+- `ml/tests/engine_equivalence`, `ml/tests/separation`, and `ml/tests/tiff_export` provide focused regression checks.
+- ESICUP-style benchmark conversion and runner support live under `ml/benchmark`, `ml/cli`, and `ml/lib`.
 
 ### Artwork + Contour Imports
 
@@ -75,12 +103,31 @@ Outer no-fit polygons now try the native Boost-based addon first, then fall back
 
 ```bash
 npm start
+npm run build
 npm run dist
 ```
 
 `npm start` launches the local Electron app.
 
+`npm run build` rebuilds the native Minkowski addon for the installed Electron version.
+
 `npm run dist` packages the macOS build through Electron Builder.
+
+## Verification Commands
+
+Useful targeted checks for the current active path:
+
+```bash
+node --check main.js
+node --check main/deepnest.js
+python3 -c "import ast; ast.parse(open('scripts/conversion/local-convert.py').read())"
+python3 scripts/conversion/local-convert.py --mode doctor
+node ml/tests/tiff_export/run.js
+node ml/tests/engine_equivalence/run.js
+node ml/tests/separation/run.js
+bash ml/scripts/run_boot_check.sh
+bash ml/scripts/run_smoke_battery.sh
+```
 
 ## License
 
