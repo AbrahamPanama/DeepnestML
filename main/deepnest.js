@@ -37,6 +37,10 @@
 			improvedPlacementScoring: false,
 			fitnessVersion: 1,
 			localRefinement: false,
+			localRefinementEngine: 'slide',
+			localRefinementBudgetMs: 1500,
+			localRefinementRotations: false,
+			localRefinementMaxColdAnglesPerPart: 3,
 			mergeLines: true,
 			timeRatio: 0.5,
 			scale: 72,
@@ -758,6 +762,24 @@
 
 			if(c.localRefinement === true || c.localRefinement === false){
 				config.localRefinement = !!c.localRefinement;
+			}
+
+			if(c.localRefinementEngine === 'slide' || c.localRefinementEngine === 'shrinkSeparate' || c.localRefinementEngine === 'smart'){
+				config.localRefinementEngine = String(c.localRefinementEngine);
+			}
+
+			var refinementBudget = Number(c.localRefinementBudgetMs);
+			if(typeof refinementBudget == 'number' && !isNaN(refinementBudget) && isFinite(refinementBudget) && refinementBudget >= 100){
+				config.localRefinementBudgetMs = Math.min(refinementBudget, 30000);
+			}
+
+			if(c.localRefinementRotations === true || c.localRefinementRotations === false){
+				config.localRefinementRotations = !!c.localRefinementRotations;
+			}
+
+			var maxColdAngles = Number(c.localRefinementMaxColdAnglesPerPart);
+			if(typeof maxColdAngles == 'number' && !isNaN(maxColdAngles) && isFinite(maxColdAngles) && maxColdAngles >= 0){
+				config.localRefinementMaxColdAnglesPerPart = Math.min(Math.floor(maxColdAngles), 12);
 			}
 			
 			if(c.mergeLines === true || c.mergeLines === false){

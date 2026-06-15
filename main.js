@@ -704,7 +704,8 @@ function normalizeFormat(value) {
   if (!value) {
     return null;
   }
-  return String(value).trim().toLowerCase().replace(/^\./, '');
+  const normalized = String(value).trim().toLowerCase().replace(/^\./, '');
+  return normalized === 'tif' ? 'tiff' : normalized;
 }
 
 function unlinkIfExists(filePath) {
@@ -833,6 +834,7 @@ async function runLocalConversion(payload) {
   const mode = sourceFormat + '-to-' + targetFormat;
   const supported = mode === 'pdf-to-svg' ||
     mode === 'svg-to-pdf' ||
+    mode === 'svg-to-tiff' ||
     mode === 'png-to-svg' ||
     mode === 'jpg-to-svg' ||
     mode === 'jpeg-to-svg';

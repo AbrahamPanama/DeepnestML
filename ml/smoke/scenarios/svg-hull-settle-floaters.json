@@ -1,0 +1,19 @@
+{
+  "name": "svg-hull-settle-floaters",
+  "description": "Convexhull construction strands comb parts (floaters); the smart-engine settle pass must capture them. WP-S1 gate fixture.",
+  "input": "ml/examples/comb-branches.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "timeBudgetSec": 10,
+  "configOverrides": {
+    "placementType": "convexhull",
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 2,
+    "rotations": 4,
+    "localRefinement": true,
+    "localRefinementEngine": "smart",
+    "localRefinementBudgetMs": 3000
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "description": "Default-flag placement digests for Deepnest engine equivalence.",
+  "scenarios": {
+    "svg-gravity": {
+      "placementsDigest": "7f61c317289450a71f979115780ecc40169c9ba8",
+      "fingerprint": "9eea1ed81401a2ab47d00f3084e326986edd14ad"
+    },
+    "svg-gravity-improved-scoring": {
+      "placementsDigest": "7f61c317289450a71f979115780ecc40169c9ba8",
+      "fingerprint": "dd96c205dc2a71bdf42e75df1e148ad817c840eb"
+    },
+    "svg-gravity-sheet-margin-outline": {
+      "placementsDigest": "d8814e87ece2d0a4bff45fa76e7473170a8dfe51",
+      "fingerprint": "46e328dd06109dc4b568c380da84a69a3e50e991"
+    },
+    "svg-steprepeat": {
+      "placementsDigest": "169ee08bbe0b5c29a57f347a807dd7af4e8dcd85",
+      "fingerprint": "43f1bfeda144c22a9c4d7671d41bb13f0eb32560"
+    },
+    "svg-export-pdf": {
+      "placementsDigest": "45f4e91aebee3ac46a13d7dcbc6e7ad897f2c639",
+      "fingerprint": "82f57f1704a70f70ef08e4b09280ac7e0235d3ad"
+    }
+  }
+}

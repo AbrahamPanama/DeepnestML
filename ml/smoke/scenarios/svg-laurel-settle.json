@@ -1,0 +1,20 @@
+{
+  "name": "svg-laurel-settle",
+  "description": "Real laurel-branch job (user-provided geometry, 12 parts, 12in sheet). Convexhull construction strands parts; the settle pass must capture them. WP-S1 visual acceptance fixture.",
+  "input": "ml/examples/laurel-branches.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 360000,
+  "timeBudgetSec": 120,
+  "configOverrides": {
+    "placementType": "convexhull",
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 4,
+    "rotations": 1,
+    "localRefinement": true,
+    "localRefinementEngine": "smart",
+    "localRefinementBudgetMs": 3000,
+    "curveTolerance": 2
+  }
+}

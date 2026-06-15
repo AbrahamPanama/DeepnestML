@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.7.2`
+- Current version: `0.7.3`
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.7.2-mac-arm64.dmg`
+- Local DMG artifact: `dist/Deepnest ML-0.7.3-mac-arm64.dmg`
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-06-11 by Codex): _dirty: existing local edits remain in `main.js` and `main/index.html` (NFP cache clear feature); version metadata remains in `package.json` / `package-lock.json`; physics nesting prototype under `experiments/physics-nest/` plus npm experiment scripts; `testpart.svg` and `.claude/` untracked; Claude-Code added `docs/sota-nesting-implementation-plan.md` (untracked); Codex added active engine bug fixes in `main/background.js`, `main/deepnest.js`, cache version bump in `main.js`, tests in `ml/tests/engine_bugfixes/`, performance hot-path top-three fixes in `main/background.js` / `main.js`, and WP-0 benchmark corpus/converter/runner files under `ml/benchmark/`, `ml/cli/`, `ml/lib/`, `ml/scripts/`, and `ml/tests/`_.
+State (verified 2026-06-11 by Codex): _dirty: Local Refinement v3 WP-R0/WP-R0.1/WP-R0.2/WP-R0.3 plus promoted relocate/swap and S1 settle foundations are implemented locally (`main/util/separation.js`, `main/background.html`, `main/background.js`, `main/index.html`, `main/deepnest.js`, `ml/tests/separation/`, `ml/tests/engine_equivalence/`, docs updates). Benchmark refinement flags are added in `ml/cli/run_benchmark.js`; bounded efficacy result JSONs are untracked under `ml/benchmark/results/`. S1 is opt-in and did not pass the full substantive/visual gate because ESICUP had no detected floaters and the real laurel visual fixture is not present._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,7 +96,16 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Claude-Code | LRv3-S1 completion: convexhull support + candidate/legality fixes + fixture gates | `main/background.js` (smart engine), gate scenario runs | Completed: machinery landed and verified (battery green); capture gate not yet demonstrated — see plan §1.9.4 and handoff note | 2026-06-11 |
+| Codex | LRv3-S1 legality predicate + settle pass | `main/util/separation.js`, `main/background.js`, `ml/tests/separation/`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; ESICUP gate failed/no floaters; visual laurel fixture still needed | 2026-06-11 |
+| Codex | LRv3-R3-promoted relocate + swap | `main/background.js`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; substantive bounded gate failed; WP-R1 remains blocked | 2026-06-11 |
+| Codex | LRv3-R0.3 clamp + axis-translation separator | `main/util/separation.js`, `main/background.js`, `ml/tests/separation/`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; substantive bounded gate failed; WP-R1 remains blocked | 2026-06-11 |
+| Codex | LRv3-R0.2 exact-relocation separation | `main/background.js`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; substantive bounded gate failed; WP-R1 remains blocked | 2026-06-11 |
+| Codex | LRv3-R0.1 virtual-sheet fix | `main/background.js`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: bounded gate passed; full WP-2.2 corpus gate still pending | 2026-06-11 |
+| Codex | Shrink-separate efficacy benchmark gate before WP-R1 | `ml/cli/run_benchmark.js`, `main/background.js`, `AGENT_COLLABORATION.md` | Completed: bounded check did not prove efficacy; pause WP-R1 pending diagnosis/full gate | 2026-06-11 |
+| Codex | Local Refinement v3 prerequisites (WP-R0: SeparationUtil, equivalence harness, shrink-separate engine flag) | `main/util/separation.js`, `main/background.html`, `main/background.js`, `main/index.html`, `main/deepnest.js`, `ml/tests/separation/`, `ml/tests/engine_equivalence/`, `AGENT_COLLABORATION.md` | Completed; ready for review | 2026-06-11 |
 | Codex | WP-1.1 fitness v2 gate investigation | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, `ml/tests/fitness_v2/`, `AGENT_COLLABORATION.md` | Blocked: flag-on gate failed; do not proceed to WP-1.2 yet | 2026-06-11 |
+| Codex | TIFF-T1..T4 bitmap TIFF export + unified export modal | `scripts/conversion/local-convert.py`, `main.js`, `main/index.html`, `main/style.css`, `ml/boot-check-main.js`, `ml/tests/tiff_export/`, `AGENT_COLLABORATION.md` | Completed: implementation landed and headless verification passed; manual CMYK/profile GUI acceptance still pending | 2026-06-15 |
 
 ## Upcoming Work
 
@@ -112,7 +121,9 @@ Park future tasks both agents should be aware of. Keep entries short. Move items
 | Accessibility pass (landmarks, labels, dialog roles) | `main/index.html` | UI_AUDIT P2.1 — entire file has zero `aria-` / `role=` attributes |
 | Extend smoke battery to bitmap/DXF cases | `ml/app-smoke-main.js`, `ml/smoke/scenarios/` | Follow-up after first scenario battery: add PNG contour import fixture and DXF export/import coverage |
 | Local Refinement v2 rotations | `main/background.js` | After v1 translation-only testing, consider tiny legal angle probes like ±1/±2/±5 degrees with aggressive caching — superseded by WP-2.3 of the SOTA plan below |
+| TIFF bitmap export + unified export modal (TIFF-T1…T4) | `docs/tiff-export-plan.md` | Export nested layouts as per-sheet raster TIFFs for print/RIP: outline-removal enum, top-indicator fiducial, ICC (RGB embed / CMYK convert+embed), via the existing PyMuPDF+Pillow converter (no new deps). Refactors the export menu into a CollageMaker-style modal (light theme). Export-only; not ML-sensitive as long as `placeParts`/vector-export defaults are untouched. Claim TIFF-T1…T4 from the plan's §10 |
 | SOTA nesting engine (WP-0 … WP-4) | `docs/sota-nesting-implementation-plan.md` | Phased plan: benchmark harness → fitness v2 → separate-and-compact refinement (replaces slide Local Refinement) → `deepsearch` placement type → ML routing. Every WP lands behind a default-off flag with equivalence + benchmark gates. Claim individual WPs from the plan's §10 table |
+| Local Refinement v3 "smart" engine (WP-R1 … WP-R6) | `docs/local-refinement-v3-plan.md` | Approved 2026-06-11; supersedes SOTA WP-2.3. Prereqs: SOTA WP-2.1, WP-2.2, and the §8.3 equivalence harness. Contact-graph chain targeting, geometry-derived rotations with pivot rocking, void relocation, swaps, ruin-&-recreate under a budgeted orchestrator (`localRefinementEngine: 'smart'`, default stays 'slide') |
 
 ## Open Questions For User
 
@@ -125,6 +136,361 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-06-15 - TIFF bitmap export + unified export modal implemented (Codex)
+
+- Implemented the attached TIFF export plan across `scripts/conversion/local-convert.py`, `main.js`, `main/index.html`, `main/style.css`, `ml/boot-check-main.js`, and `ml/tests/tiff_export/run.js`.
+- Converter: added `svg-to-tiff` doctor/dispatch support, exact DPI raster sizing, 36-1200 DPI clamp, 120 MP memory guard, white/transparent RGB output, LZW/raw/ZIP TIFF compression, RGB ICC embedding, CMYK ICC requirement + conversion, and clean errors for missing/invalid/mismatched profiles.
+- Main process: added `svg-to-tiff` to the local conversion allow-list and normalized `.tif` to `tiff`.
+- Renderer export: replaced the SVG/PDF/DXF dropdown with a unified modal covering SVG/PDF/DXF/TIFF; vector exports reuse the old paths; TIFF exports one file per sheet via repeated local `svg-to-tiff` conversions, with outline modes (`everything`/`artwork`/`keepEngrave`), optional top indicator, optional sheet number, DPI presets/custom, RGB/CMYK, ICC picker, background and compression controls.
+- `exportNest` remains backward-compatible for `exportNest(n)` and `exportNest(n, true)`; new options enable outline filtering, fiducials, and per-sheet SVG output. The engine-equivalence harness passed after this refactor.
+- Updated the boot invariant from the old export dropdown to the new four-format export modal.
+- Verification passed:
+  - `node --check main.js`
+  - `node --check main/deepnest.js`
+  - inline-script parse for `main/index.html`
+  - `python3 -c "import ast; ast.parse(open('scripts/conversion/local-convert.py').read())"`
+  - `python3 scripts/conversion/local-convert.py --mode doctor` (`svg-to-tiff: true`)
+  - `node ml/tests/tiff_export/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - `bash ml/scripts/run_boot_check.sh`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-tiff-export bash ml/scripts/run_smoke_battery.sh`
+- Not yet done: manual GUI acceptance on a real nested TIFF job, and CMYK acceptance with a real CMYK `.icc` profile from the user's printer calibration folder.
+
+### 2026-06-15 - Versioned 0.7.3 and built local DMG (Codex)
+
+- Bumped app/package/window title metadata to `0.7.3` for the TIFF export release.
+- Rebuilt the native addon with `npm run build`.
+- Built `dist/Deepnest ML-0.7.3-mac-arm64.dmg` with `npm run dist`.
+- Verified the DMG checksum with `hdiutil verify`.
+- Packaging note: electron-builder still reports the known BOM-prefixed JSON warning, falls back to ad-hoc signing, and skips notarization because notarization is not configured.
+
+### 2026-06-12 - TIFF bitmap export plan authored (Claude-Code)
+
+- Added `docs/tiff-export-plan.md`: concrete, self-contained implementation plan for exporting nested layouts as per-sheet raster TIFFs for print/RIP software, written for a less-capable implementing model (exact files, line anchors, options schema, algorithm pseudocode, gates).
+- Feasibility proven on this Mac (2026-06-12): PyMuPDF 1.26.5 renders SVG→pixmap at exact DPI; Pillow 11.3 (libtiff + ImageCms) writes TIFF with DPI tags, embedded ICC, and RGB→CMYK conversion. **No new dependencies** — reuses the existing `scripts/conversion/local-convert.py` service.
+- Scope: (T1) Python `convert_svg_to_tiff` (dumb rasterizer + color/ICC/dpi/background); (T2) add `svg-to-tiff` mode to `runLocalConversion`; (T3) refactor `exportNest` with an outline-classification enum (`everything`/`artwork`/`keepEngrave`), a top-indicator fiducial (always-kept, mm-sized tick), optional sheet-number stamp, and a `perSheet` array output; (T4) replace the export menu with a unified CollageMaker-style modal (light theme) covering all four formats.
+- Locked decisions (plan §2): RGB default (embed-only) / CMYK (convert+embed, requires ICC, forces white bg); one TIFF per sheet, zero-padded naming; outline default `artwork` for TIFF / `everything` for vectors; indicator default center-top.
+- Export-only feature: NOT ML-sensitive provided `placeParts` and the existing SVG/PDF/DXF vector output (default options) stay byte-identical — gated by the engine-equivalence harness.
+- CollageMaker reference studied: `~/Desktop/CollageMaker/src/components/ExportModal.tsx` (React/Tauri/dark) — patterns ported (format row-list, preset tiles showing resulting size, toggle switches with self-explaining disabled states, live preview + meta, restated primary button), rebuilt in Deepnest's vanilla-JS light-theme stack.
+- Next agent: claim `TIFF-T1 python svg-to-tiff converter` from the plan's §10 (T1+T2 land + test headless before any UI). For the CMYK manual gate, ask the user for a real CMYK `.icc` (they have `~/Desktop/PrinterColorCalibration`).
+
+### 2026-06-11 - Real laurel fixture committed and probe-verified; convexhull support is the last S1 gap (Claude-Code)
+
+The user provided the real job files (original `Lastart777.svg` two mirrored branch paths + their nest export). Analysis of the export: 13 placements, ALL `rotate(0)` — a 10-part interlocked diagonal stack at even ~41×28 pitch plus 3 stranded parts; the user runs convexhull-style placement and (nicely) has the new `sheetoutline` export feature on. Actions:
+
+1. **Committed** `ml/examples/laurel-branches.svg` (8 offset copies of the two branch variants + 12in sheet, derived from the user's original) and `ml/smoke/scenarios/svg-laurel-settle.json`. Probe-verified end-to-end on the smoke harness: nest completes, convexhull strands ALL 8 branches (nearest-neighbor 150–487 units vs ~50 interlocked), and the smart engine no-ops with `reason: 'unsupportedPlacementType'` — i.e., the ONLY remaining gap between this fixture and a live visual gate is convexhull support in the smart engine (already specced in plan §0 amendment + §1.9.2).
+2. Fixture-building traps recorded in §1.9.2: identical coincident copies collapse into one part at import (must offset copies via transforms); the legacy x64 smoke runtime lacks the native addon, so the scenario pins rotations:1 (true to the user's job) and curveTolerance:2 with a 120 s budget.
+3. Codex, continuing `LRv3-S1`: (a) convexhull support in the smart engine guard + hull metric for settle, (b) the two §1.9.2 implementation fixes (inward-only candidate offsets; per-candidate moved-part-only legality), then (c) gate on `svg-hull-settle-floaters` AND `svg-laurel-settle`, and attach the before/after laurel exports to the handoff note for the user's visual sign-off.
+
+### 2026-06-11 - S1 smart-engine implementation by Claude-Code: convexhull + group settle landed; honest gate status (Claude-Code)
+
+Implemented directly (user request) in `main/background.js`, all gated behind `localRefinementEngine: 'smart'`; defaults verified untouched (separation/bugfix/equivalence tests, boot check, full smoke battery all green):
+
+1. Convexhull allowed in the smart engine (hull metric via the existing fitness-v2 path).
+2. Inward-only region candidates (boundary-exact + one centroid-ward nudge) replacing the ±4-direction offsets.
+3. Per-candidate legality now `localRefinementSinglePlacementLegal` (O(n), moved part only); the full-layout gate runs once at engine exit, as designed.
+4. Composite acceptance metric (`localRefinementSmartMetric` = pure mode metric + 5e-4 × normalized center spread); stats still report the pure metric so the substantive gate stays honest.
+5. Hull-contribution (≥2%) + spread-outlier (>1.4× median center distance) floater detection alongside the contact test.
+6. **Group settle = ruin & recreate**: empirical proof on the laurel fixture that single-part relocation cannot work there (390 legal candidates evaluated, best delta exactly 0 — every pocket reachable by one move is at the periphery of the jam); floaters are now removed together and re-placed sequentially against the growing cluster, with a one-shot full-rebuild escalation around a seed part; whole-group accept-or-restore; new diagnostics `settleLegalCandidates` / `settleBestDelta` / `settleDebug`.
+
+Gate: **not claimed.** Key corrections recorded in plan §1.9.4: translate-delta stranding measurements are invalid on multi-copy fixtures (measure true world positions); with valid measurement, several fixture rolls were already well-packed (two interlocked laurel stacks — engine null results there are CORRECT); the 12-part roll reproduced the true phenotype (1 genuine stray) but the stray was jammed at rotation 0 with no reachable improving pocket. The user-job insight: their strays exist because the 10-stack hit the sheet edge, so capture = creating a second interlocked stack — the group recreate can build one sequentially, but acceptance failed when borderline tip "floaters" were recreated along with the true stray. Next increment for whoever continues: per-floater accept-or-restore inside the group, or restrict the recreate set to true spread outliers; then re-gate on `svg-laurel-settle` (12-part fixture committed) and attach before/after exports for the user.
+
+### 2026-06-11 - S1 gate unblocked: convexhull is the floater mode; fixture committed; two S1 code fixes specced (Claude-Code)
+
+Investigated the S1 gate blocker (`floatersDetected = 0` on all ESICUP instances) with live probes on a synthetic comb fixture. Findings:
+
+1. **Zero floaters on gravity/box is CORRECT, not a failure.** Construction candidates are NFP-boundary positions — always in contact with a part or the sheet edge. Gravity/box cannot strand parts mid-air. The ESICUP probe is therefore a non-regression check for settle, not its gate.
+2. **Convexhull is the mode that produces floaters** — any position inside the current hull ties on hull area, so late parts are dropped at arbitrary interior spots. Reproduced: `ml/examples/comb-branches.svg` (12 interdigitating comb parts, committed) under convexhull strands 7/12 parts at 200–400-unit nearest-neighbor distances (packed pairs: 62), mixed grid rotations — the user's laurel-image phenotype exactly. **Consequence: the plan's gravity/box-only scope for settle excluded the motivating use case — amended; settle/relocate/swap now support convexhull (hull metric), shrink-separate stays gravity/box.**
+3. **Committed gate fixture**: `ml/smoke/scenarios/svg-hull-settle-floaters.json` (comb fixture, convexhull, smart engine, 3000 ms). Revised gate in plan §1.9.2: `floatersDetected ≥ 4`, `floatersRelocated ≥ 3`, hull-metric improvement ≥ 5%, zero illegal; ESICUP probe demoted to non-regression (settle must no-op cleanly); user-visual laurel acceptance still pending the actual job file from the user.
+4. **Two S1 code fixes found reviewing the landed implementation** (also in §1.9.2): (a) region candidate offsets are ±4-direction at ~20× ε, so ~2/5 of candidates are systematically illegal — observed 73 legality rejects in one probe; make offsets inward-only or boundary-exact. (b) per-candidate legality runs the full O(n²) layout gate although only one part moved — observed 2 deadlineHits; validate the moved part only per candidate (O(n)), full gate once on final acceptance.
+5. Codex: continue under the `LRv3-S1` claim — (a) convexhull support in the smart-engine guard + settle metric, (b) the two fixes above, (c) gate on `svg-hull-settle-floaters`.
+
+### 2026-06-11 - S1 legality predicate + settle pass implemented; visual fixture still needed (Codex)
+
+- Implemented §1.9.0 erosion material-overlap predicate:
+  - `SeparationUtil.materialOverlap(A, B, config)` intersects the polygons and erodes the intersection by `0.5 * EPS_DEPTH` before declaring real material overlap.
+  - Replaced the local-refinement final legality and single-placement legality area threshold with this width-consistent predicate.
+  - Added separation tests for exact edge contact, 0.4-eps sliver, and 3-eps material overlap.
+- Re-ran the promoted R3 smart probe immediately after the legality fix:
+  - `ml/benchmark/results/20260611T231557Z-lr-s1-erosion-r3-regate-10s.json`
+  - Still 0 accepted moves; legality rejects remained high, so the old relocate/swap path is not fixed by erosion alone.
+- Implemented §1.9.1 settle pass behind opt-in `localRefinementEngine: 'smart'`:
+  - floater detection by zero part-to-part contacts;
+  - all-floater seed handling;
+  - floater ordering by distance from cluster center;
+  - current/grid rotation candidates when `localRefinementRotations` is true;
+  - rotated-copy bookkeeping for `placed[i]` and `placements[i].rotation`;
+  - settle region computations through the standalone feasible-region builder;
+  - stats: `floatersDetected`, `floatersRelocated`, `settleRegionComputations`, `settleEmptyRegions`, `rotationsTried`, plus `operatorStats.settle`.
+- Final S1 bounded probe:
+  - `ml/benchmark/results/20260611T232202Z-lr-s1-settle-rounded-3000ms-10s.json`
+  - `albano`, `blaz1`, and `shapes0` all reported `floatersDetected=0`; settle did not fire; 0 accepted moves; substantive ESICUP gate failed.
+  - The real laurel/floating-parts visual fixture was not found in the workspace or Codex attachments, so the visual acceptance lane could not be run.
+- Verification after S1:
+  - `node --check main/background.js`
+  - `node --check main/deepnest.js`
+  - `node --check main/util/separation.js`
+  - `node --check ml/cli/run_benchmark.js`
+  - `node ml/tests/separation/run.js`
+  - `node ml/tests/engine_bugfixes/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - `bash ml/scripts/run_boot_check.sh`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-s1-settle bash ml/scripts/run_smoke_battery.sh`
+- Takeaway: S1 is wired and regression-clean, but it cannot be accepted on ESICUP alone because those instances have no detected floaters. Next step is to run the actual laurel floating-parts job or commit a synthetic floater fixture that exercises `floatersDetected > 0` and proves visible cluster capture.
+
+### 2026-06-11 - Promoted smart relocate/swap implemented; bounded gate still failed (Codex)
+
+- User approved the strategic reorder: promote legal-to-legal void relocation + swaps ahead of WP-R1, keep shrink-separate as polish/deepsearch work.
+- Implemented a minimal opt-in `localRefinementEngine: 'smart'` path in `main/background.js`:
+  - standalone feasible-region builder mirroring the one-part `placeParts` IFP-minus-shifted-NFP pipeline;
+  - region candidate sampling from vertices, midpoints, current-point projections, and tiny curve-tolerance offsets;
+  - relocate operator that accepts only full-layout-legal, strict metric-improving moves;
+  - position-swap operator with same-rotation/own-pose semantics, partner bbox-ratio filter, and relocate-after-swap repair;
+  - `operatorStats.relocate` / `operatorStats.swap`, `passes`, `legalityRejects`, and additive stats merging.
+- Bounded smart probe:
+  - First run: `ml/benchmark/results/20260611T214431Z-lr-r3-smart-relocate-swap-10s.json` completed but accepted 0 moves.
+  - Offset-candidate run: `ml/benchmark/results/20260611T214700Z-lr-r3-smart-offset-candidates-10s.json` also failed the substantive gate:
+    - `albano`: 0 accepted, 1 relocate tried, deadline hit.
+    - `blaz1`: 0 accepted, 6 relocates tried, 9 swaps tried, 4 empty regions, 28 legality rejects.
+    - `shapes0`: 0 accepted, 6 relocates tried, 12 swaps tried, 1 empty region, 103 legality rejects.
+- Interpretation: the smart path is wired and safely opt-in, but the legal-to-legal gate is not green. High legality rejects imply the next diagnosis should improve feasible-region candidate generation/classification (Clipper difference paths may include boundary/holes/exact-contact samples that are not acceptable to the full polygon-area legality gate).
+- Verification after promoted relocate/swap:
+  - `node --check main/background.js`
+  - `node --check main/deepnest.js`
+  - `node --check main/util/separation.js`
+  - `node --check ml/cli/run_benchmark.js`
+  - `node ml/tests/separation/run.js`
+  - `node ml/tests/engine_bugfixes/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - `bash ml/scripts/run_boot_check.sh`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-smart-relocate-swap bash ml/scripts/run_smoke_battery.sh`
+
+### 2026-06-11 - LRv3-R0.3 clamp + axis-translation separator implemented; gate still failed (Codex)
+
+- Implemented the WP-R0.3 separator path:
+  - `SeparationUtil.axisBreakpoints(q, axis, ring)` plus unit tests;
+  - clamp warm start (`q_i` is clamped only when it crosses the virtual `qLimit_i`; global proportional squeeze no longer drives the attempt);
+  - Umetani-style min-overlap axis translations with residual overlap allowed between moves;
+  - GLS pair reweighting on stuck sweeps;
+  - exact-region relocation demoted to fallback after repeated stuck cycles;
+  - empty fallback regions are skipped, not fatal, with one-shot empty fallback caching per part/attempt;
+  - curve-tolerance-derived breakpoint clearance and final-legality checks before accepting a shrink step;
+  - axis-line/NFP-bound prefiltering so dense layouts do not scan every edge for impossible axis crossings.
+- Bounded R0.3 gate result: **failed**. The final recorded run is `ml/benchmark/results/20260611T204037Z-lr-r0.3-prefilter-10s.json`:
+  - `albano`: 0 accepted, 0 feasible, 1 infeasible, 1 deadline hit, relative improvement 0.
+  - `blaz1`: 0 accepted, 1 separator-feasible attempt, 1 final-legality rejection, 3 infeasible attempts, relative improvement 0.
+  - `shapes0`: 0 accepted, 0 feasible, 4 infeasible, 1 exact relocation, 19 empty fallback regions, relative improvement 0.
+- Diagnostic trail:
+  - `ml/benchmark/results/20260611T202723Z-lr-r0.3-clamp-axis-10s.json` showed the mechanism can substantially improve `albano` in one run (3 shrink steps, 1.94% relative improvement) but did not pass the 2/3 gate.
+  - `ml/benchmark/results/20260611T202927Z-lr-r0.3-clamp-axis-5srefine.json` showed extra budget alone does not solve legality/fallback failures.
+  - `ml/benchmark/results/20260611T203157Z-lr-r0.3-clamp-axis-legal-10s.json`, `20260611T203334Z-lr-r0.3-clamp-axis-fallback-cache-10s.json`, and `20260611T203751Z-lr-r0.3-active-neighbors-10s.json` document the legality-gate and performance refinements.
+- Verification after R0.3:
+  - `node --check main/background.js`
+  - `node --check main/deepnest.js`
+  - `node --check main/util/separation.js`
+  - `node --check ml/cli/run_benchmark.js`
+  - `node ml/tests/separation/run.js`
+  - `node ml/tests/engine_bugfixes/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - `bash ml/scripts/run_boot_check.sh`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-local-refinement-r0.3 bash ml/scripts/run_smoke_battery.sh`
+- Takeaway: R0.3 is implemented and regresses neither boot nor default engine equivalence, but the bounded efficacy gate still blocks WP-R1. The next diagnosis should focus on why axis translation can still time out in the first attempt on some dense nests, and why `blaz1` reaches separator feasibility that the final polygon-area legality backstop rejects.
+
+### 2026-06-11 - WP-S1 "settle pass" approved and specced; legality-predicate root cause identified (Claude-Code)
+
+User approved the settle-pass direction (motivated by a real laurel-branch nest with a dense interlocked cluster and ~6 floating parts stranded at arbitrary rotations). Spec: `docs/local-refinement-v3-plan.md` §1.9. Two parts:
+
+1. **§1.9.0 — FIX THE LEGALITY PREDICATE FIRST (blocks every tier).** The Codex 'smart' relocate/swap gate failure ("many legality rejects from feasible-region boundary candidates") has the same root cause as blaz1's R0.3 reject: region-boundary candidates are exact-contact positions, Clipper quantization (~1/clipperScale) turns a legal contact edge of length L into intersection area ≈ L·δ, which exceeds the (1e-3·curveTolerance)² area gate. Area cannot distinguish a long legal contact sliver from a real overlap. Replace with the width-consistent **erosion predicate**: `materialOverlap = nonEmpty(offset(intersect(A,B), −EPS_DEPTH/2))`, unit-tested (exact contact + 0.4·EPS overlap ⇒ legal; 3·EPS ⇒ illegal). Re-run the R3 bounded probe immediately after this lands — it alone may flip several rejects to accepts.
+2. **§1.9.1 — settle pass** extending the landed 'smart' engine: floater detection (zero part-contacts), settle order by distance from cluster, grid-rotation alignment toward the dominant cluster rotation (warm cache, respects job rotation constraints, ≤4 tried), relocation via `buildFeasibleRegion` with the REAL IFP (no virtual clipping; no rectangle-sheet guard needed), construction-metric candidate scoring, erosion-predicate legality, budget 3000 ms recommended. Gate §1.9.2: ≥0.5% relative improvement on ≥2/3 bounded instances + visible floater capture on the user's laurel job. §1.9.3: optional A/B vs `experiments/physics-nest` on the same layout to settle the literal-physics question with data.
+- Annealed relax ("shaking" as Metropolis acceptance) is WP-S2, only after S1 is green.
+- Codex: claim `LRv3-S1 legality predicate + settle pass`. Suggested order: erosion predicate + tests → re-run R3 probe → floater/rotation/settle additions → §1.9.2 gate.
+
+### 2026-06-11 - R0.3 autopsy: tolerance mismatch + cost cliff diagnosed; WP-R0.4 + strategic reorder proposed (Claude-Code)
+
+R0.3 was implemented faithfully and its instrumentation made the diagnosis precise. From `20260611T204037Z-lr-r0.3-prefilter-10s.json`:
+
+1. **blaz1 "separator-feasible but polygon-illegal" is a dimensional spec error (mine):** separation accepts residual depth ≤ ε ≈ 7.2e-5 while the legality gate bounds intersection AREA by ≈ 5e-7; a sub-ε sliver along a 50-unit edge has area ≈ 2.5e-3 — 4 orders of magnitude over. Fix: deterministic contact-polish pass (push sub-ε pairs out along exit vectors, ≤3 rounds, zero-residual required) before acceptance. Specced in plan §1.8.
+2. **albano timeout is a per-visit cost cliff:** `movesTested:1` — one part-visit ate the full 1500 ms (curved parts ⇒ NFP rings with hundreds of vertices × 64 candidates × n neighbors). Fix: decimate provider rings to curveTolerance resolution for separation queries only (legality gate keeps full rings; polish absorbs the error) + bbox neighbor prefilter. Specced in §1.8.
+3. **shapes0 empty regions at a packed boundary are correct behavior** — no action.
+4. **Strategic reorder proposed (needs user sign-off):** promote the legal-to-legal operators (void relocation + swaps, old WP-R3) to the next WP — they need no separation convergence, reuse the already-proven `buildFeasibleRegion`, and are the likeliest first substantive green gate. Re-scope shrink-separate as a polish operator for budgets ≥ 5000 ms and as a core loop of the future `deepsearch` mode (its natural habitat). WP-R1's chain targeting then serves relocation first.
+
+### 2026-06-11 - WP-R0.2 gate failure diagnosed: two plan design errors; WP-R0.3 specced (Claude-Code)
+
+The R0.2 implementation was faithful and the gate failure honest — the defects are in this plan's design, found and fixed as follows:
+
+1. **Global proportional squeeze is the wrong warm start.** It displaces every part, creating O(n) simultaneous overlaps — the hardest possible separation problem. The literature (sparrow) shrinks the container and only the items sticking out get pulled in: overlaps stay localized at the boundary. Replaced by a **clamp warm start** (only parts with `q.x > qLimit` move, to exactly `qLimit`).
+2. **Zero-overlap-or-fail relocation deadlocks on dense layouts.** With all-others-fixed, no pocket exists until several parts shuffle cooperatively — which requires intermediate states that retain overlap. That is exactly the "exact relocations happened but regions came up empty / no convergence" signature of the R0.2 gate run. Replaced by **Umetani min-overlap axis translations**: per violating part, translate along x/y to the strict argmin of total weighted penetration, candidates taken from NFP boundary crossings of the axis line (±2ε) — contact-exact pockets are reached analytically AND intermediate residual overlap is allowed; GLS pair reweighting on stuck sweeps; exact-region relocation demoted to a fallback after 3 stuck cycles, empty region no longer fatal.
+3. Empirical ledger (restack toy, n=12, 20 seeds): argmax GLS 0/20 → sweep GLS 0/20 → zero-overlap relocation 20/20 on toy but deadlocks on real layouts → **clamp + axis translations: 20/20 in mean 3.8 sweeps**. The winning move set is Umetani et al. 2009's published separation operator, validated on the same ESICUP family our gate uses.
+4. Spec: `docs/local-refinement-v3-plan.md` §1.7 **WP-R0.3** (modifies `separateBySweep`; new pure helper `SeparationUtil.axisBreakpoints(q, axis, ring)` with unit test; candidate cap 64/part-axis; sweep cap 60; alphaMin stays 0.0005; §1.6 substantive gate unchanged). Codex: next claim `LRv3-R0.3 clamp + axis-translation separator`. WP-R1 stays blocked until the §1.6 gate passes substantively.
+
+### 2026-06-11 - LRv3-R0.2 exact-relocation separator implemented; substantive gate failed (Codex)
+
+- Implemented the WP-R0.2 separator path in `main/background.js`:
+  - seeded sweep over currently violating parts;
+  - cheap exit/axis nudge candidates that must fully clear residual violation;
+  - exact feasible-region relocation using the clipped virtual IFP minus all shifted current NFP blockers;
+  - nearest-region-point selection via ring vertices plus edge projections;
+  - fail-closed empty-region/deadline behavior and additive stats (`exactRelocations`, `emptyRegionHits`, `relativeImprovement`, `epsilonScaleFeasible`).
+- Restored shrink-separate `alphaMin` to `0.0005` and tightened acceptance so eps-scale relative improvements below `1e-6` do not count as accepted moves.
+- Bounded substantive gate result: **failed**. No run reached the required ≥0.5% relative metric improvement on ≥2/3 bounded ESICUP instances.
+  - Fail-fast/cold result: `ml/benchmark/results/20260611T200508Z-lr-r0.2-exact-10s.json`
+  - Fail-fast/warm result: `ml/benchmark/results/20260611T200704Z-lr-r0.2-exact-warm-10s.json` (`albano`: 0 accepted, 0 feasible, 4 infeasible, 3 exact relocations, 4 empty-region hits; `blaz1`: 0 accepted, 0 feasible, 4 infeasible, 1 exact relocation, 4 empty-region hits; `shapes0`: 0 accepted, 0 feasible, 4 infeasible, 0 exact relocations, 4 empty-region hits)
+  - Diagnostic variant with deferred empty regions: `ml/benchmark/results/20260611T200916Z-lr-r0.2-defer-empty-10s.json`
+  - Diagnostic variant with 20 sweeps: `ml/benchmark/results/20260611T201117Z-lr-r0.2-sweep20-10s.json`
+- Takeaway: exact relocations do occur, but the current feasible-region relocation strategy still does not reliably converge to a legal improved layout on the bounded benchmark. Do **not** proceed to WP-R1 yet; the separator/region strategy needs another diagnosis pass first. The code has been returned to the written R0.2 fail-fast semantics after the diagnostic variants failed.
+- Verification after returning to fail-fast R0.2 semantics:
+  - `node --check main/background.js`
+  - `node --check main/deepnest.js`
+  - `node --check main/util/separation.js`
+  - `node --check ml/cli/run_benchmark.js`
+  - `node ml/tests/separation/run.js`
+  - `node ml/tests/engine_bugfixes/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - `bash ml/scripts/run_boot_check.sh`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-local-refinement-r0.2-final bash ml/scripts/run_smoke_battery.sh`
+
+### 2026-06-11 - WP-R0.1 review: gate hollow; second diagnosis round; WP-R0.2 specced (Claude-Code)
+
+Reviewed the Codex WP-R0.1 batch. The virtual-sheet implementation is correct, the new counters work, and the discipline (stop before WP-R1) was right. But the **bounded gate pass is substantively hollow**, and a second diagnosis round found the real remaining defect.
+
+1. **Gate autopsy** (from `20260611T193645Z-lr-r0.1-alpha-light-10s.json`): albano 0 accepts (13 infeasible attempts); blaz1 1 accept with `scoreBefore === scoreAfter` to 16 digits; shapes0 1 accept worth Δ=1.3e-6 (0.00013%). With `alphaMin = 1e-6`, squeezes shrink below the separator's eps and become trivially feasible — the gate counted accepts without measuring their size. That gate was my design error; replaced by the substantive gate in plan §1.6.
+2. **Why meaningful squeezes all fail** (alpha 0.005…0.0005, `deadlineHits=0` so not budget): two controlled experiments on a restack-required toy (12 squares, two full rows, 1% squeeze, free third row; the only legal restack position is contact-exact `qy=20.0`):
+   - current argmax-GLS separator: **0/20 feasible** (~58 iterations — argmax re-selects the same boxed-in part until `strikes > n` kills each attempt);
+   - Umetani-style randomized-sweep GLS: **also 0/20** — root cause is not target selection but that **stochastic candidates cannot land in contact-exact (near measure-zero) pockets**, and greedy descent rejects the cost-increasing intermediate states needed to climb into them;
+   - sweep + cheap nudges + **exact feasible-region relocation** (NFP region math — the same machinery as placeParts / the planned WP-R3 `buildFeasibleRegion`): **20/20 feasible**, improvement by construction.
+3. **Action:** `docs/local-refinement-v3-plan.md` §1.6 **WP-R0.2** (REQUIRED before WP-R1): `separateBySweep` in `main/background.js` — seeded-random sweep over violating parts; exit-nudges first; exact relocation via `buildFeasibleRegion` (pulled forward from WP-R3, IFP input parameterized so the clipped/virtual IFP flows through) to the NEAREST region point; empty region ⇒ fail fast; ≤5 sweeps; no GLS weights needed (region relocation creates no new overlaps, so the violating set shrinks monotonically). `alphaMin` restored to 0.0005. New stat `exactRelocations`. Substantive gate: ≥0.5% relative metric improvement on ≥2/3 bounded instances, eps-scale accepts don't count, then the full WP-2.2 corpus gate.
+4. Codex: next claim is `LRv3-R0.2 exact-relocation separation`. WP-R1 stays blocked.
+
+### 2026-06-11 - LRv3-R0.1 virtual-sheet fix implemented; bounded gate passed (Codex)
+
+- Implemented the WP-R0.1 provider-layer fix in `main/background.js`:
+  - per-attempt virtual extent boundary for x/y shrink axes;
+  - per-part reference-point `qLimit`;
+  - real IFP clipping to the virtual half-plane with Clipper `ctIntersection`;
+  - clipped `ctx.sheetBounds` for `SeparationUtil` candidate prefilter;
+  - real-sheet final legality gate remains unchanged.
+- Added required additive instrumentation to shrink-separate stats:
+  - `attemptsFeasible`
+  - `attemptsInfeasible`
+  - `deadlineHits`
+  - `feasibleNotImproved`
+  - zero-valued fields are preserved through `mergeLocalRefinementStats`.
+- First rerun of the WP-R0.1 bounded gate:
+  - Result file: `ml/benchmark/results/20260611T192305Z-lr-r0.1-virtual-shrink-10s.json`
+  - Instances: `albano,blaz1,shapes0`; 1 run each; construction budget 10s; refinement budget 1500ms.
+  - Gate result: failed. `shrinkSteps=0` and `movesAccepted=0` on all 3 instances.
+  - Diagnostics: `attemptsFeasible=0`, `attemptsInfeasible=4`, `deadlineHits=0`, `feasibleNotImproved=0` on each instance. This is no longer the original "feasible but no compaction pressure" failure; virtual containment is active, but separation did not find any feasible clipped-strip repair even after alpha halving to the floor.
+- Added opt-in heavy residual diagnostics (`localRefinementDiagnostics === true`) and ran `ml/benchmark/results/20260611T193221Z-lr-r0.1-diagnostic-10s.json`. That showed `blaz1` and `shapes0` residuals shrinking nearly linearly with alpha and no missing geometry, so the old `alphaMin=0.0005` was too coarse for dense layouts. Heavy diagnostics were then made opt-in because they consumed enough budget to cause deadline hits.
+- Lowered shrink alpha floor from `0.0005` to `0.000001`.
+- Final bounded WP-R0.1 gate:
+  - Result file: `ml/benchmark/results/20260611T193645Z-lr-r0.1-alpha-light-10s.json`
+  - Instances: `albano,blaz1,shapes0`; 1 run each; construction budget 10s; refinement budget 1500ms.
+  - Gate result: **passed bounded gate**. `blaz1` and `shapes0` accepted one shrink step each; `albano` remained infeasible.
+  - Aggregate: `instancesWithAcceptedMoves=2/3`, `totalMovesAccepted=2`, `feasibleNotImproved=0`, `deadlineHits=0`.
+  - This proves the virtual-sheet mechanism can accept legal improving shrink steps on the bounded probe. It does **not** replace the full WP-2.2 corpus gate.
+- Verification passed after WP-R0.1:
+  - `node --check main/background.js`
+  - `node --check main/deepnest.js`
+  - `node --check main/util/separation.js`
+  - `node --check ml/cli/run_benchmark.js`
+  - `node ml/tests/separation/run.js`
+  - `node ml/tests/engine_bugfixes/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-local-refinement-r0.1-final bash ml/scripts/run_smoke_battery.sh`
+- Recommendation: full WP-2.2 corpus gate is the next decision point before WP-R1. Use the new benchmark flags; expect the full frozen run to be expensive. If full gate is deferred, keep `localRefinementEngine` default at `'slide'` and continue treating `shrinkSeparate` as experimental.
+
+### 2026-06-11 - Shrink-separate efficacy benchmark plumbing + bounded result (Codex)
+
+- Added Local Refinement benchmark flags to `ml/cli/run_benchmark.js`:
+  - `--local-refinement true|false`
+  - `--local-refinement-engine slide|shrinkSeparate|smart`
+  - `--local-refinement-budget-ms <ms>`
+  - `--local-refinement-rotations true|false`
+  - `--local-refinement-max-cold-angles-per-part <n>`
+  - aliases `--refinement`, `--refinement-engine`, `--refinement-budget-ms`
+- Benchmark scenarios now pass those flags through `configOverrides`, record per-run `localRefinement` / `localRefinementSummary`, and aggregate accepted-move stats (`instancesWithAcceptedMoves`, `totalMovesTested`, `totalMovesAccepted`, accepted rates).
+- Added a `smart` guard in `main/background.js`: if `localRefinementEngine === 'smart'` before WP-R5 exists, the refinement metadata reports `{engine:'smart', reason:'engineNotImplemented'}` instead of silently routing to slide.
+- Bounded efficacy check:
+  - Off result: `ml/benchmark/results/20260611T184920Z-lr-r0-efficacy-off-3x10s.json`
+  - Shrink result: `ml/benchmark/results/20260611T184753Z-lr-r0-efficacy-shrink-10s.json`
+  - Instances: `albano,blaz1,shapes0`; 1 run each; construction budget 10s; shrink budget 1500ms.
+  - `shrinkSeparate` ran on all 3 instances, with 876 total separator iterations and **0 accepted moves** (`instanceAcceptedRate: 0`, `runAcceptedRate: 0`).
+  - Utilization deltas from this 1-run bounded comparison are noisy due GA randomness and should not be treated as the gate, but the accepted-move signal is negative: mean delta was -4.717pp and no `shrinkSteps` were accepted.
+  - Extra probe: `ml/benchmark/results/20260611T185035Z-lr-r0-efficacy-shrink-albano-5srefine.json` (`albano`, 10s construction, 5000ms refinement) also accepted 0 moves after 383 iterations.
+  - A first attempted 5-instance 10s off run hit `shirts` `no_nest_before_time_budget`; partial file is `ml/benchmark/results/20260611T184626Z-lr-r0-efficacy-off-10s.json`.
+- Verification after benchmark edits passed:
+  - `node --check ml/cli/run_benchmark.js`
+  - `node --check main/background.js`
+  - `node --check main/deepnest.js`
+  - `node --check main/util/separation.js`
+  - `node ml/tests/separation/run.js`
+  - `node ml/tests/engine_bugfixes/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-local-refinement-r0-benchmark bash ml/scripts/run_smoke_battery.sh`
+- Recommendation: do **not** start WP-R1 yet. Either run the full WP-2.2 gate with the new flags, or diagnose why shrink-separate reaches feasible/no-improvement states but accepts no shrink steps on real benchmark layouts. The next likely debugging target is instrumenting rejected shrink attempts (`result.feasible`, candidate metric, residual depth, legality revert status) before adding smart operators.
+
+### 2026-06-11 - Local Refinement v3 WP-R0 foundation implemented (Codex)
+
+- Implemented SOTA WP-2.1 `SeparationUtil` in `main/util/separation.js` and loaded it in `main/background.html`. It provides `pointInRing`, boundary distance, NFP penetration, IFP containment, deterministic `mulberry32`, and the budget/deadline-aware GLS `separate(ctx)` loop. Boundary contact with zero residual depth is treated as legal by the separator loop, matching Deepnest placement semantics.
+- Added `ml/tests/separation/run.js` with hand-built square NFP fixtures covering non-overlap, overlap depth/exit, child-hole semantics, containment, deterministic three-square repair, and deadline exit.
+- Added deterministic default-flag equivalence harness `ml/tests/engine_equivalence/run.js` plus `golden.json`. The harness uses the existing smoke inputs with deterministic knobs (`populationSize=1`, `mutationRate=0`, `threads=1`, `rotations=1`) because the full GA smoke digests are nondeterministic across fresh app launches.
+- Wired flagged Local Refinement engine selection:
+  - defaults remain `localRefinement: false` and `localRefinementEngine: 'slide'`;
+  - Settings now expose engine select (`Slide`, `Shrink-separate`) and budget ms/sheet;
+  - `main/deepnest.js` validates `localRefinementEngine`, `localRefinementBudgetMs`, `localRefinementRotations`, and `localRefinementMaxColdAnglesPerPart`.
+- Added `refineByShrinkSeparate(...)` in `main/background.js`, selected only when `config.localRefinementEngine === 'shrinkSeparate'`. It supports rectangular `gravity`/`box` sheets, squeezes toward the gravity origin, calls `SeparationUtil.separate(...)`, keeps strict metric improvements, recomputes merge-line metadata through the existing call site, and fail-closes through a final NFP/IFP legality gate plus Clipper intersection area for hole-free pairs.
+- Updated SOTA/v3 docs: `docs/sota-nesting-implementation-plan.md` registry includes `localRefinementMaxColdAnglesPerPart`; `docs/local-refinement-v3-plan.md` marks WP-R0 implemented and WP-R1…WP-R6 pending.
+- Verification passed:
+  - `node --check main/util/separation.js`
+  - `node --check main/background.js`
+  - `node --check main/deepnest.js`
+  - `node --check ml/tests/separation/run.js`
+  - `node --check ml/tests/engine_equivalence/run.js`
+  - executable inline-script parse for `main/index.html`
+  - `node ml/tests/separation/run.js`
+  - `node ml/tests/engine_bugfixes/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - focused app smoke with `localRefinement=true`, `localRefinementEngine='shrinkSeparate'`, budget 500 ms completed and reported `engine: "shrinkSeparate"`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-local-refinement-r0 bash ml/scripts/run_smoke_battery.sh`
+- Not run: benchmark corpus gate for `'shrinkSeparate'` utilization and `npm run ml:bakeoff`; leave those for WP-2.2 gate review before making any default decision.
+- Next agent: proceed to `LRv3-R1 contact graph + critical chain` (`main/util/refinement-util.js`, tests) using this separator and shrink-separate branch as the foundation. Do not implement `smart` operators until WP-R1/R2 unit tests exist.
+
+### 2026-06-11 - Shrink-separate zero-accepts diagnosed: WP-2.2 plan defect, fix specced as WP-R0.1 (Claude-Code)
+
+The bounded efficacy result (0 accepted moves on albano/blaz1/shapes0, 876 separator iterations, unchanged at 5000 ms budget) is **not an implementation bug — it is a defect in the WP-2.2 spec I authored**: containment was validated against the ORIGINAL sheet, so the separator (whose cost function only minimizes overlap) is free to resolve squeeze overlaps by pushing parts back out or scattering them. The literature's mechanism shrinks the **container**, making feasibility itself the improvement; my spec dropped that ("no virtual sheet needed") and thereby removed all compaction pressure.
+
+Empirical proof (A/B with the real `SeparationUtil`, 3 packed 10×10 squares, 5% squeeze, 20 seeds, 500 ms):
+- A, original-sheet containment (current code): 20/20 separations feasible, mean resulting width **42.4** vs starting 30 — actively worse; improvements only by chance (10/20 on this toy with abundant free space; ≈0 on dense real instances, matching the benchmark).
+- B, IFP clipped to the squeezed extent (q.x ≤ 18.5): 17/20 feasible and **every feasible result improved by construction** (mean width 25.0 — the separator even discovered vertical restacking); the 3 infeasible attempts are what the alpha-halving loop is designed to absorb.
+
+Action: `docs/local-refinement-v3-plan.md` gains **§1.5 WP-R0.1 (REQUIRED before WP-R1)** with the precise fix: per-part `qLimit_i = virtualBoundary − (maxVertexX_i − refX_i)`, Clipper-clipped IFP provider memoized per (source, rotation, qLimit), clipped ctx.sheetBounds, fail-closed empty clips, unchanged real-sheet final legality gate, mandatory instrumentation (`attemptsFeasible/attemptsInfeasible/deadlineHits/feasibleNotImproved`), an incremental-evaluation performance fallback if deadlineHits dominate at n ≥ 20, and a re-gate (bounded probe: accepts on ≥2/3 instances, then the full WP-2.2 benchmark gate). The SOTA plan's WP-2.2 provider spec is annotated as AMENDED. Codex: claim `LRv3-R0.1 virtual-sheet fix` next; WP-R1 stays blocked until its gate passes.
+
+### 2026-06-11 - WP-R0 foundation review (Claude-Code)
+
+Independent verification of the Codex WP-R0 batch (SeparationUtil + equivalence harness + shrinkSeparate engine). Verdict: **correct and spec-faithful; one functional proof still outstanding before WP-R1 work should proceed.**
+
+Verified correct (code read + re-execution):
+- `main/util/separation.js` matches the WP-2.1 contract: API surface, boundary-is-outside `pointInRing`, NFP-children-as-holes penetration, multi-ring IFP containment, proper mulberry32 (Math.imul), and the GLS `separate(ctx)` loop (weights init 1, wSheet 2.0, 3 attempts, 50n iters, exit/entry candidates with 2ε nudges + 12 gaussians σ=0.5·bboxDiag + 4 uniform, argmax-weighted-cost target selection, strict-improvement acceptance, strikes>n, depth/maxDepth reweighting between attempts, in-loop deadline, fail-closed on missing geometry).
+- `refineByShrinkSeparate` matches WP-2.2: guards (≥2 parts, gravity/box, rect sheet, SeparationUtil presence — all fail-soft with stats.reason), α schedule 0.005→[0.0005, 0.02] with ×1.5/÷2 adaptation, box x/y alternation, deterministic seed `nestindex*104729+17`, ε = max(1e-9, 1e-4·curveTolerance), memoized NFP/IFP providers, metric = fitness-v2 sheetMetric, two-layer final legality gate (NFP penetration + IFP containment via SeparationUtil, plus Clipper pairwise intersection backstop) with revert + `legalityRevert` reason, additive stats, mergeLines recompute preserved at the call site.
+- Equivalence harness design is sound: determinism achieved by pinning `populationSize:1, mutationRate:0, threads:1, rotations:1` (the deterministic seed individual — no Math.random influence), default flags forced, committed `golden.json`, digest comparison across the 5-battery. Re-ran: passes. Separation unit tests and full battery re-ran green.
+- Behavioral spot check: ad-hoc smoke with `localRefinementEngine='shrinkSeparate'` on the 3-part fixture ran the engine end-to-end (13 separation iterations, feasible separations, α decayed to floor) and correctly accepted 0 moves — the fixture is already corner-packed with zero recoverable slack, so 0 is the right answer there.
+
+Findings / follow-ups (none blocking the merge, one blocking WP-R1):
+1. **BLOCKING for WP-R1: functional efficacy is unproven on real instances.** The trivial fixture cannot distinguish "engine works but no slack" from "engine can never improve". Run the WP-2.2 benchmark gate before building operators on top: extend `ml/cli/run_benchmark.js` with a local-refinement flag and compare refinement-on vs off on the frozen corpus (gates: movesAccepted>0 on ≥70% of instances; mean ≥ +1.5pp).
+2. `shrinkSeparateOnce` shared-primitive extraction (v3 plan §1.3) was not done — the loop body is inline in `refineByShrinkSeparate`. Must be extracted by WP-R5 at the latest so 'smart' does not fork the code.
+3. The Clipper legality backstop skips pairs where either part has holes (`localRefinementClipperIntersectionArea` returns 0) — justified to avoid false reverts on legal hole-nesting (outer-ring intersection is legal there), and the NFP penetration layer still covers those pairs; documented here so nobody "fixes" it naively.
+4. `main/deepnest.js:767` already accepts `'smart'` as a valid engine value but `main/background.js` silently routes it to the slide engine — harmless forward-compat, but a dev setting 'smart' today gets 'slide' without any indication. Consider stats.reason='engineNotImplemented' until WP-R5.
+
+### 2026-06-11 - Local Refinement v3 implementation plan authored (Claude-Code)
+
+- Added `docs/local-refinement-v3-plan.md`: the implementation plan for the approved "smart" Local Refinement direction (user + coder sign-off). It extends the SOTA plan's Phase 2 and supersedes WP-2.3's blind rotation probes.
+- Core design: budgeted multi-operator orchestrator (`localRefinementEngine: 'smart'`, default remains 'slide') combining (1) the WP-2.2 shrink–separate translation backbone, (2) contact-graph **critical-chain targeting** so moves focus on the parts that actually pin the layout extent, (3) **geometry-derived rotation candidates** (hull-edge alignment between contacting parts, pivot/"rocking" rotations about contact points, cache-warm grid angles first, slenderness gating, cold-angle caps), (4) **void relocation** via a standalone feasible-region builder (placeParts pipeline mirrored, hot path untouched), (5) pairwise position swaps, and (6) ruin-&-recreate using the construction scorer as re-placer.
+- New module `main/util/refinement-util.js` (contact probes via direct penetration nudges — no normal math; criticalChain BFS; rotationCandidates; pivot pose formula `t' = R_delta(t−c)+c`) with Node unit tests; orchestrator in `main/background.js` behind the engine flag; badge/stats contract preserved with additive operator counters; final legality gate identical to WP-2.2.
+- Prerequisites called out explicitly: SOTA WP-2.1 (SeparationUtil), WP-2.2 (shrink–separate, shared `shrinkSeparateOnce` primitive), and the still-missing §8.3 engine-equivalence harness.
+- Gates: 'smart' ≥ 'shrinkSeparate' +0.75pp and ≥ no-refinement +1.5pp mean median utilization on the frozen benchmark; rotation acceptances must actually fire on slender-part instances; all shipped layouts legal; ML checkpoint before any default flip.
+- SOTA plan §5/§10 updated to point at the v3 plan. No code changed.
+- Next agent: build WP-R0 prerequisites first (SOTA WP-2.1 + §8.3 harness + WP-2.2), then claim `LRv3-R1 contact graph + critical chain`.
 
 ### 2026-06-11 - Sheet margin setting + export sheet outline option (Claude-Code)
 

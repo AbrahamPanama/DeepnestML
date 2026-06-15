@@ -2,7 +2,7 @@
 <html itemscope="" itemtype="http://schema.org/WebPage" lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Deepnest ML 0.7.1</title>
+		<title>Deepnest ML 0.7.3</title>
 
 		<link type="text/css" rel="stylesheet" media="all" href="font/latolatinfonts.css" />
 		<link rel="stylesheet" type="text/css" href="style.css" />
@@ -416,8 +416,22 @@
 			  improvedPlacementScoring: false,
 			  fitnessVersion: 1,
 			  localRefinement: false,
+			  localRefinementEngine: 'slide',
+			  localRefinementBudgetMs: 1500,
+			  localRefinementRotations: false,
+			  localRefinementMaxColdAnglesPerPart: 3,
 			  processHoles: true, // when true, NFP generation subtracts A's holes; when false, holes on A are ignored (faster for hole-free jobs)
 			  exportSheetOutline: false, // when true, exports include the sheet boundary with the nested parts
+			  exportFormat: 'svg',
+			  exportOutlineMode: 'everything',
+			  exportTopIndicator: false,
+			  exportTopIndicatorPos: 'center',
+			  exportSheetNumber: false,
+			  tiffDpi: 300,
+			  tiffColorMode: 'rgb',
+			  tiffBackground: 'white',
+			  tiffCompression: 'lzw',
+			  lastIccProfilePath: '',
 			  mergeLines: true, // whether to merge lines
 			  timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
 			  simplify: false,
@@ -462,7 +476,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'processHoles' || key == 'exportSheetOutline'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							val = i.checked;
 						}
 					
@@ -567,7 +581,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'processHoles' || key == 'exportSheetOutline'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -2321,64 +2335,276 @@
 			}
 			
 			var exportbutton = document.querySelector('#export');
-			
-			var exportsvg = document.querySelector('#exportsvg');
-			exportsvg.onclick = function(){
-				
-				var dialog = app.dialog;
-				dialog.showSaveDialog({
-					title: 'Export Deepnest ML SVG',
-					defaultPath: 'deepnest.svg',
-					filters: [{ name: 'SVG file', extensions: ['svg'] }]
-				}, function (fileName) {
-					if(fileName === undefined){
-						console.log("No file selected");
-					}
-					else{
-						fileName = ensureFileExtension(fileName, '.svg');
-						var selected = DeepNest.nests.filter(function(n){
-							return n.selected;
-						});
-						
-						if(selected.length == 0){
-							return false;
-						}
-						
-						fs.writeFileSync(fileName, exportNest(selected.pop()));
+			var exportDialog = document.querySelector('#exportdialog');
+			var exportDialogCard = exportDialog ? exportDialog.querySelector('.exportdialog-card') : null;
+			var exportFormatList = document.querySelector('#export-format-list');
+			var exportDpiTiles = document.querySelector('#export-dpi-tiles');
+			var exportDpiCustom = document.querySelector('#export-dpi-custom');
+			var exportOutline = document.querySelector('#export-outline');
+			var exportIndicator = document.querySelector('#export-indicator');
+			var exportIndicatorPos = document.querySelector('#export-indicator-pos');
+			var exportSheetNum = document.querySelector('#export-sheetnum');
+			var exportBg = document.querySelector('#export-bg');
+			var exportColor = document.querySelector('#export-color');
+			var exportCompression = document.querySelector('#export-compression');
+			var exportIccLabel = document.querySelector('#export-icc');
+			var exportPreviewImg = document.querySelector('#export-preview-img');
+			var exportPreviewMeta = document.querySelector('#export-preview-meta');
+			var exportDialogHint = document.querySelector('#exportdialog-hint');
+			var exportDialogGo = document.querySelector('#exportdialog-go');
+			var exportIccProfilePath = config.getSync('lastIccProfilePath') || '';
+			var exportUserAdjustedFormatOptions = false;
+
+			function getSelectedNestForExport(){
+				var selected = DeepNest.nests.filter(function(n){
+					return n.selected;
+				});
+				return selected.length ? selected.pop() : null;
+			}
+
+			function clampExportDpi(value){
+				value = parseInt(value, 10);
+				if(!isFinite(value)){
+					value = 300;
+				}
+				return Math.max(36, Math.min(1200, value));
+			}
+
+			function getExportDpi(){
+				var active = exportDpiTiles ? exportDpiTiles.querySelector('button.active') : null;
+				if(active && active.getAttribute('data-dpi') == 'custom'){
+					return clampExportDpi(exportDpiCustom.value);
+				}
+				return clampExportDpi(active ? active.getAttribute('data-dpi') : config.getSync('tiffDpi'));
+			}
+
+			function setExportDpi(value){
+				value = clampExportDpi(value);
+				var matched = false;
+				Array.prototype.slice.call(exportDpiTiles.querySelectorAll('button')).forEach(function(button){
+					var dpi = button.getAttribute('data-dpi');
+					var active = String(value) == dpi;
+					button.classList.toggle('active', active);
+					if(active){
+						matched = true;
 					}
 				});
-			};
+				if(!matched){
+					var custom = exportDpiTiles.querySelector('button[data-dpi="custom"]');
+					if(custom){
+						custom.classList.add('active');
+					}
+					exportDpiCustom.value = value;
+					exportDpiCustom.classList.add('active');
+				}
+				else{
+					exportDpiCustom.classList.remove('active');
+				}
+			}
 
-			var exportpdf = document.querySelector('#exportpdf');
-			exportpdf.onclick = function(){
-				var dialog = app.dialog;
-				dialog.showSaveDialog({
-					title: 'Export Deepnest ML PDF',
-					defaultPath: 'deepnest.pdf',
-					filters: [{ name: 'PDF file', extensions: ['pdf'] }]
-				}, function (fileName) {
-					if(fileName === undefined){
-						console.log("No file selected");
+			function getExportFormat(){
+				var active = exportFormatList ? exportFormatList.querySelector('button.active') : null;
+				return active ? active.getAttribute('data-format') : (config.getSync('exportFormat') || 'svg');
+			}
+
+			function setExportFormat(format, applyFormatDefaults){
+				format = format || 'svg';
+				Array.prototype.slice.call(exportFormatList.querySelectorAll('button')).forEach(function(button){
+					button.classList.toggle('active', button.getAttribute('data-format') == format);
+				});
+				if(exportDialogCard){
+					exportDialogCard.classList.toggle('vector-mode', format != 'tiff');
+				}
+				if(applyFormatDefaults !== false && format == 'tiff' && !exportUserAdjustedFormatOptions){
+					exportOutline.value = 'artwork';
+					exportIndicator.checked = true;
+					exportIndicatorPos.value = 'center';
+				}
+				if(applyFormatDefaults !== false && format != 'tiff' && !exportUserAdjustedFormatOptions){
+					exportOutline.value = 'everything';
+					exportIndicator.checked = false;
+				}
+				refreshExportDialog();
+			}
+
+			function getExportSheetInfo(n){
+				if(!n || !n.placements || !n.placements.length){
+					return null;
+				}
+				var sheet = DeepNest.parts[n.placements[0].sheet];
+				if(!sheet || !sheet.bounds){
+					return null;
+				}
+				return {
+					widthInches: sheet.bounds.width / Number(config.getSync('scale') || 72),
+					heightInches: sheet.bounds.height / Number(config.getSync('scale') || 72),
+					sheets: n.placements.length
+				};
+			}
+
+			function getExportOptions(){
+				return {
+					outlineMode: exportOutline.value || 'everything',
+					topIndicator: exportIndicator.checked ? {
+						enabled: true,
+						placement: exportIndicatorPos.value || 'center',
+						lengthMm: 10,
+						thicknessMm: 0.5,
+						insetMm: 2
+					} : null,
+					sheetNumber: exportSheetNum.checked === true
+				};
+			}
+
+			function saveExportSettings(){
+				config.setSync('exportFormat', getExportFormat());
+				config.setSync('exportOutlineMode', exportOutline.value || 'everything');
+				config.setSync('exportTopIndicator', exportIndicator.checked === true);
+				config.setSync('exportTopIndicatorPos', exportIndicatorPos.value || 'center');
+				config.setSync('exportSheetNumber', exportSheetNum.checked === true);
+				config.setSync('tiffDpi', getExportDpi());
+				config.setSync('tiffColorMode', exportColor.value || 'rgb');
+				config.setSync('tiffBackground', exportBg.value || 'white');
+				config.setSync('tiffCompression', exportCompression.value || 'lzw');
+				config.setSync('lastIccProfilePath', exportIccProfilePath || '');
+			}
+
+			function refreshExportDialog(){
+				var selected = getSelectedNestForExport();
+				var format = getExportFormat();
+				var sheetInfo = getExportSheetInfo(selected);
+				var dpi = getExportDpi();
+				if(exportColor.value == 'cmyk'){
+					exportBg.value = 'white';
+					exportBg.disabled = true;
+				}
+				else{
+					exportBg.disabled = false;
+				}
+				Array.prototype.slice.call(exportDpiTiles.querySelectorAll('button')).forEach(function(button){
+					var tileDpi = button.getAttribute('data-dpi');
+					var label = button.querySelector('span');
+					if(!label){
+						return;
+					}
+					if(tileDpi == 'custom'){
+						label.innerText = dpi + ' DPI';
+					}
+					else if(sheetInfo){
+						label.innerText = Math.round(sheetInfo.widthInches * Number(tileDpi)) + ' x ' + Math.round(sheetInfo.heightInches * Number(tileDpi)) + ' px';
 					}
 					else{
-						fileName = ensureFileExtension(fileName, '.pdf');
-						var selected = DeepNest.nests.filter(function(n){
-							return n.selected;
-						});
-
-						if(selected.length == 0){
-							return false;
+						label.innerText = '';
+					}
+				});
+				exportIccLabel.innerText = exportIccProfilePath ? path.basename(exportIccProfilePath) : 'None';
+				var hint = '';
+				var error = false;
+				if(format == 'tiff' && exportColor.value == 'cmyk' && !exportIccProfilePath){
+					hint = 'Choose a CMYK ICC profile.';
+					error = true;
+				}
+				else if(format == 'tiff' && exportColor.value == 'cmyk'){
+					hint = 'CMYK has no transparency; background is forced to white.';
+				}
+				else{
+					hint = 'Ready to export.';
+				}
+				exportDialogHint.innerText = hint;
+				exportDialogHint.classList.toggle('error', error);
+				exportDialogGo.classList.toggle('disabled', error);
+				if(format == 'tiff' && selected){
+					exportDialogGo.innerText = sheetInfo && sheetInfo.sheets > 1 ? ('Export ' + sheetInfo.sheets + ' TIFF files') : 'Export TIFF';
+				}
+				else{
+					exportDialogGo.innerText = 'Export ' + format.toUpperCase();
+				}
+				if(selected && exportPreviewImg){
+					try{
+						var previewOptions = getExportOptions();
+						previewOptions.perSheet = true;
+						var sheets = exportNest(selected, previewOptions);
+						if(sheets && sheets.length){
+							exportPreviewImg.src = 'data:image/svg+xml;base64,' + Buffer.from(sheets[0].svg, 'utf8').toString('base64');
 						}
+					}
+					catch(err){
+						exportPreviewImg.removeAttribute('src');
+					}
+				}
+				if(exportPreviewMeta){
+					if(sheetInfo){
+						var pxText = format == 'tiff' ? (Math.round(sheetInfo.widthInches * dpi) + ' x ' + Math.round(sheetInfo.heightInches * dpi) + ' px') : 'vector';
+						var estimateMb = format == 'tiff' ? Math.max(0.1, (sheetInfo.widthInches * dpi * sheetInfo.heightInches * dpi * (exportColor.value == 'cmyk' ? 4 : (exportBg.value == 'transparent' ? 4 : 3)) / (1024 * 1024))).toFixed(1) + ' MB raw/sheet' : '';
+						exportPreviewMeta.innerText = 'Format: ' + format.toUpperCase() + '\nSheets: ' + sheetInfo.sheets + '\nPer sheet: ' + pxText + (estimateMb ? ('\nEstimate: ' + estimateMb) : '');
+					}
+					else{
+						exportPreviewMeta.innerText = 'No selected nest.';
+					}
+				}
+			}
 
+			function openExportDialog(){
+				if(!exportDialog || exportbutton.className.indexOf('disabled') >= 0){
+					return false;
+				}
+				var selected = getSelectedNestForExport();
+				if(!selected){
+					message('select a nest before exporting', true);
+					return false;
+				}
+				exportUserAdjustedFormatOptions = false;
+				exportOutline.value = config.getSync('exportOutlineMode') || 'everything';
+				exportIndicator.checked = config.getSync('exportTopIndicator') === true || config.getSync('exportTopIndicator') === 'true';
+				exportIndicatorPos.value = config.getSync('exportTopIndicatorPos') || 'center';
+				exportSheetNum.checked = config.getSync('exportSheetNumber') === true || config.getSync('exportSheetNumber') === 'true';
+				exportColor.value = config.getSync('tiffColorMode') || 'rgb';
+				exportBg.value = config.getSync('tiffBackground') || 'white';
+				exportCompression.value = config.getSync('tiffCompression') || 'lzw';
+				exportIccProfilePath = config.getSync('lastIccProfilePath') || '';
+				setExportDpi(config.getSync('tiffDpi') || 300);
+				setExportFormat(config.getSync('exportFormat') || 'svg', false);
+				exportDialog.classList.add('active');
+				refreshExportDialog();
+				return false;
+			}
+
+			function closeExportDialog(){
+				if(exportDialog){
+					exportDialog.classList.remove('active');
+				}
+				return false;
+			}
+
+			function exportVectorNest(format, selected, options){
+				var dialog = app.dialog;
+				var ext = format;
+				dialog.showSaveDialog({
+					title: 'Export Deepnest ML ' + format.toUpperCase(),
+					defaultPath: 'deepnest.' + ext,
+					filters: [{ name: format.toUpperCase() + ' file', extensions: [ext] }]
+				}, function(fileName){
+					if(fileName === undefined){
+						return;
+					}
+					fileName = ensureFileExtension(fileName, '.' + ext);
+					saveExportSettings();
+					if(format == 'svg'){
+						fs.writeFileSync(fileName, exportNest(selected, options));
+						message('exported SVG');
+						closeExportDialog();
+					}
+					else if(format == 'pdf'){
 						exportbutton.className = 'button export spinner';
-						var exportData = exportNest(selected.pop());
-						requestLocalConversion('pdf', 'svg', exportData, 'deepnest.svg')
+						requestLocalConversion('pdf', 'svg', exportNest(selected, options), 'deepnest.svg')
 							.then(function(response){
 								if(!response.outputBase64){
 									message('local conversion did not return a PDF', true);
 									return;
 								}
 								fs.writeFileSync(fileName, base64ToBytes(response.outputBase64));
+								message('exported PDF');
+								closeExportDialog();
 							})
 							.catch(function(err){
 								message('could not convert SVG to PDF locally: ' + err.message, true);
@@ -2387,59 +2613,192 @@
 								exportbutton.className = 'button export';
 							});
 					}
-				});
-			};
-			
-			var exportdxf = document.querySelector('#exportdxf');
-			exportdxf.onclick = function(){
-				var dialog = app.dialog;
-				dialog.showSaveDialog({
-					title: 'Export Deepnest ML DXF',
-					defaultPath: 'deepnest.dxf',
-					filters: [{ name: 'DXF file', extensions: ['dxf'] }]
-				}, function (fileName) {
-					if(fileName === undefined){
-						console.log("No file selected");
-					}
-					else{
-						fileName = ensureFileExtension(fileName, '.dxf');
-						var selected = DeepNest.nests.filter(function(n){
-							return n.selected;
-						});
-						
-						if(selected.length == 0){
-							return false;
-						}
-						// send to conversion server
-						var url = config.getSync('conversionServer');
-						if(!url){
-							url = defaultConversionServer;
-						}
-						
+					else if(format == 'dxf'){
+						var url = config.getSync('conversionServer') || defaultConversionServer;
 						exportbutton.className = 'button export spinner';
-						
-						var req = request.post(url, function (err, resp, body) {
+						var dxfOptions = cloneConfigObject(options || {});
+						dxfOptions.dxf = true;
+						var req = request.post(url, function(err, resp, body){
 							exportbutton.className = 'button export';
-							if (err) {
+							if(err){
 								message('could not contact file conversion server', true);
-							} else {
-								if(body.substring(0, 5) == 'error'){
-									message(body, true);
-								}
-								else{
-									fs.writeFileSync(fileName, body);
-								}
+							}
+							else if(body.substring(0, 5) == 'error'){
+								message(body, true);
+							}
+							else{
+								fs.writeFileSync(fileName, body);
+								message('exported DXF');
+								closeExportDialog();
 							}
 						});
-
 						var form = req.form();
 						form.append('format', 'dxf');
-						form.append('fileUpload', exportNest(selected.pop(), true), {
+						form.append('fileUpload', exportNest(selected, dxfOptions), {
 						  filename: 'deepnest.svg',
 						  contentType: 'image/svg+xml'
 						});
 					}
 				});
+			}
+
+			function exportTiffNest(selected, options){
+				if(exportColor.value == 'cmyk' && !exportIccProfilePath){
+					message('Choose a CMYK ICC profile before exporting TIFF.', true);
+					refreshExportDialog();
+					return;
+				}
+				var dialog = app.dialog;
+				dialog.showSaveDialog({
+					title: 'Export Deepnest ML TIFF',
+					defaultPath: 'deepnest.tiff',
+					filters: [{ name: 'TIFF file', extensions: ['tiff', 'tif'] }]
+				}, function(fileName){
+					if(fileName === undefined){
+						return;
+					}
+					fileName = ensureFileExtension(fileName, '.tiff');
+					saveExportSettings();
+					var sheets = exportNest(selected, Object.assign({}, options, { perSheet: true }));
+					var dir = path.dirname(fileName);
+					var ext = path.extname(fileName) || '.tiff';
+					var base = path.basename(fileName, ext);
+					var width = Math.max(2, String(sheets.length).length);
+					var outputs = sheets.map(function(sheet, index){
+						if(sheets.length == 1){
+							return fileName;
+						}
+						var number = String(index + 1);
+						while(number.length < width){
+							number = '0' + number;
+						}
+						return path.join(dir, base + '_' + number + ext);
+					});
+					var existing = outputs.filter(function(outputPath){
+						return fs.existsSync(outputPath);
+					});
+					if(existing.length && !window.confirm(existing.length + ' TIFF file(s) already exist. Overwrite them?')){
+						return;
+					}
+					var iccBase64 = exportIccProfilePath ? fs.readFileSync(exportIccProfilePath).toString('base64') : null;
+					var dpi = getExportDpi();
+					var colorMode = exportColor.value || 'rgb';
+					var background = colorMode == 'cmyk' ? 'white' : (exportBg.value || 'white');
+					var compression = exportCompression.value || 'lzw';
+					exportbutton.className = 'button export spinner';
+					exportDialogGo.classList.add('disabled');
+					var chain = Promise.resolve();
+					sheets.forEach(function(sheet, index){
+						chain = chain.then(function(){
+							exportDialogHint.innerText = 'Exporting sheet ' + (index + 1) + ' of ' + sheets.length + '...';
+							return requestLocalConversion('tiff', 'svg', sheet.svg, 'sheet' + (index + 1) + '.svg', {
+								dpi: dpi,
+								widthInches: sheet.widthInches,
+								heightInches: sheet.heightInches,
+								colorMode: colorMode,
+								background: background,
+								compression: compression,
+								iccProfileBase64: iccBase64
+							}).then(function(response){
+								if(!response.outputBase64){
+									throw new Error('sheet ' + (index + 1) + ' failed: ' + (response.error || 'no TIFF output'));
+								}
+								fs.writeFileSync(outputs[index], base64ToBytes(response.outputBase64));
+							});
+						});
+					});
+					chain.then(function(){
+						message('Exported ' + sheets.length + ' TIFF file' + (sheets.length == 1 ? '' : 's') + '.');
+						closeExportDialog();
+					}).catch(function(err){
+						message('could not export TIFF: ' + err.message, true);
+					}).finally(function(){
+						exportbutton.className = 'button export';
+						exportDialogGo.classList.remove('disabled');
+						refreshExportDialog();
+					});
+				});
+			}
+
+			exportbutton.onclick = openExportDialog;
+			document.querySelector('#exportdialog-close').onclick = closeExportDialog;
+			document.querySelector('#exportdialog-cancel').onclick = closeExportDialog;
+			exportFormatList.onclick = function(event){
+				var button = event.target;
+				while(button && button.tagName != 'BUTTON'){
+					button = button.parentNode;
+				}
+				if(!button){
+					return;
+				}
+				setExportFormat(button.getAttribute('data-format'));
+			};
+			exportDpiTiles.onclick = function(event){
+				var button = event.target;
+				while(button && button.tagName != 'BUTTON'){
+					button = button.parentNode;
+				}
+				if(!button){
+					return;
+				}
+				var dpi = button.getAttribute('data-dpi');
+				if(dpi == 'custom'){
+					Array.prototype.slice.call(exportDpiTiles.querySelectorAll('button')).forEach(function(tile){
+						tile.classList.toggle('active', tile == button);
+					});
+					exportDpiCustom.classList.add('active');
+				}
+				else{
+					setExportDpi(dpi);
+				}
+				refreshExportDialog();
+			};
+			[exportOutline, exportIndicator, exportIndicatorPos, exportSheetNum, exportBg, exportColor, exportCompression, exportDpiCustom].forEach(function(control){
+				control.onchange = function(){
+					exportUserAdjustedFormatOptions = true;
+					if(control == exportColor && exportColor.value == 'cmyk'){
+						exportBg.value = 'white';
+					}
+					refreshExportDialog();
+				};
+			});
+			document.querySelector('#export-icc-pick').onclick = function(){
+				var files = app.dialog.showOpenDialog({
+					title: 'Choose ICC profile',
+					filters: [{ name: 'ICC profile', extensions: ['icc', 'icm'] }],
+					properties: ['openFile']
+				});
+				if(files && files.length){
+					exportIccProfilePath = files[0];
+					exportUserAdjustedFormatOptions = true;
+					refreshExportDialog();
+				}
+				return false;
+			};
+			document.querySelector('#export-icc-clear').onclick = function(){
+				exportIccProfilePath = '';
+				exportUserAdjustedFormatOptions = true;
+				refreshExportDialog();
+				return false;
+			};
+			exportDialogGo.onclick = function(){
+				if(exportDialogGo.className.indexOf('disabled') >= 0){
+					return false;
+				}
+				var selected = getSelectedNestForExport();
+				if(!selected){
+					message('select a nest before exporting', true);
+					return false;
+				}
+				var format = getExportFormat();
+				var options = getExportOptions();
+				if(format == 'tiff'){
+					exportTiffNest(selected, options);
+				}
+				else{
+					exportVectorNest(format, selected, options);
+				}
+				return false;
 			};
 
 			function parseInlineStyleMap(styleText){
@@ -2530,8 +2889,65 @@
 				return false;
 			}
 
+			function getExportStyleValue(node, name){
+				var styleMap = parseInlineStyleMap(node ? node.getAttribute('style') : '');
+				if(styleMap && typeof styleMap[name] !== 'undefined'){
+					return styleMap[name];
+				}
+				return node ? node.getAttribute(name) : null;
+			}
+
+			function exportColorIsNone(value){
+				if(value === null || typeof value === 'undefined'){
+					return false;
+				}
+				value = String(value).trim().toLowerCase();
+				return value === 'none' || value === 'transparent';
+			}
+
+			function exportColorIsVisible(value){
+				if(value === null || typeof value === 'undefined'){
+					return false;
+				}
+				value = String(value).trim().toLowerCase();
+				return !!value && value !== 'none' && value !== 'transparent';
+			}
+
+			function classifyExportNode(node){
+				if(!node){
+					return 'outline';
+				}
+				if(node.tagName == 'image'){
+					return 'artwork';
+				}
+				var fill = getExportStyleValue(node, 'fill');
+				var stroke = getExportStyleValue(node, 'stroke');
+				if(fill === null || typeof fill === 'undefined'){
+					return 'artwork';
+				}
+				if(!exportColorIsNone(fill)){
+					return 'artwork';
+				}
+				if(exportColorIsVisible(stroke)){
+					return 'outline';
+				}
+				return 'outline';
+			}
+
 			// nest save
-			var exportNest = function(n, dxf){
+			var exportNest = function(n, optionsOrDxf){
+				var exportOptions = {};
+				if(optionsOrDxf === true){
+					exportOptions.dxf = true;
+				}
+				else if(optionsOrDxf && typeof optionsOrDxf === 'object'){
+					exportOptions = optionsOrDxf;
+				}
+				var dxf = !!exportOptions.dxf;
+				var outlineMode = exportOptions.outlineMode || 'everything';
+				var perSheet = exportOptions.perSheet === true;
+				var topIndicator = exportOptions.topIndicator && exportOptions.topIndicator.enabled ? exportOptions.topIndicator : null;
+				var sheetNumber = exportOptions.sheetNumber === true;
 				var activeConfig = cloneConfigObject(window.DeepNestRuntimeConfig || {});
 				if(typeof activeConfig.scale === 'undefined'){
 					activeConfig.scale = config.getSync('scale');
@@ -2552,17 +2968,91 @@
 					activeConfig.exportSheetOutline = config.getSync('exportSheetOutline');
 				}
 
-				var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+				var svgns = 'http://www.w3.org/2000/svg';
+				var scale = activeConfig.scale || config.getSync('scale');
+				var outputScale = scale;
 				
-				var svgwidth = 0;
-				var svgheight = 0;
+				if(dxf){
+					outputScale /= Number(activeConfig.dxfExportScale || config.getSync('dxfExportScale')); // inkscape on server side
+				}
 				
-				// create elements if they don't exist, show them otherwise
-				n.placements.forEach(function(s){
-					var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-					svg.appendChild(group);
-					if(activeConfig.exportSheetOutline === true || activeConfig.exportSheetOutline === 'true'){
-						DeepNest.parts[s.sheet].svgelements.forEach(function(e){
+				var units = activeConfig.units || config.getSync('units');
+				if(units == 'mm'){
+					outputScale /= 25.4;
+				}
+
+				function setSvgPhysicalSize(svgNode, width, height){
+					svgNode.setAttribute('width', (width/outputScale) + (units == 'inch' ? 'in' : 'mm'));
+					svgNode.setAttribute('height', (height/outputScale) + (units == 'inch' ? 'in' : 'mm'));
+					svgNode.setAttribute('viewBox', '0 0 '+width+' '+height);
+				}
+
+				function shouldAppendExportNode(node){
+					if(outlineMode == 'everything'){
+						return true;
+					}
+					var classification = classifyExportNode(node);
+					if(classification == 'artwork'){
+						return true;
+					}
+					return outlineMode == 'keepEngrave' && elementHasNonBlackStyle(node);
+				}
+
+				function appendTopIndicator(group, sheetbounds, sheetIndex, sheetCount){
+					if(!topIndicator){
+						return;
+					}
+					var unitsPerMm = scale / 25.4;
+					var length = Number(topIndicator.lengthMm || 10) * unitsPerMm;
+					var thickness = Number(topIndicator.thicknessMm || 0.5) * unitsPerMm;
+					var inset = Number(topIndicator.insetMm || 2) * unitsPerMm;
+					var baseY = sheetbounds.y + inset;
+					var xs = [];
+					var placement = topIndicator.placement || 'center';
+					if(placement == 'topLeft' || placement == 'bothCorners'){
+						xs.push(sheetbounds.x + inset + length);
+					}
+					if(placement == 'topRight' || placement == 'bothCorners'){
+						xs.push(sheetbounds.x + sheetbounds.width - inset - length);
+					}
+					if(xs.length === 0){
+						xs.push(sheetbounds.x + sheetbounds.width/2);
+					}
+					xs.forEach(function(x){
+						var line = document.createElementNS(svgns, 'line');
+						line.setAttribute('x1', x);
+						line.setAttribute('x2', x);
+						line.setAttribute('y1', baseY);
+						line.setAttribute('y2', baseY + length);
+						line.setAttribute('stroke', '#000');
+						line.setAttribute('stroke-width', thickness);
+						line.setAttribute('stroke-linecap', 'square');
+						line.setAttribute('fill', 'none');
+						line.setAttribute('class', 'topindicator');
+						group.appendChild(line);
+					});
+					if(sheetNumber){
+						var text = document.createElementNS(svgns, 'text');
+						text.setAttribute('class', 'sheetnumber');
+						text.setAttribute('x', sheetbounds.x + sheetbounds.width/2);
+						text.setAttribute('y', baseY + length + 5 * unitsPerMm);
+						text.setAttribute('font-size', 5 * unitsPerMm);
+						text.setAttribute('text-anchor', 'middle');
+						text.setAttribute('fill', '#000');
+						text.setAttribute('font-family', 'sans-serif');
+						text.appendChild(document.createTextNode((sheetIndex + 1) + ' / ' + sheetCount));
+						group.appendChild(text);
+					}
+				}
+
+				function buildSheetSvg(sheetPlacement, sheetIndex, yOffset, targetSvg){
+					var svgNode = targetSvg || document.createElementNS(svgns, 'svg');
+					var group = document.createElementNS(svgns, 'g');
+					svgNode.appendChild(group);
+					var sheetbounds = DeepNest.parts[sheetPlacement.sheet].bounds;
+					var includeSheetOutline = outlineMode == 'everything' && (activeConfig.exportSheetOutline === true || activeConfig.exportSheetOutline === 'true');
+					if(includeSheetOutline){
+						DeepNest.parts[sheetPlacement.sheet].svgelements.forEach(function(e){
 							if(e.tagName == 'image'){
 								return;
 							}
@@ -2574,18 +3064,17 @@
 						});
 					}
 					
-					var sheetbounds = DeepNest.parts[s.sheet].bounds;
+					var translateY = perSheet ? -sheetbounds.y : (yOffset-sheetbounds.y);
+					group.setAttribute('transform', 'translate('+(-sheetbounds.x)+' '+translateY+')');
 					
-					group.setAttribute('transform', 'translate('+(-sheetbounds.x)+' '+(svgheight-sheetbounds.y)+')');
-					if(svgwidth < sheetbounds.width){
-						svgwidth = sheetbounds.width;
-					}
-					
-					s.sheetplacements.forEach(function(p){
+					sheetPlacement.sheetplacements.forEach(function(p){
 						var part = DeepNest.parts[p.source];
-						var partgroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+						var partgroup = document.createElementNS(svgns, 'g');
 												
-						part.svgelements.forEach(function(e, index){
+						part.svgelements.forEach(function(e){
+							if(!shouldAppendExportNode(e)){
+								return;
+							}
 							var node = e.cloneNode(false);
 							
 							if(node.tagName == 'image'){
@@ -2603,32 +3092,52 @@
 						// position part
 						partgroup.setAttribute('transform','translate('+p.x+' '+p.y+') rotate('+p.rotation+')');
 					});
-					
+
+					appendTopIndicator(group, sheetbounds, sheetIndex, n.placements.length);
+					return {
+						svg: svgNode,
+						bounds: sheetbounds
+					};
+				}
+
+				if(perSheet){
+					return n.placements.map(function(s, sheetIndex){
+						var result = buildSheetSvg(s, sheetIndex, 0, null);
+						setSvgPhysicalSize(result.svg, result.bounds.width, result.bounds.height);
+						return {
+							svg: (new XMLSerializer()).serializeToString(result.svg),
+							widthInches: result.bounds.width / scale,
+							heightInches: result.bounds.height / scale,
+							sheetIndex: sheetIndex
+						};
+					});
+				}
+
+				var svg = document.createElementNS(svgns, 'svg');
+				
+				var svgwidth = 0;
+				var svgheight = 0;
+				
+				// create elements if they don't exist, show them otherwise
+				n.placements.forEach(function(s, sheetIndex){
+					var sheetbounds = DeepNest.parts[s.sheet].bounds;
+					buildSheetSvg(s, sheetIndex, svgheight, svg);
+					if(svgwidth < sheetbounds.width){
+						svgwidth = sheetbounds.width;
+					}
 					// put next sheet below
 					svgheight += 1.1*sheetbounds.height;
 				});
 				
-				var scale = activeConfig.scale || config.getSync('scale');
-				
-				if(dxf){
-					scale /= Number(activeConfig.dxfExportScale || config.getSync('dxfExportScale')); // inkscape on server side
-				}
-				
-				var units = activeConfig.units || config.getSync('units');
-				if(units == 'mm'){
-					scale /= 25.4;
-				}
-				
-				svg.setAttribute('width', (svgwidth/scale) + (units == 'inch' ? 'in' : 'mm'));
-				svg.setAttribute('height', (svgheight/scale) + (units == 'inch' ? 'in' : 'mm'));
-				svg.setAttribute('viewBox', '0 0 '+svgwidth+' '+svgheight);
+				setSvgPhysicalSize(svg, svgwidth, svgheight);
 				
 				var skipMergeForColor = activeConfig.mergeLines && n.mergedLength > 0 && nestHasColoredGeometry(n);
 				if(skipMergeForColor){
 					message('Merge common lines was skipped because this nest contains colored engraving geometry.');
 				}
 				
-				if(activeConfig.mergeLines && n.mergedLength > 0 && !skipMergeForColor){
+				var allowMergeLines = outlineMode == 'everything' && !topIndicator && !sheetNumber;
+				if(activeConfig.mergeLines && n.mergedLength > 0 && !skipMergeForColor && allowMergeLines){
 					SvgParser.applyTransform(svg);
 					SvgParser.flatten(svg);
 					SvgParser.splitLines(svg);
@@ -3846,11 +4355,6 @@
 					<li class="button stop" id="stopnest">Stop nest</li>
 					<span id="export_wrapper">
 						<li class="button export disabled" id="export">Export</li>
-						<ul class="dropdown">
-							<li id="exportsvg">SVG file</li>
-							<li id="exportpdf">PDF file</li>
-							<li id="exportdxf">DXF file</li>
-						</ul>
 					</span>
 					<li class="button back" id="back">Reset nest</li>
 					<li class="progress active">
@@ -3995,9 +4499,114 @@
 							</div>
 						</div>
 					{{/each}}
-				</div>
+					</div>
 
-				{{#if bitmapContourOpen}}
+					<div id="exportdialog" class="exportdialog-overlay">
+						<div class="exportdialog-card">
+							<div class="exportdialog-header">
+								<div>
+									<h2>Export nest</h2>
+									<p>Choose a vector or print-ready bitmap export.</p>
+								</div>
+								<a href="#" class="button" id="exportdialog-close">Close</a>
+							</div>
+							<div class="exportdialog-body">
+								<div class="exportdialog-left">
+									<div id="export-format-list" class="export-format-list">
+										<button type="button" data-format="svg"><strong>SVG</strong><span>Editable vector layout</span></button>
+										<button type="button" data-format="pdf"><strong>PDF</strong><span>Vector document for print</span></button>
+										<button type="button" data-format="dxf"><strong>DXF</strong><span>CAD/CAM vector paths</span></button>
+										<button type="button" data-format="tiff"><strong>TIFF</strong><span>Per-sheet raster files for RIP software</span></button>
+									</div>
+									<div id="export-res-block" class="export-res-block">
+										<div class="export-section-title">Resolution</div>
+										<div id="export-dpi-tiles" class="export-dpi-tiles">
+											<button type="button" data-dpi="150"><strong>150 DPI</strong><span></span></button>
+											<button type="button" data-dpi="300"><strong>300 DPI</strong><span></span></button>
+											<button type="button" data-dpi="600"><strong>600 DPI</strong><span></span></button>
+											<button type="button" data-dpi="custom"><strong>Custom</strong><span></span></button>
+										</div>
+										<input type="number" min="36" max="1200" step="1" id="export-dpi-custom" />
+									</div>
+								</div>
+								<div class="exportdialog-right">
+									<div id="export-options" class="export-options">
+										<label class="export-control">
+											<span>Outline</span>
+											<select id="export-outline">
+												<option value="everything">Everything</option>
+												<option value="artwork">Artwork only</option>
+												<option value="keepEngrave">Artwork + colored engrave</option>
+											</select>
+										</label>
+										<label class="export-control inline">
+											<input type="checkbox" id="export-indicator" />
+											<span>Top indicator</span>
+										</label>
+										<label class="export-control">
+											<span>Indicator position</span>
+											<select id="export-indicator-pos">
+												<option value="center">Center</option>
+												<option value="topLeft">Top left</option>
+												<option value="topRight">Top right</option>
+												<option value="bothCorners">Both corners</option>
+											</select>
+										</label>
+										<label class="export-control inline">
+											<input type="checkbox" id="export-sheetnum" />
+											<span>Sheet number</span>
+										</label>
+										<div class="export-tiff-only">
+											<label class="export-control">
+												<span>Background</span>
+												<select id="export-bg">
+													<option value="white">White</option>
+													<option value="transparent">Transparent</option>
+												</select>
+											</label>
+											<label class="export-control">
+												<span>Color mode</span>
+												<select id="export-color">
+													<option value="rgb">RGB</option>
+													<option value="cmyk">CMYK</option>
+												</select>
+											</label>
+											<div class="export-control export-icc-row">
+												<span>ICC profile</span>
+												<div>
+													<span id="export-icc">None</span>
+													<a href="#" class="button" id="export-icc-pick">Choose...</a>
+													<a href="#" class="button" id="export-icc-clear">Clear</a>
+												</div>
+											</div>
+											<label class="export-control">
+												<span>Compression</span>
+												<select id="export-compression">
+													<option value="lzw">LZW</option>
+													<option value="none">None</option>
+													<option value="zip">ZIP</option>
+												</select>
+											</label>
+										</div>
+									</div>
+									<div id="export-preview" class="export-preview">
+										<div class="export-preview-frame"><img id="export-preview-img" /></div>
+										<div id="export-preview-meta" class="export-preview-meta"></div>
+									</div>
+									<div id="exportdialog-hint" class="exportdialog-hint"></div>
+								</div>
+							</div>
+							<div class="exportdialog-footer">
+								<span>Renders locally via the bundled converter. Nothing leaves your machine.</span>
+								<div>
+									<a href="#" class="button" id="exportdialog-cancel">Cancel</a>
+									<a href="#" class="button add" id="exportdialog-go">Export</a>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					{{#if bitmapContourOpen}}
 					<div id="bitmapcontourwrapper">
 						<div id="bitmapcontourdialog">
 							<div class="bitmapcontour-header">
@@ -4228,6 +4837,19 @@
 							<dt class="steprepeat-disabled">Local refinement</dt>
 							<dd class="steprepeat-disabled">
 								<input type="checkbox" data-config="localRefinement" /> <span class="radiolabel">Jiggle placed parts after nesting</span>
+							</dd>
+
+							<dt class="steprepeat-disabled">Refinement engine</dt>
+							<dd class="steprepeat-disabled">
+								<select data-config="localRefinementEngine">
+									<option value="slide">Slide</option>
+									<option value="shrinkSeparate">Shrink-separate</option>
+								</select>
+							</dd>
+
+							<dt class="steprepeat-disabled">Refinement budget</dt>
+							<dd class="steprepeat-disabled">
+								<input type="number" min="100" step="100" data-config="localRefinementBudgetMs" /> <i>ms/sheet</i>
 							</dd>
 
 							<dt class="steprepeat-disabled">Process part holes</dt>
@@ -4686,7 +5308,7 @@
 
 				<div class="config_explain" id="explain_localRefinement">
 					<h1>Local refinement</h1>
-					After a normal nest is generated, Deepnest runs a small translation-only refinement pass on each sheet. It tries short, legal nudges around already placed parts and keeps a move only when the final footprint score improves. This is experimental and disabled by default.
+					After a normal nest is generated, Deepnest can run a post-process refinement pass on each sheet. The classic slide engine tries legal translation nudges; the shrink-separate engine lightly compresses a rectangular layout, repairs overlaps with NFP-based separation, and keeps only legal score improvements. This is experimental and disabled by default.
 				</div>
 
 				<div class="config_explain" id="explain_processHoles">

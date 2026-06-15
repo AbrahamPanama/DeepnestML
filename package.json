@@ -1,7 +1,7 @@
 {
   "name": "deepnest-ml",
   "productName": "Deepnest ML",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "ML-assisted deep nesting for laser and CNC workflows",
   "main": "main.js",
   "scripts": {

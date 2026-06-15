@@ -484,6 +484,11 @@ sheetboundsForScoring)` in `main/background.js` (thin orchestrator; geometry via
              NOTE the global NFP cache already holds all same-rotation pairs from
              construction — these lookups are cheap cache hits.
    ifp(i):   getInnerNfp(sheet, placed[i], config), memoized per (source, rotation).
+   ⚠ AMENDED 2026-06-11: during separation the IFP provider must return the REAL
+   IFP clipped to the shrunken virtual extent (per-part qLimit), per
+   `docs/local-refinement-v3-plan.md` §1.5 (WP-R0.1). The original "containment
+   against the original sheet" design was proven defective (the separator undoes
+   the squeeze; 0 accepted moves on all efficacy instances).
 3. Score: layoutMetric = the SAME formula as fitness-v2 sheetMetric_s for the
    configured placementType (gravity: (2W+H)/(2SW+SH); box: WH/sheetArea).
 4. Loop:
@@ -517,12 +522,13 @@ sheetboundsForScoring)` in `main/background.js` (thin orchestrator; geometry via
    illegal layout regardless of separation bugs.
 ```
 
-**Rotation probes (WP-2.3, separate flag `localRefinementRotations`, default false,
-build only after WP-2.2 gates pass):** after each successful shrink step, for the 3
-parts with the highest local free area (largest min pairwise clearance), try
-rotations {+2°, −2°, +5°, −5°} via the rotated-copy pattern (§1.5), re-running
-`separate` for each; accept on metric improvement. Budget-bound: probes must check
-the same deadline. Expect NFP cache misses (new rotations) — acceptable, LRU-bounded.
+**Rotation probes (WP-2.3) — SUPERSEDED.** The blind ±2°/±5° probe design is
+replaced by `docs/local-refinement-v3-plan.md` (approved 2026-06-11): contact-graph
+critical-chain targeting, hull-edge-derived rotation candidates with pivot
+("rocking") rotations, void relocation, pairwise swaps, and ruin-&-recreate, under
+a budgeted orchestrator (`localRefinementEngine: 'smart'`). Implement WP-2.1 and
+WP-2.2 from THIS document first (they are prerequisites WP-R0 of the v3 plan), then
+continue with the v3 plan's WP-R1…WP-R6 instead of WP-2.3.
 
 **Gates P2:**
 1. Flag `'slide'` ⇒ byte-identical battery (§8.3).
@@ -637,6 +643,7 @@ otherwise keep the flag experimental and record findings.
 | `localRefinementEngine` | string | 'slide' | P2 | select + explain |
 | `localRefinementBudgetMs` | number | 1500 | P2 | number input |
 | `localRefinementRotations` | bool | false | P2.3 | checkbox |
+| `localRefinementMaxColdAnglesPerPart` | number | 3 | P2.3/v3 | none yet |
 | `placementType: 'deepsearch'` | enum value | — | P3 | existing select |
 | `deepSearchBudgetSec` | number | 60 | P3 | number input |
 | `deepSearchRestarts` | number | 0 (auto) | P3 | number input |
@@ -720,7 +727,7 @@ cache key format or `NFP_CACHE_VERSION`.
 | 4 | WP-1.2 | `WP-1.2 NFP edge sampling (flagged)` | main/background.js, main/index.html |
 | 5 | WP-2.1 | `WP-2.1 separation module + tests` | main/util/separation.js, main/background.html, ml/tests |
 | 6 | WP-2.2 | `WP-2.2 shrink-separate refinement (flagged)` | main/background.js, main/index.html |
-| 7 | WP-2.3 | `WP-2.3 rotation probes (flagged)` | main/background.js |
+| 7 | WP-2.3 (superseded) | see `docs/local-refinement-v3-plan.md` WP-R1…WP-R6 | main/util/refinement-util.js, main/background.js |
 | 8 | WP-3.1 | `WP-3.1 deepsearch placement type` | main/background.js, main/deepnest.js, main/index.html |
 | 9 | WP-3.2 | `WP-3.2 sparrow sidecar (optional)` | main.js, ml/lib |
 | 10 | WP-4.x | `WP-4 ML routing/ordering` | ml/python, ml/schemas |

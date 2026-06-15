@@ -173,11 +173,11 @@ function collectInvariantsInRenderer() {
 		return out;
 	}
 
-	function exportDropdownIds() {
-		const items = document.querySelectorAll('#export_wrapper .dropdown > li');
+	function exportFormatIds() {
+		const items = document.querySelectorAll('#export-format-list > button');
 		const out = [];
 		for (let i = 0; i < items.length; i++) {
-			out.push(items[i].id || '');
+			out.push(items[i].getAttribute('data-format') || '');
 		}
 		return out;
 	}
@@ -222,7 +222,7 @@ function collectInvariantsInRenderer() {
 			? Object.keys(window.DeepNestAutomation)
 			: [],
 		sidenavIds: sidenavIds(),
-		exportDropdownIds: exportDropdownIds(),
+		exportFormatIds: exportFormatIds(),
 		hasAccountPage: !!document.getElementById('account'),
 		hasPurchaseSingle: !!document.getElementById('purchaseSingle'),
 		hasHomePage: !!document.getElementById('home'),
@@ -270,7 +270,7 @@ function evaluateInvariants(snapshot) {
 	}
 
 	// Core boot invariants
-	assert('title matches 0.7.1', snapshot.title === 'Deepnest ML 0.7.1');
+	assert('title matches 0.7.3', snapshot.title === 'Deepnest ML 0.7.3');
 	assert('DeepNest global present', snapshot.hasDeepNest);
 	assert('DeepNestAutomation hook present', snapshot.hasAutomation);
 	assert('DeepNestAutomation exposes runAppSmokeTest',
@@ -279,8 +279,8 @@ function evaluateInvariants(snapshot) {
 	// UI audit regression guards
 	assert('sidenav has exactly home/config/info',
 		arraysEqual(snapshot.sidenavIds, ['home_tab', 'config_tab', 'info_tab']));
-	assert('export dropdown has exactly svg/pdf/dxf',
-		arraysEqual(snapshot.exportDropdownIds, ['exportsvg', 'exportpdf', 'exportdxf']));
+	assert('export modal has exactly svg/pdf/dxf/tiff',
+		arraysEqual(snapshot.exportFormatIds, ['svg', 'pdf', 'dxf', 'tiff']));
 	assert('orphan #account page is gone', !snapshot.hasAccountPage);
 	assert('orphan #purchaseSingle link is gone', !snapshot.hasPurchaseSingle);
 	assert('#home page present', snapshot.hasHomePage);

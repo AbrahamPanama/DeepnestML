@@ -62,6 +62,64 @@ function parseArgs(argv) {
 	return args;
 }
 
+function optionValue(options, camelName, kebabName, fallback) {
+	if (Object.prototype.hasOwnProperty.call(options, camelName)) {
+		return options[camelName];
+	}
+	if (kebabName && Object.prototype.hasOwnProperty.call(options, kebabName)) {
+		return options[kebabName];
+	}
+	return fallback;
+}
+
+function booleanOption(value, fallback) {
+	if (typeof value === 'undefined') {
+		return fallback;
+	}
+	if (value === true || value === false) {
+		return value;
+	}
+	const normalized = String(value).trim().toLowerCase();
+	if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') {
+		return true;
+	}
+	if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') {
+		return false;
+	}
+	return fallback;
+}
+
+function numberOption(value, fallback, min, max) {
+	if (typeof value === 'undefined' || value === null || value === '') {
+		return fallback;
+	}
+	const number = Number(value);
+	if (!isFinite(number)) {
+		return fallback;
+	}
+	let bounded = number;
+	if (typeof min === 'number' && bounded < min) {
+		bounded = min;
+	}
+	if (typeof max === 'number' && bounded > max) {
+		bounded = max;
+	}
+	return bounded;
+}
+
+function localRefinementOptions(options) {
+	const enabledValue = optionValue(options, 'localRefinement', 'local-refinement', optionValue(options, 'refinement', 'refinement', undefined));
+	const engineValue = optionValue(options, 'localRefinementEngine', 'local-refinement-engine', optionValue(options, 'refinementEngine', 'refinement-engine', 'slide'));
+	const engine = engineValue === 'shrinkSeparate' || engineValue === 'smart' || engineValue === 'slide' ? engineValue : 'slide';
+	return {
+		localRefinement: booleanOption(enabledValue, false),
+		localRefinementEngine: engine,
+		localRefinementBudgetMs: Math.floor(numberOption(optionValue(options, 'localRefinementBudgetMs', 'local-refinement-budget-ms', optionValue(options, 'refinementBudgetMs', 'refinement-budget-ms', 1500)), 1500, 100, 30000)),
+		localRefinementRotations: booleanOption(optionValue(options, 'localRefinementRotations', 'local-refinement-rotations', undefined), false),
+		localRefinementMaxColdAnglesPerPart: Math.floor(numberOption(optionValue(options, 'localRefinementMaxColdAnglesPerPart', 'local-refinement-max-cold-angles-per-part', undefined), 3, 0, 12))
+	};
+}
+
 function ensureDir(dir) {
 	if (!fs.existsSync(dir)) {
 		fs.mkdirSync(dir, { recursive: true });
@@ -142,6 +200,59 @@ function mean(values) {
 	}, 0) / values.length;
 }
 
+function summarizeLocalRefinementRuns(runs) {
+	const summary = {
+		runsChecked: 0,
+		runsWithAcceptedMoves: 0,
+		totalMovesTested: 0,
+		totalMovesAccepted: 0
+	};
+	for (let i = 0; i < runs.length; i++) {
+		const meta = runs[i].localRefinement;
+		if (!meta || !meta.enabled) {
+			continue;
+		}
+		summary.runsChecked += 1;
+		const tested = Number(meta.movesTested) || 0;
+		const accepted = Number(meta.movesAccepted) || 0;
+		summary.totalMovesTested += tested;
+		summary.totalMovesAccepted += accepted;
+		if (accepted > 0) {
+			summary.runsWithAcceptedMoves += 1;
+		}
+	}
+	summary.runAcceptedRate = summary.runsChecked > 0 ? summary.runsWithAcceptedMoves / summary.runsChecked : null;
+	return summary;
+}
+
+function summarizeLocalRefinementInstances(instances) {
+	const summary = {
+		instancesChecked: 0,
+		instancesWithAcceptedMoves: 0,
+		runsChecked: 0,
+		runsWithAcceptedMoves: 0,
+		totalMovesTested: 0,
+		totalMovesAccepted: 0
+	};
+	for (let i = 0; i < instances.length; i++) {
+		const local = instances[i].localRefinement;
+		if (!local || local.runsChecked === 0) {
+			continue;
+		}
+		summary.instancesChecked += 1;
+		if (local.totalMovesAccepted > 0) {
+			summary.instancesWithAcceptedMoves += 1;
+		}
+		summary.runsChecked += local.runsChecked;
+		summary.runsWithAcceptedMoves += local.runsWithAcceptedMoves;
+		summary.totalMovesTested += local.totalMovesTested;
+		summary.totalMovesAccepted += local.totalMovesAccepted;
+	}
+	summary.instanceAcceptedRate = summary.instancesChecked > 0 ? summary.instancesWithAcceptedMoves / summary.instancesChecked : null;
+	summary.runAcceptedRate = summary.runsChecked > 0 ? summary.runsWithAcceptedMoves / summary.runsChecked : null;
+	return summary;
+}
+
 function rotationsForMeta(meta) {
 	let rotations = 1;
 	for (let i = 0; i < meta.items.length; i++) {
@@ -150,8 +261,9 @@ function rotationsForMeta(meta) {
 	return rotations;
 }
 
-function buildConfigPreset(rotations, fitnessVersion) {
+function buildConfigPreset(rotations, fitnessVersion, refinementOptions) {
 	fitnessVersion = parseInt(fitnessVersion || 1, 10) === 2 ? 2 : 1;
+	refinementOptions = refinementOptions || localRefinementOptions({});
 	return {
 		placementType: 'gravity',
 		spacing: 0,
@@ -160,7 +272,12 @@ function buildConfigPreset(rotations, fitnessVersion) {
 		populationSize: 10,
 		mutationRate: 10,
 		rotations: rotations,
-		fitnessVersion: fitnessVersion
+		fitnessVersion: fitnessVersion,
+		localRefinement: refinementOptions.localRefinement,
+		localRefinementEngine: refinementOptions.localRefinementEngine,
+		localRefinementBudgetMs: refinementOptions.localRefinementBudgetMs,
+		localRefinementRotations: refinementOptions.localRefinementRotations,
+		localRefinementMaxColdAnglesPerPart: refinementOptions.localRefinementMaxColdAnglesPerPart
 	};
 }
 
@@ -189,6 +306,7 @@ function runBenchmark(options) {
 	const runCount = Math.max(1, parseInt(options.runs || DEFAULT_RUNS, 10));
 	const timeBudgetSec = Math.max(1, Number(options.timeBudgetSec || options['time-budget-sec'] || DEFAULT_TIME_BUDGET_SEC));
 	const fitnessVersion = parseInt(options.fitnessVersion || options['fitness-version'] || 1, 10) === 2 ? 2 : 1;
+	const refinementOptions = localRefinementOptions(options);
 	const selectedInstances = listInstances(options.instances || options.instance || 'all');
 	const stamp = timestamp();
 	const artifactRoot = path.join(ARTIFACT_ROOT, stamp + '-' + label);
@@ -203,12 +321,14 @@ function runBenchmark(options) {
 			runsPerInstance: runCount,
 			timeBudgetSec: timeBudgetSec,
 			fitnessVersion: fitnessVersion,
-			baseConfig: buildConfigPreset('<per-instance rotations>', fitnessVersion)
+			localRefinement: refinementOptions,
+			baseConfig: buildConfigPreset('<per-instance rotations>', fitnessVersion, refinementOptions)
 		},
 		artifactRoot: artifactRoot,
 		instances: [],
 		aggregate: {
-			meanMedianUtilization: null
+			meanMedianUtilization: null,
+			localRefinement: null
 		}
 	};
 
@@ -225,7 +345,7 @@ function runBenchmark(options) {
 		const instance = readJson(instancePath);
 		const converted = esicup.instanceToSvg(instance);
 		const rotations = rotationsForMeta(converted.meta);
-		const configOverrides = buildConfigPreset(rotations, fitnessVersion);
+		const configOverrides = buildConfigPreset(rotations, fitnessVersion, refinementOptions);
 		const instanceResult = {
 			name: converted.meta.name || name,
 			file: path.relative(ROOT, instancePath),
@@ -276,6 +396,8 @@ function runBenchmark(options) {
 				timeToBestSec: report.details.timeToBestSec,
 				fitness: report.details.fitness,
 				fitnessBreakdown: report.details.fitnessBreakdown,
+				localRefinement: report.details.localRefinement || null,
+				localRefinementSummary: report.details.localRefinementSummary || null,
 				placementsDigest: report.details.placementsDigest,
 				reportPath: path.relative(ROOT, reportPath),
 				outputPath: path.relative(ROOT, outputPath)
@@ -287,12 +409,14 @@ function runBenchmark(options) {
 		instanceResult.median = median(instanceResult.runs.map(function (run) {
 			return run.utilization;
 		}));
+		instanceResult.localRefinement = summarizeLocalRefinementRuns(instanceResult.runs);
 		benchmark.instances.push(instanceResult);
 		benchmark.aggregate.meanMedianUtilization = mean(benchmark.instances.map(function (entry) {
 			return entry.median;
 		}).filter(function (value) {
 			return typeof value === 'number';
 		}));
+		benchmark.aggregate.localRefinement = summarizeLocalRefinementInstances(benchmark.instances);
 		writeJson(resultPath, benchmark);
 	}
 

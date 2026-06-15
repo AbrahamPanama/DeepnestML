@@ -5,6 +5,7 @@ Modes:
 - doctor: checks required Python modules
 - pdf-to-svg: first page PDF -> SVG with text outlined and masked images precomposed
 - svg-to-pdf: SVG -> single page PDF
+- svg-to-tiff: SVG -> raster TIFF with DPI/color/profile options
 - png/jpg/jpeg-to-svg: bitmap -> SVG with embedded artwork and either a rectangle
   contour or a traced outer silhouette
 """
@@ -44,11 +45,13 @@ def run_doctor() -> int:
     pil_image = None
     pil_chops = None
     pil_err = None
+    pil_imagecms = None
     try:
-        from PIL import Image, ImageChops  # type: ignore
+        from PIL import Image, ImageChops, ImageCms  # type: ignore
 
         pil_image = Image
         pil_chops = ImageChops
+        pil_imagecms = ImageCms
     except Exception as exc:  # pragma: no cover - runtime dependency probe
         pil_err = str(exc)
 
@@ -74,6 +77,7 @@ def run_doctor() -> int:
     mode_support = {
         "pdf-to-svg": fitz is not None and pil_image is not None and pil_chops is not None,
         "svg-to-pdf": fitz is not None,
+        "svg-to-tiff": fitz is not None and pil_image is not None and pil_imagecms is not None,
         "png-to-svg": pil_image is not None and numpy_mod is not None and scipy_mod is not None and contourpy_mod is not None,
         "jpg-to-svg": pil_image is not None and numpy_mod is not None and scipy_mod is not None and contourpy_mod is not None,
         "jpeg-to-svg": pil_image is not None and numpy_mod is not None and scipy_mod is not None and contourpy_mod is not None,
@@ -727,6 +731,138 @@ def convert_svg_to_pdf(input_path: str, output_path: str):
         f.write(pdf_bytes)
 
 
+def _clamp_int(value, fallback: int, min_value: int, max_value: int) -> int:
+    try:
+        number = int(round(float(value)))
+    except Exception:
+        number = fallback
+    return max(min_value, min(max_value, number))
+
+
+def _clamp_positive_float(value, fallback: float, min_value: float) -> float:
+    try:
+        number = float(value)
+    except Exception:
+        number = fallback
+    if not math.isfinite(number):
+        number = fallback
+    return max(min_value, number)
+
+
+def _icc_profile_from_bytes(icc_bytes: bytes, clean_error: str):
+    try:
+        from PIL import ImageCms  # type: ignore
+
+        return ImageCms.ImageCmsProfile(io.BytesIO(icc_bytes))
+    except Exception as exc:
+        raise RuntimeError(clean_error) from exc
+
+
+def convert_svg_to_tiff(input_path: str, output_path: str, options_json: str = None):
+    fitz, fitz_err = _load_module("fitz")
+    if fitz is None:
+        raise RuntimeError(f"PyMuPDF missing: {fitz_err}")
+
+    try:
+        from PIL import Image, ImageCms  # type: ignore
+    except Exception as exc:
+        raise RuntimeError(f"Pillow missing: {exc}") from exc
+
+    try:
+        opts = json.loads(options_json or "{}")
+    except Exception as exc:
+        raise RuntimeError("invalid-options-json") from exc
+
+    dpi = _clamp_int(opts.get("dpi", 300), 300, 36, 1200)
+    color_mode = str(opts.get("colorMode", "rgb") or "rgb").lower()
+    if color_mode not in {"rgb", "cmyk"}:
+        color_mode = "rgb"
+    background = str(opts.get("background", "white") or "white").lower()
+    compression = {
+        "lzw": "tiff_lzw",
+        "none": "raw",
+        "zip": "tiff_adobe_deflate",
+    }.get(str(opts.get("compression", "lzw") or "lzw").lower(), "tiff_lzw")
+
+    width_inches = _clamp_positive_float(opts.get("widthInches", 0), 0.0, 0.0001)
+    height_inches = _clamp_positive_float(opts.get("heightInches", 0), 0.0, 0.0001)
+    target_w = max(1, int(round(width_inches * dpi)))
+    target_h = max(1, int(round(height_inches * dpi)))
+    if target_w * target_h > 120_000_000:
+        raise RuntimeError("raster-too-large")
+
+    with open(input_path, "rb") as f:
+        svg_bytes = f.read()
+
+    doc = fitz.open(stream=svg_bytes, filetype="svg")
+    if doc.page_count < 1:
+        raise RuntimeError("svg-render-produced-no-pages")
+    page = doc[0]
+    if page.rect.width <= 0 or page.rect.height <= 0:
+        raise RuntimeError("svg-has-invalid-size")
+
+    zoom_x = target_w / page.rect.width
+    zoom_y = target_h / page.rect.height
+    pix = page.get_pixmap(matrix=fitz.Matrix(zoom_x, zoom_y), alpha=True)
+    img = Image.frombytes("RGBA", (pix.width, pix.height), pix.samples)
+
+    if background == "transparent" and color_mode == "rgb":
+        base = img
+    else:
+        base = Image.new("RGB", img.size, (255, 255, 255))
+        base.paste(img, mask=img.split()[3])
+
+    icc_b64 = opts.get("iccProfileBase64")
+    icc_bytes = None
+    if icc_b64:
+        try:
+            icc_bytes = base64.b64decode(icc_b64)
+        except Exception as exc:
+            raise RuntimeError("invalid-icc-profile") from exc
+
+    save_kwargs = {
+        "format": "TIFF",
+        "compression": compression,
+        "dpi": (dpi, dpi),
+    }
+
+    if color_mode == "cmyk":
+        if not icc_bytes:
+            raise RuntimeError("cmyk-requires-icc")
+        dst_profile = _icc_profile_from_bytes(icc_bytes, "invalid-icc-profile")
+        try:
+            if str(ImageCms.getProfileColorSpace(dst_profile)).upper() != "CMYK":
+                raise RuntimeError("icc-profile-is-not-cmyk")
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError("invalid-icc-profile") from exc
+
+        rgb = base if base.mode == "RGB" else base.convert("RGB")
+        try:
+            src_profile = ImageCms.createProfile("sRGB")
+            intent = getattr(getattr(ImageCms, "Intent", None), "RELATIVE_COLORIMETRIC", 1)
+            out = ImageCms.profileToProfile(
+                rgb,
+                src_profile,
+                dst_profile,
+                renderingIntent=intent,
+                outputMode="CMYK",
+            )
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError("icc-profile-is-not-cmyk") from exc
+        save_kwargs["icc_profile"] = icc_bytes
+    else:
+        if icc_bytes:
+            _icc_profile_from_bytes(icc_bytes, "invalid-icc-profile")
+            save_kwargs["icc_profile"] = icc_bytes
+        out = base
+
+    out.save(output_path, **save_kwargs)
+
+
 def _rdp(points: Sequence[Point], epsilon: float) -> List[Point]:
     if len(points) < 3:
         return list(points)
@@ -1364,7 +1500,7 @@ def convert_bitmap_to_svg(input_path: str, output_path: str, mode_name: str, opt
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Deepnest local conversion helper")
-    parser.add_argument("--mode", required=True, choices=["doctor", "pdf-to-svg", "svg-to-pdf", "png-to-svg", "jpg-to-svg", "jpeg-to-svg"])
+    parser.add_argument("--mode", required=True, choices=["doctor", "pdf-to-svg", "svg-to-pdf", "svg-to-tiff", "png-to-svg", "jpg-to-svg", "jpeg-to-svg"])
     parser.add_argument("--input")
     parser.add_argument("--output")
     parser.add_argument("--options")
@@ -1382,6 +1518,8 @@ def main(argv=None):
             convert_pdf_to_svg(args.input, args.output, args.options)
         elif args.mode == "svg-to-pdf":
             convert_svg_to_pdf(args.input, args.output)
+        elif args.mode == "svg-to-tiff":
+            convert_svg_to_tiff(args.input, args.output, args.options)
         elif args.mode in {"png-to-svg", "jpg-to-svg", "jpeg-to-svg"}:
             convert_bitmap_to_svg(args.input, args.output, args.mode, args.options)
         else:  # pragma: no cover
