@@ -8,10 +8,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ## Current Local Release
 
-- **Version:** `0.7.3`
+- **Version:** `0.7.5`
 - **Product name:** `Deepnest ML`
 - **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
-- **macOS local build:** `dist/Deepnest ML-0.7.3-mac-arm64.dmg`
+- **macOS local build:** `dist/Deepnest ML-0.7.5-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
 
@@ -33,6 +33,18 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Run in a unified light workspace where the parts list remains visible while nesting runs in the main workspace pane.
 
 ## Recent 0.7.x Highlights
+
+### 0.7.5: Final Legality Gate For Slide Local Refinement
+
+The `slide` local-refinement engine now validates the assembled layout with the same NFP-independent material-overlap gate that the `smart` and `shrinkSeparate` engines already used, and reverts all accepted slide moves if the refined layout fails it. Previously `slide` relied only on per-move point-in-NFP tests, so a wrong or missing pairwise NFP could let a slide land a part on top of another and ship the overlapping layout as the displayed/exported nest.
+
+### 0.7.4: Corrupt NFP Fix For Near-Degenerate Rectangle Pairs
+
+Fixed a nesting-engine bug where hairline-skewed rectangular parts (a common artifact of CAD export transforms) at mixed rotations could produce a corrupt no-fit-polygon during the `ClipperLib.MinkowskiSum` pair pre-pass, causing placed parts to overlap on the sheet. The Minkowski solution is now normalized with a non-zero-fill re-union before the largest-ring selection, at both the pair pre-pass and the `getOuterNfp` ClipperLib fallback in `main/background.js`. If you were nesting parts with interior cutouts and seeing overlaps that persisted even after clearing the NFP cache, clear the cache once more after upgrading to pick up correct NFPs going forward.
+
+```text
+dist/Deepnest ML-0.7.4-mac-arm64.dmg
+```
 
 ### 0.7.3: Unified Export Modal + TIFF Output
 

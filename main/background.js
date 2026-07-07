@@ -387,8 +387,15 @@ window.onload = function () {
 				Bc[i].Y *= -1;
 			}
 			var solution = ClipperLib.Clipper.MinkowskiSum(Ac, Bc, true);
+			// At clipperScale precision, near-degenerate inputs (hairline-skewed
+			// rectangles from CAD transforms) can make MinkowskiSum emit
+			// self-intersecting or fragmented rings; picking the largest raw ring
+			// then yields an NFP missing part of the forbidden region, which lets
+			// the placer overlap parts. Re-union with nonzero fill to normalize
+			// the rings before selection.
+			solution = ClipperLib.Clipper.SimplifyPolygons(solution, ClipperLib.PolyFillType.pftNonZero);
 			var clipperNfp;
-		
+
 			var largestArea = null;
 			for(i=0; i<solution.length; i++){
 				var n = toNestCoordinates(solution[i], 10000000);
@@ -4121,6 +4128,9 @@ function refineLocalPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.sheetsChecked = 1;
 	stats.scoreBefore = currentScore;
 	var moved = false;
+	// Keep references to the pre-refinement placement objects so an illegal
+	// refined layout can be reverted wholesale (preserving mergedSegments etc.).
+	var preRefinementPlacements = placements.slice();
 
 	for(var pass=0; pass<maxPasses; pass++){
 		var passMoved = false;
@@ -4181,6 +4191,21 @@ function refineLocalPlacements(sheet, placed, placements, config, sheetboundsFor
 		if(!passMoved){
 			break;
 		}
+	}
+
+	// Same final gate the smart/shrinkSeparate engines use: the per-move point
+	// tests validate each slide against pairwise NFPs, but a wrong or missing
+	// NFP would let a slide land on top of another part. Verify the assembled
+	// layout with the NFP-independent material-overlap check and revert to the
+	// pre-refinement placements if it fails, rather than ship an overlap.
+	if(moved && !localRefinementFinalLayoutLegal(sheet, placed, placements, config)){
+		console.log('slide refinement produced an illegal layout; reverting', stats.movesAccepted, 'moves');
+		for(var r=0; r<preRefinementPlacements.length; r++){
+			placements[r] = preRefinementPlacements[r];
+		}
+		moved = false;
+		stats.movesAccepted = 0;
+		stats.revertedIllegal = true;
 	}
 
 	scoreState = localRefinementScore(sheet, placed, placements, config, sheetboundsForScoring);
@@ -4492,6 +4517,11 @@ function getOuterNfp(A, B, inside, config){
 					Bc[i].Y *= -1;
 				}
 				var solution = ClipperLib.Clipper.MinkowskiSum(Ac, Bc, true);
+				// Same normalization as the pair pre-pass: MinkowskiSum can emit
+				// self-intersecting/fragmented rings for near-degenerate inputs at
+				// this scale, and the largest-ring pick would return an NFP with a
+				// missing forbidden region (overlapping placements).
+				solution = ClipperLib.Clipper.SimplifyPolygons(solution, ClipperLib.PolyFillType.pftNonZero);
 				var clipperNfp = buildClipperNfpFromMinkowskiSolution(solution, B, 10000000);
 				if(!clipperNfp){
 					console.timeEnd('clipper');

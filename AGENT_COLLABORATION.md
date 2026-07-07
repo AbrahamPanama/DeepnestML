@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.7.3`
+- Current version: `0.7.5`
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.7.3-mac-arm64.dmg`
+- Local DMG artifact: `dist/Deepnest ML-0.7.5-mac-arm64.dmg`
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | PERF-P0 baseline freeze + pre-pass cache-key fix | `package-lock.json`, `main/background.js`, smoke/equivalence coverage, `AGENT_COLLABORATION.md` | In progress | 2026-07-07 |
 | Claude-Code | LRv3-S1 completion: convexhull support + candidate/legality fixes + fixture gates | `main/background.js` (smart engine), gate scenario runs | Completed: machinery landed and verified (battery green); capture gate not yet demonstrated — see plan §1.9.4 and handoff note | 2026-06-11 |
 | Codex | LRv3-S1 legality predicate + settle pass | `main/util/separation.js`, `main/background.js`, `ml/tests/separation/`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; ESICUP gate failed/no floaters; visual laurel fixture still needed | 2026-06-11 |
 | Codex | LRv3-R3-promoted relocate + swap | `main/background.js`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; substantive bounded gate failed; WP-R1 remains blocked | 2026-06-11 |
@@ -121,6 +122,8 @@ Park future tasks both agents should be aware of. Keep entries short. Move items
 | Accessibility pass (landmarks, labels, dialog roles) | `main/index.html` | UI_AUDIT P2.1 — entire file has zero `aria-` / `role=` attributes |
 | Extend smoke battery to bitmap/DXF cases | `ml/app-smoke-main.js`, `ml/smoke/scenarios/` | Follow-up after first scenario battery: add PNG contour import fixture and DXF export/import coverage |
 | Local Refinement v2 rotations | `main/background.js` | After v1 translation-only testing, consider tiny legal angle probes like ±1/±2/±5 degrees with aggressive caching — superseded by WP-2.3 of the SOTA plan below |
+| Engine performance plan (PERF-P1…P7) | `docs/performance-plan.md` | Hot-path speed work, all output-identical or flagged: fingerprint memoization, hot-loop logging removal (+timing telemetry), hull candidate hoists, flagged mergeLines top-k credit cap, geometry-once dispatch (pull model via main-process broker — payloads drop from MBs to KBs per individual), batched NFP cache prefetch, refinement ring decimation. Equivalence harness is THE gate; benchmark before/after numbers required per WP. Order: P2→P1→P3→P6→P5→P4→P7 |
+| Windows port (WIN-W1…W5) | `docs/windows-port-plan.md` | Ship a Windows x64 build preserving all features; mac stays unchanged. Three real risks: native addon (MSVC + header-only Boost.Polygon + `NOMINMAX`), the Python sidecar (bundle embeddable CPython + wheels for PDF/PNG/TIFF conversion), packaging (NSIS/portable, unsigned v1). JS layer is already platform-neutral. W1 compile / W2 bundling / W4 packaging need a Windows build host; W3 + config edits are Mac-authorable but must not regress the mac build. Claim WIN-W1…W5 from §10 |
 | TIFF bitmap export + unified export modal (TIFF-T1…T4) | `docs/tiff-export-plan.md` | Export nested layouts as per-sheet raster TIFFs for print/RIP: outline-removal enum, top-indicator fiducial, ICC (RGB embed / CMYK convert+embed), via the existing PyMuPDF+Pillow converter (no new deps). Refactors the export menu into a CollageMaker-style modal (light theme). Export-only; not ML-sensitive as long as `placeParts`/vector-export defaults are untouched. Claim TIFF-T1…T4 from the plan's §10 |
 | SOTA nesting engine (WP-0 … WP-4) | `docs/sota-nesting-implementation-plan.md` | Phased plan: benchmark harness → fitness v2 → separate-and-compact refinement (replaces slide Local Refinement) → `deepsearch` placement type → ML routing. Every WP lands behind a default-off flag with equivalence + benchmark gates. Claim individual WPs from the plan's §10 table |
 | Local Refinement v3 "smart" engine (WP-R1 … WP-R6) | `docs/local-refinement-v3-plan.md` | Approved 2026-06-11; supersedes SOTA WP-2.3. Prereqs: SOTA WP-2.1, WP-2.2, and the §8.3 equivalence harness. Contact-graph chain targeting, geometry-derived rotations with pivot rocking, void relocation, swaps, ruin-&-recreate under a budgeted orchestrator (`localRefinementEngine: 'smart'`, default stays 'slide') |
@@ -136,6 +139,24 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-06 - 0.7.5: final legality gate for the slide local-refinement engine (Claude-Code)
+
+- User reports overlapping nests correlate exactly with `localRefinementEngine: slide` being enabled, on 0.7.4 with a verified-clean NFP cache. Could not reproduce in the instrumented Electron-40 harness (tried gravity/box, user's exact Settings incl. `curveTolerance: 0`, `spacing: 0.72`, `processHoles: false`, `mlMode: override`, import-time settings seeded, loose 4-part layouts) — slide accepted 0 moves and stayed legal in every run.
+- Structural finding: `refineLocalPlacements` (slide) was the only refinement engine WITHOUT the `localRefinementFinalLayoutLegal` gate (smart uses it at ~3708/3818/3851, shrinkSeparate at ~3970). Slide relied purely on per-move point-in-NFP tests, so any wrong/missing pairwise NFP lets a slide land a part on top of another and ship it. Note slide is also the only consumer that needs REVERSED-ordering pair NFPs (`localRefinementForbiddenNfps` queries both directions), which the pre-pass does not compute — those are computed on demand mid-refinement.
+- Change in `main/background.js` `refineLocalPlacements`: snapshot pre-refinement placement object references; after the passes, if moves were accepted and `localRefinementFinalLayoutLegal` (incl. NFP-independent SeparationUtil material-overlap check) fails, revert all placements, zero `movesAccepted`, set `stats.revertedIllegal`, and log. Bumped to 0.7.5.
+- Verified: `node --check` passes, engine-equivalence suite passes, harness slide run legal. The gate is defense-in-depth — root cause of the user's slide-correlated overlap is still not reproduced; if it recurs on 0.7.5, capture the exported SVG + the report stats (look for `revertedIllegal`) and the freshly-written nfpcache entries.
+- Version metadata updated in package.json, index.html title, README, and the baseline block above.
+
+### 2026-07-03 - Fixed overlapping-nest root cause: corrupt NFPs from ClipperLib.MinkowskiSum (Claude-Code)
+
+- User-reported bug: nesting frame parts (rects with inner cutouts, hairline-skewed by CAD `matrix(1,-1e-6,-1e-6,-1,...)` transforms) produced overlapping placements; clearing the NFP cache did not help.
+- Root cause (verified live with an instrumented Electron-40 run of the real renderer pipeline): the pair pre-pass `process()` in `main/background.js` computes outer NFPs with `ClipperLib.Clipper.MinkowskiSum` at scale 1e7; for these near-degenerate rect pairs at mixed rotations the solution comes back self-intersecting or fragmented, and the largest-ring pick returns an NFP **missing a part-sized corner region** (~108k units² measured). The placer then places parts inside the phantom region → overlaps. Corrupt results were also persisted to the disk NFP cache (geometry-keyed), which is why cache clears only helped until the next nest.
+- Fix applied in `main/background.js` (2 sites): normalize the Minkowski solution with `ClipperLib.Clipper.SimplifyPolygons(solution, pftNonZero)` before ring selection — in the Parallel-worker `process()` (~line 389) and in the `getOuterNfp` ClipperLib fallback branch (~line 4501). Selection/shift semantics unchanged.
+- Verification: standalone repro of the exact corrupt pair shows missing-region 108,355 → 0 units²; instrumented full nest run (7 frame parts + sheet, gravity, rotations 4, 60 s) went from dozens of corrupt cache inserts to **zero**, final placement 6/7 parts, zero overlaps (7 genuinely don't fit on the 22.5×14 in sheet).
+- ML-sensitivity note: `main/background.js` is on the ML-sensitive list. The change only alters previously-corrupt outputs (makes NFPs correct), but if the trained baseline matters, run `npm run ml:checkpoint` before retraining comparisons.
+- Users must **clear the NFP cache once** after picking up this fix (old poisoned entries are geometry-keyed and otherwise persist).
+- Ruled out by direct test: the native addon (clean with/without holes at all rotation combos), the GeometryUtil orbit-slider fallback (clean on these inputs), stale cache keys. Separate observation: renderer-local addon `require` fails under Electron 40 ("non context-aware"), so addon calls go through the `minkowski-calculate-nfp-sync` IPC to the main process — worth its own follow-up but unrelated to this bug.
 
 ### 2026-06-15 - TIFF bitmap export + unified export modal implemented (Codex)
 
@@ -164,6 +185,36 @@ Use newest notes at the top.
 - Built `dist/Deepnest ML-0.7.3-mac-arm64.dmg` with `npm run dist`.
 - Verified the DMG checksum with `hdiutil verify`.
 - Packaging note: electron-builder still reports the known BOM-prefixed JSON warning, falls back to ad-hoc signing, and skips notarization because notarization is not configured.
+
+### 2026-06-12 - Performance plan v2 after implementer review — claims verified, plan amended (Claude-Code)
+
+The implementing coder reviewed the performance plan and pushed back. I verified every claim against the live code before amending; verdicts:
+
+- **TRUE — version/baseline drift**: package.json + title at 0.7.5, package-lock at 0.7.3, ~32 dirty entries, last commit is the 0.7.3 release. New **PERF-P0** (baseline freeze + fresh goldens/benchmark baseline) is now a hard prerequisite.
+- **TRUE — the pair pre-pass** (`background.js:346-370`) does O(n²) sync `db.has()` IPC BEFORE `placeParts`; the original P6 (prefetch inside placeParts) was too late. P6 redesigned: one batched warm BEFORE the pre-pass, pre-pass `db.has` replaced by local-mirror checks, handler parity in ALL THREE IPC hosts, byte(64MB)/time(250ms) caps.
+- **TRUE — pre-pass cache-key drift**: the pre-pass doc omits `processHoles` (getOuterNfp includes it) and computes hole child NFPs unconditionally; under `processHoles:false` it re-checks the wrong key every run and pollutes the cache with unread hole-aware entries. Folded into PERF-P0 as a correctness fix with its own gate (`pairsCacheHits` telemetry proves second-run hits).
+- **TRUE — harness-main IPC parity**: `ml/app-smoke-main.js:557-658` (and the teacher main) implement their own `nfp-cache-*` handlers; P5/P6's new channels must be added there or every harness run silently exercises the fallback. P5 now requires parity + a `geometryPath: 'token'|'legacy'` telemetry field, and lands in five slices (broker → worker pull behind fallback → GA call-site → refinement call-site → cleanup/failure).
+- **TRUE — benchmark flags** `--instances/--time-budget-sec/--runs` exist in `ml/cli/run_benchmark.js`; the exact command is now in §8.
+- **ACCEPTED — P4 base-score precision** (full pipeline incl. `improvedPlacementScore`, minus only merge credit) and **P7 moved out** to the LR/smart-refinement track.
+- **ONE CORRECTION (§9a)**: expanding the DIGEST equivalence harness to "rotations 4 / threads 2-4 / normal GA" is not implementable — GA and seed rotations use `Math.random`, so digests aren't run-stable. Split instead: digest goldens extended to deterministic configs (convexhull, mergeLines, processHoles:false, simplify), a NEW legality-assertion battery (erosion-predicate no-overlap + containment + part-count) over the stochastic matrix, plus a teacher mini-run per WP batch.
+
+Amended order: **P0 → P2 → P1 → P3 → P6 → P5 → P4**; P5/P6 blocked until P0 + §9a exist. `docs/performance-plan.md` is now v2 with all amendments inline. Codex: claim `PERF-P0 baseline freeze + pre-pass key fix` first.
+
+### 2026-06-12 - Engine performance plan authored (Claude-Code)
+
+- Added `docs/performance-plan.md`: seven work packages on the placement hot paths, written for a less-capable implementing model with verified line anchors (background.js anchors re-checked 2026-06-12 post-LR-work: logging sites :4508/:4677/:4758/:4878/:5046, hull triple-compute :4996-4999, mergeLines per-candidate eval :5008, dispatch payload deepnest.js:1506-1540).
+- Discipline: every WP is either **output-identical** (P1 fingerprint memoization, P2 logging removal + `timing.placementMs` telemetry, P3 hull hoists, P5 geometry-once dispatch, P6 batched NFP prefetch — gated on the engine-equivalence harness) or **flagged default-off** (P4 mergeLines top-k credit cap — it can change placements; P7 refinement ring decimation — flagged engines only). No ML checkpoint needed while defaults hold.
+- Key designs: P1 memoizes `polygonFingerprint` as a NON-ENUMERABLE own property (invisible to structured clone/JSON — required so it never leaks into IPC, exports, or cache files) with an immutability audit; P5 replaces the per-individual megabyte payloads (sheets + placement trees + a third children copy, confirmed at deepnest.js:1524-1537) with a nest-token pull model brokered by the main process (workers pull geometry on miss — survives worker recreation; both dispatch call sites incl. the refinement post-process migrate; `exact`-flag preservation in cloning is a named trap for mergeLines); P6 adds one `nfp-cache-find-batch-sync` IPC replacing the O(n²) per-pair sync round-trips, with a key-match dev assertion.
+- Measurement: benchmark labels `perf-p<N>-before/after` on albano/shirts/shapes0 + the new timing telemetry; before/after numbers required in every handoff note. Order P2→P1→P3→P6→P5→P4→P7 (P2 installs telemetry first; P1 is a P6 prerequisite; P5 rides alone).
+- Rust decision recorded: parked — the remaining wins here are algorithmic/IPC, not language-bound; revisit a rayon-parallel Rust core only when `deepsearch` lands and needs in-process parallelism.
+
+### 2026-06-12 - Windows port plan authored (Claude-Code)
+
+- Added `docs/windows-port-plan.md`: plan to ship a Windows x64 build preserving all features, mac unchanged. Grounded in a platform audit of the live code (line anchors cited).
+- Audit result — already cross-platform: native addon load paths (`path.join` + `[\\/]` asar-unpacked rewrite), the Boost resolver (env + `third_party/boost*`, header-only Boost.Polygon), the `win` electron-builder block, the darwin-gated frameless window, and the remote DXF conversion server. The app runtime requires none of the `ml/scripts/*.sh`.
+- Must-change for Windows: (A) native build npm scripts use POSIX `$(node -p …)` substitution — replace with a Node build driver `scripts/native/build-addon.cjs`; (B) `binding.gyp` needs an MSVC branch (`ExceptionHandling`/`/EHsc`, `NOMINMAX`, `/bigobj`, `/std:c++17`); (C) `getPythonCandidates` lists only `python3`+Mac paths — add `python`/`py -3`/bundled; (D) **Python sidecar** (PyMuPDF+Pillow for PDF export, PNG/PDF import, TIFF) — bundle an embeddable CPython + wheels under `python/win/**` (asarUnpack), since a clean Windows box has no Python; (E) packaging — add `win.target = [nsis, portable]`, unsigned v1; (F) `.sh` dev tooling — optional Node smoke runner.
+- WP order (§10): WIN-W1 addon (MSVC+Boost; gate = nfp_equivalence passes) → WIN-W2 bundled Python (gate = converter doctor all-true + PDF/PNG round-trip) → WIN-W3 runtime branches (Mac-authorable) → WIN-W4 NSIS packaging (gate = clean-VM feature matrix §8) → WIN-W5 optional CI parity. W1/W2/W4 need a Windows build host; W3 + config edits are Mac-authorable but must not regress the mac build.
+- Key traps documented: `NOMINMAX` (the classic Boost-on-Windows failure), Electron-ABI-pinned addon build, win-x64 wheel/python version match, asarUnpack for `.node` + `python/win`.
 
 ### 2026-06-12 - TIFF bitmap export plan authored (Claude-Code)
 
