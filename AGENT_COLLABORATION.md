@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | LR fine rotation Phase 0/1 | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/tests/engine_bugfixes/`, smoke/benchmark reports, `AGENT_COLLABORATION.md` | In progress: Phase 0 guard verified; Phase 1 default-off operator next | 2026-07-08 |
 | Codex | PERF-P4 mergeLines top-k credit cap | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, smoke scenario, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: hidden default-off cap landed; flag-off equivalence green; flag-on benchmark borderline-green at cap64 | 2026-07-08 |
 | Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: token geometry dispatch landed; refinement token path verified; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P6 batched NFP warm (pre-pass first) | `main/background.js`, `main.js`, `ml/app-smoke-main.js`, `ml/teacher-main.js`, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: batch find IPC + pre-pass warm landed; telemetry proves path; equivalence/smoke/teacher/benchmark green | 2026-07-08 |
@@ -145,6 +146,13 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - LR fine rotation Phase 0 guard (Codex)
+
+- Attempted required pre-edit checkpoint: `npm run ml:checkpoint -- --name fine-rotation-pre`. It failed because no completed training runs with trained models exist in this checkout (`RuntimeError: No completed training runs with a trained model were found.`). Proceeded with this caveat recorded.
+- Added canonical-grid NFP guard helpers in `main/background.js`. `getOuterNfp` / `getInnerNfp` now fail closed and increment `localRefinement.nonCanonicalNfpLookups` if asked for an off-grid rotation, preventing one-off fine-angle NFPs from reaching the persistent cache.
+- Phase 0 is intended behavior-neutral for the existing canonical engine path. Verification passed: `node --check main/background.js`; `node --check ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_bugfixes/run.js`; `bash ml/scripts/run_boot_check.sh`; `node ml/tests/engine_equivalence/run.js`.
+- Phase 1 remains active: default-off centroid fine-rotation operator, strictly last, exact final gate, skip holes/mergeLines.
 
 ### 2026-07-08 - PERF-P4 mergeLines candidate cap (Codex)
 

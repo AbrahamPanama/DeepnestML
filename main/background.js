@@ -129,6 +129,8 @@ function cloneNfp(nfp, inner){
 // all persisted entries. The size / byte / manifest-path constants used to
 // live here too — they moved to main.js along with cache ownership.
 var NFP_CACHE_VERSION = 3;
+
+var nonCanonicalNfpLookups = 0;
 var backgroundGeometryCache = {};
 var backgroundGeometryCacheOrder = [];
 
@@ -4399,6 +4401,7 @@ function createLocalRefinementStats(enabled){
 		sheetsChecked: 0,
 		movesTested: 0,
 		movesAccepted: 0,
+		nonCanonicalNfpLookups: 0,
 		scoreBefore: null,
 		scoreAfter: null
 	};
@@ -4451,7 +4454,7 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'nonCanonicalNfpLookups'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
 	}
@@ -4664,6 +4667,47 @@ function rotationRetryStep(config){
 
 function rotationRetryAngle(baseRotation, config, attemptIndex){
 	return normalizedRotation((Number(baseRotation) || 0) + rotationRetryStep(config)*attemptIndex);
+}
+
+function localRefinementRotationOnCanonicalGrid(rotation, config){
+	var step = rotationRetryStep(config);
+	if(!isFinite(step) || step <= 0){
+		return true;
+	}
+	var normalized = normalizedRotation(rotation || 0);
+	var nearest = Math.round(normalized / step) * step;
+	var delta = Math.abs(normalizedRotation(normalized - nearest));
+	if(delta > 180){
+		delta = 360 - delta;
+	}
+	return delta <= 1e-6;
+}
+
+function localRefinementRecordNonCanonicalNfpLookup(A, B, config, kind){
+	var badA = A && !localRefinementRotationOnCanonicalGrid(A.rotation || 0, config);
+	var badB = B && !localRefinementRotationOnCanonicalGrid(B.rotation || 0, config);
+	if(!badA && !badB){
+		return false;
+	}
+	nonCanonicalNfpLookups++;
+	if(config && config.localRefinementDebugNonCanonicalNfp === true && typeof console !== 'undefined' && console.warn){
+		console.warn('non-canonical NFP lookup blocked', {
+			kind: kind || 'unknown',
+			Arotation: A ? A.rotation : null,
+			Brotation: B ? B.rotation : null,
+			rotations: config ? config.rotations : null
+		});
+	}
+	return true;
+}
+
+function localRefinementNonCanonicalNfpLookupCount(){
+	return nonCanonicalNfpLookups;
+}
+
+function localRefinementNonCanonicalNfpLookupDelta(start){
+	var baseline = typeof start === 'number' ? start : 0;
+	return Math.max(0, nonCanonicalNfpLookups - baseline);
 }
 
 function candidatePlacementIsBetter(currentScore, currentX, currentY, candidateScore, candidateX, candidateY){
@@ -4919,6 +4963,10 @@ function getOuterNfp(A, B, inside, config){
 	var nfp;
 	var processHoles = !config || config.processHoles !== false;
 
+	if(localRefinementRecordNonCanonicalNfpLookup(A, B, config, inside ? 'outer-inside' : 'outer')){
+		return null;
+	}
+
 	// try the file cache if the calculation will take a long time
 	var doc = window.db.find(buildOuterNfpCacheDoc(A, B, processHoles));
 
@@ -5079,6 +5127,10 @@ function getFrame(A){
 }
 
 function getInnerNfp(A, B, config){
+	if(localRefinementRecordNonCanonicalNfpLookup(A, B, config, 'inner')){
+		return null;
+	}
+
 	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
 		var doc = window.db.find(buildInnerNfpCacheDoc(A, B), true);
 	
@@ -5118,6 +5170,7 @@ function placeParts(sheets, parts, config, nestindex){
 	// total length of merged lines
 	var totalMerged = 0;
 	var localRefinement = createLocalRefinementStats(config && config.localRefinement === true);
+	var nonCanonicalNfpLookupStart = localRefinementNonCanonicalNfpLookupCount();
 	var runLocalRefinement = config && config.localRefinement === true && config.localRefinementPostProcess === true;
 	var fitnessVersion = getFitnessVersion(config);
 	var useFitnessV2 = fitnessVersion === 2;
@@ -5587,6 +5640,7 @@ function placeParts(sheets, parts, config, nestindex){
 	for(i=0; i<allplacements.length; i++){
 		placedCount += allplacements[i].sheetplacements.length;
 	}
+	localRefinement.nonCanonicalNfpLookups = localRefinementNonCanonicalNfpLookupDelta(nonCanonicalNfpLookupStart);
 
 	var result = {
 		placements: allplacements,

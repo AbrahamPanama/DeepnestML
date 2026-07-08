@@ -146,6 +146,37 @@ function testRotationRetries() {
 	});
 }
 
+function testNonCanonicalNfpGuardHelpers() {
+	const ctx = loadBackgroundFunctions([
+		'normalizedRotation',
+		'rotationRetryCount',
+		'rotationRetryStep',
+		'localRefinementRotationOnCanonicalGrid',
+		'localRefinementRecordNonCanonicalNfpLookup',
+		'localRefinementNonCanonicalNfpLookupCount',
+		'localRefinementNonCanonicalNfpLookupDelta'
+	], {}, {
+		nonCanonicalNfpLookups: 0
+	});
+	const config = { rotations: 4 };
+	assert.strictEqual(ctx.localRefinementRotationOnCanonicalGrid(90, config), true, 'canonical 90-degree rotation should be on-grid');
+	assert.strictEqual(ctx.localRefinementRotationOnCanonicalGrid(360, config), true, '360 should normalize onto the canonical grid');
+	assert.strictEqual(ctx.localRefinementRotationOnCanonicalGrid(47.3, config), false, 'fine rotation should be off-grid');
+	assert.strictEqual(
+		ctx.localRefinementRecordNonCanonicalNfpLookup({ rotation: 0 }, { rotation: 180 }, config, 'outer'),
+		false,
+		'canonical NFP lookup should not trip guard'
+	);
+	assert.strictEqual(ctx.localRefinementNonCanonicalNfpLookupCount(), 0, 'canonical lookup should not increment counter');
+	assert.strictEqual(
+		ctx.localRefinementRecordNonCanonicalNfpLookup({ rotation: 0 }, { rotation: 47.3 }, config, 'outer'),
+		true,
+		'off-grid NFP lookup should trip guard'
+	);
+	assert.strictEqual(ctx.localRefinementNonCanonicalNfpLookupCount(), 1, 'off-grid lookup should increment counter');
+	assert.strictEqual(ctx.localRefinementNonCanonicalNfpLookupDelta(0), 1, 'delta should report guard trips since baseline');
+}
+
 function testSheetHoleForbiddenNfp() {
 	const calls = [];
 	const forbiddenRing = rect(0, 0, 10, 10);
@@ -552,6 +583,7 @@ function run() {
 	testMergedLengthChildrenCountOnce();
 	testEmptyClipperFallback();
 	testRotationRetries();
+	testNonCanonicalNfpGuardHelpers();
 	testSheetHoleForbiddenNfp();
 	testSheetHoleFailsClosed();
 	testSheetHoleDifferenceFailureFailsClosed();
