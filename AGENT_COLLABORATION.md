@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-08 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after the PERF-P3 commit; code/docs are expected clean after `[codex] PERF-P3: hoist convex hull candidate work`. Generated benchmark artifacts remain untracked by convention._
+State (verified 2026-07-08 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after the PERF-P6 commit; code/docs are expected clean after `[codex] PERF-P6: batch warm NFP cache lookups`. Generated benchmark artifacts remain untracked by convention._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | PERF-P6 batched NFP warm (pre-pass first) | `main/background.js`, `main.js`, `ml/app-smoke-main.js`, `ml/teacher-main.js`, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: batch find IPC + pre-pass warm landed; telemetry proves path; equivalence/smoke/teacher/benchmark green | 2026-07-08 |
 | Codex | PERF-P3 hull candidate hoists | `main/background.js`, `ml/scripts/run_smoke_battery.sh`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: candidate/sheet hull reuse landed; `svg-hull` in default smoke battery; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P1 fingerprint memoization | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: non-enumerable fingerprint memo landed; targeted tests + equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P2 hot-loop logging + timing telemetry | `main/background.js`, `ml/cli/run_benchmark.js`, smoke/equivalence/benchmark reports, `AGENT_COLLABORATION.md` | Completed: hot-loop logs removed; placement timing persisted in smoke + benchmark JSONs; equivalence gate green | 2026-07-08 |
@@ -142,6 +143,18 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P6 batched NFP warm (pre-pass first) (Codex)
+
+- Implemented `PERF-P6`: added `nfp-cache-find-batch-sync` in `main.js` and `ml/app-smoke-main.js`, plus in-memory `nfp-cache-*` parity in `ml/teacher-main.js` (the swarm audit found teacher did not actually have cache handlers despite the plan wording).
+- `main/background.js` now builds deduped prefetch keys after part/sheet reconstruction and before the pair pre-pass, warms local `window.nfpcache` in chunks, and uses confirmed batch misses to avoid pre-pass `db.has` sync IPC while falling back to old `db.has` for unfetched/capped keys.
+- Added helper docs (`buildOuterNfpCacheDoc`, `buildInnerNfpCacheDoc`) so prefetch keys, pre-pass keys, `getOuterNfp`, and `getInnerNfp` share the same key shape. Added `timing.nfpBatch` telemetry and targeted tests for key parity, local-hit skipping, batch warm stats, and checked-miss tracking.
+- Smoke proof: `/tmp/deepnest-smoke-perf-p6/svg-gravity/report.json` showed `nfpBatch.requested: 9`; `/tmp/deepnest-smoke-perf-p6/svg-hull/report.json` showed `nfpBatch.hits: 4`; sensitive scenarios passed under `/tmp/deepnest-smoke-perf-p6-sensitive`, including `processHoles:false` with `nfpBatch.eligible: 4` and `pairsCacheHits: 1`.
+- Benchmark before reference: `ml/benchmark/results/20260708T144732Z-perf-p3-after.json`. P6 after artifact: `ml/benchmark/results/20260708T150210Z-perf-p6-after.json`. Batch telemetry is present in every non-step benchmark run; examples: shapes0 run2 `nfpBatch.hits: 1094`, `pairsCacheHits: 903`, `placementMs: 344`; albano run1 `nfpBatch.requested: 576`, hits `103`; blaz1 run1 requested `784`, hits `44`.
+- Benchmark medians (P3 before → P6 after): albano `0.7901515158895724` → `0.7619901808483602`; blaz1 `0.25914372861195734` → `0.2588902859733389`; shapes0 unchanged at `0.16120748980179334`. Run-level GA output varies stochastically; deterministic `engine_equivalence` is the output-identity gate and passed. Runtime impact is mixed on cold-ish albano/blaz1 but strong on second-run shapes0 cache reuse.
+- Teacher mini-run passed: `npm run legacy:teacher -- --job ml/examples/simple-job.json --output-dir /tmp/deepnest-teacher-p6`; `/tmp/deepnest-teacher-p6/result.json` status `succeeded`, legality `legal: true`, `placed_part_count: 3`.
+- Verification passed: `node --check main/background.js main.js ml/app-smoke-main.js ml/teacher-main.js ml/tests/engine_bugfixes/run.js`; `git diff --check`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/separation/run.js`; `node ml/tests/engine_equivalence/run.js`; `bash ml/scripts/run_boot_check.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p6 bash ml/scripts/run_smoke_battery.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p6-sensitive bash ml/scripts/run_smoke_battery.sh svg-gravity-merge svg-gravity-processholes-off svg-gravity-simplify`; amended `npm run ml:nest-benchmark -- --label perf-p6-after --instances albano,blaz1,shapes0 --time-budget-sec 10 --runs 2`; teacher mini-run above.
+- Next claim per plan: `PERF-P5 geometry-once dispatch (5 slices)`.
 
 ### 2026-07-08 - PERF-P3 hull candidate hoists (Codex)
 

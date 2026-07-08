@@ -216,6 +216,37 @@ function nfpCacheKey(obj, inner){
 	return parts.join('-');
 }
 
+function buildOuterNfpCacheDoc(A, B, processHoles, nfp){
+	var doc = {
+		A: A.source,
+		B: B.source,
+		Arotation: A.rotation,
+		Brotation: B.rotation,
+		Apolygon: A,
+		Bpolygon: B,
+		processHoles: processHoles
+	};
+	if(typeof nfp !== 'undefined'){
+		doc.nfp = nfp;
+	}
+	return doc;
+}
+
+function buildInnerNfpCacheDoc(A, B, nfp){
+	var doc = {
+		A: A.source,
+		B: B.source,
+		Arotation: 0,
+		Brotation: B.rotation,
+		Apolygon: A,
+		Bpolygon: B
+	};
+	if(typeof nfp !== 'undefined'){
+		doc.nfp = nfp;
+	}
+	return doc;
+}
+
 // NFP cache ownership lives in main.js. This renderer keeps a per-window
 // in-memory mirror (window.nfpcache) so repeated hits stay free of IPC, and
 // falls back to synchronous IPC for cross-window / disk-backed lookups and
@@ -252,6 +283,175 @@ function warmLocalNfpCache(key, nfp, inner){
 	if(!memory || memory.totalJSHeapSize < 0.8*memory.jsHeapSizeLimit){
 		window.nfpcache[key] = cloneNfp(nfp, inner);
 	}
+}
+
+function nfpBatchResponseValues(response){
+	if(!response){
+		return null;
+	}
+	if(Array.isArray(response)){
+		return response;
+	}
+	if(response.values && Array.isArray(response.values)){
+		return response.values;
+	}
+	return null;
+}
+
+function estimateNfpPayloadBytes(nfp){
+	if(!nfp){
+		return 0;
+	}
+	try{
+		return JSON.stringify(nfp).length;
+	}
+	catch(e){
+		return 0;
+	}
+}
+
+function addNfpPrefetchEntry(entries, seen, doc, inner){
+	var key = nfpCacheKey(doc, inner);
+	if(!key || seen[key] || window.nfpcache[key]){
+		return;
+	}
+	seen[key] = true;
+	entries.push({
+		key: key,
+		inner: inner === true
+	});
+}
+
+function warmNfpCacheBatch(entries){
+	var stats = {
+		eligible: entries.length,
+		requested: 0,
+		chunks: 0,
+		hits: 0,
+		misses: 0,
+		bytes: 0,
+		elapsedMs: 0,
+		capped: false,
+		checked: {}
+	};
+	if(!entries.length){
+		return stats;
+	}
+
+	var chunkSize = 2000;
+	var maxBytes = 64 * 1024 * 1024;
+	var maxMs = 250;
+	var started = Date.now();
+	for(var i=0; i<entries.length; i += chunkSize){
+		if(stats.bytes >= maxBytes || Date.now() - started >= maxMs){
+			stats.capped = true;
+			break;
+		}
+		var chunk = entries.slice(i, i + chunkSize);
+		var keys = [];
+		for(var j=0; j<chunk.length; j++){
+			keys.push(chunk[j].key);
+		}
+		var response = ipcRendererSafeSendSync('nfp-cache-find-batch-sync', keys);
+		var values = nfpBatchResponseValues(response);
+		if(!values){
+			stats.capped = true;
+			break;
+		}
+		stats.chunks++;
+		stats.requested += keys.length;
+		if(response && typeof response.bytes === 'number'){
+			stats.bytes += response.bytes;
+		}
+		for(j=0; j<chunk.length; j++){
+			var value = values[j] || null;
+			stats.checked[chunk[j].key] = true;
+			if(value){
+				warmLocalNfpCache(chunk[j].key, value, chunk[j].inner);
+				stats.hits++;
+				if(!response || typeof response.bytes !== 'number'){
+					stats.bytes += estimateNfpPayloadBytes(value);
+				}
+			}
+			else{
+				stats.misses++;
+			}
+		}
+	}
+	stats.elapsedMs = Date.now() - started;
+	return stats;
+}
+
+function buildNfpPrefetchEntries(sheets, parts, config, processHoles){
+	var entries = [];
+	var seen = {};
+	var i;
+	var j;
+	var rotated = [];
+	for(i=0; i<parts.length; i++){
+		var r = rotatePolygon(parts[i], parts[i].rotation);
+		r.rotation = parts[i].rotation;
+		r.source = parts[i].source;
+		r.id = parts[i].id;
+		rotated.push(r);
+	}
+
+	var pairSeen = [];
+	var inpairs = function(key, p){
+		for(var k=0; k<p.length; k++){
+			if(p[k].Asource == key.Asource && p[k].Bsource == key.Bsource && p[k].Arotation == key.Arotation && p[k].Brotation == key.Brotation){
+				return true;
+			}
+		}
+		return false;
+	};
+
+	for(i=0; i<parts.length; i++){
+		var B = parts[i];
+		for(j=0; j<i; j++){
+			var A = parts[j];
+			var pairKey = {
+				Asource: A.source,
+				Bsource: B.source,
+				Arotation: A.rotation,
+				Brotation: B.rotation
+			};
+			if(!inpairs(pairKey, pairSeen)){
+				pairSeen.push(pairKey);
+				addNfpPrefetchEntry(entries, seen, buildOuterNfpCacheDoc(rotated[j], rotated[i], processHoles), false);
+			}
+		}
+	}
+
+	for(i=0; i<rotated.length; i++){
+		for(j=0; j<rotated.length; j++){
+			if(i === j){
+				continue;
+			}
+			addNfpPrefetchEntry(entries, seen, buildOuterNfpCacheDoc(rotated[i], rotated[j], processHoles), false);
+		}
+	}
+
+	for(i=0; i<sheets.length; i++){
+		for(j=0; j<rotated.length; j++){
+			addNfpPrefetchEntry(entries, seen, buildInnerNfpCacheDoc(sheets[i], rotated[j]), true);
+		}
+	}
+
+	return entries;
+}
+
+function nfpBatchTiming(stats){
+	return {
+		eligible: stats.eligible,
+		requested: stats.requested,
+		chunks: stats.chunks,
+		hits: stats.hits,
+		misses: stats.misses,
+		bytes: stats.bytes,
+		elapsedMs: stats.elapsedMs,
+		capped: stats.capped
+	};
 }
 
 window.db = {
@@ -351,6 +551,7 @@ window.onload = function () {
 		
 		// preprocess
 		var processHoles = !data.config || data.config.processHoles !== false;
+		var nfpBatchStats = warmNfpCacheBatch(buildNfpPrefetchEntries(data.sheets, parts, data.config, processHoles));
 		var pairsCacheHits = 0;
 		var pairsMissing = 0;
 		var pairs = [];
@@ -374,17 +575,16 @@ window.onload = function () {
 					Asource: A.source,
 					Bsource: B.source
 				};
-				var doc = {
-					A: A.source,
-					B: B.source,
-					Arotation: A.rotation,
-					Brotation: B.rotation,
-					Apolygon: rotatePolygon(A, A.rotation),
-					Bpolygon: rotatePolygon(B, B.rotation),
-					processHoles: processHoles
-				}
+				var doc = buildOuterNfpCacheDoc(rotatePolygon(A, A.rotation), rotatePolygon(B, B.rotation), processHoles);
 				if(!inpairs(key, pairs)){
-					if(db.has(doc)){
+					var docKey = nfpCacheKey(doc, false);
+					if(docKey && window.nfpcache[docKey]){
+						pairsCacheHits++;
+					}
+					else if(docKey && nfpBatchStats.checked[docKey]){
+						pairs.push(key);
+					}
+					else if(db.has(doc)){
 						pairsCacheHits++;
 					}
 					else{
@@ -500,6 +700,7 @@ window.onload = function () {
 			placement.timing.pairsCacheHits = pairsCacheHits;
 			placement.timing.pairsMissing = pairsMissing;
 			placement.timing.processHoles = processHoles;
+			placement.timing.nfpBatch = nfpBatchTiming(nfpBatchStats);
 			if(data.postProcessRefinement){
 				placement.postProcessRefinement = true;
 				placement.refinementToken = data.refinementToken;
@@ -571,16 +772,7 @@ window.onload = function () {
 						processed[i].nfp.children = cnfp;
 					}
 					
-					var doc = {
-						A: processed[i].Asource,
-						B: processed[i].Bsource,
-						Arotation: processed[i].Arotation,
-						Brotation: processed[i].Brotation,
-						Apolygon: rotatePolygon(A, processed[i].Arotation),
-						Bpolygon: rotatePolygon(B, processed[i].Brotation),
-						processHoles: processHoles,
-						nfp: processed[i].nfp
-					};
+					var doc = buildOuterNfpCacheDoc(rotatePolygon(A, processed[i].Arotation), rotatePolygon(B, processed[i].Brotation), processHoles, processed[i].nfp);
 					window.db.insert(doc);
 					
 				}
@@ -4503,15 +4695,7 @@ function getOuterNfp(A, B, inside, config){
 	var processHoles = !config || config.processHoles !== false;
 
 	// try the file cache if the calculation will take a long time
-	var doc = window.db.find({
-		A: A.source,
-		B: B.source,
-		Arotation: A.rotation,
-		Brotation: B.rotation,
-		Apolygon: A,
-		Bpolygon: B,
-		processHoles: processHoles
-	});
+	var doc = window.db.find(buildOuterNfpCacheDoc(A, B, processHoles));
 
 	if(doc){
 		return doc;
@@ -4576,16 +4760,7 @@ function getOuterNfp(A, B, inside, config){
 
 	if(!inside && typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
 		// insert into db
-		doc = {
-			A: A.source,
-			B: B.source,
-			Arotation: A.rotation,
-			Brotation: B.rotation,
-			Apolygon: A,
-			Bpolygon: B,
-			processHoles: processHoles,
-			nfp: nfp
-		};
+		doc = buildOuterNfpCacheDoc(A, B, processHoles, nfp);
 		window.db.insert(doc);
 	}
 
@@ -4680,14 +4855,7 @@ function getFrame(A){
 
 function getInnerNfp(A, B, config){
 	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
-		var doc = window.db.find({
-			A: A.source,
-			B: B.source,
-			Arotation: 0,
-			Brotation: B.rotation,
-			Apolygon: A,
-			Bpolygon: B
-		}, true);
+		var doc = window.db.find(buildInnerNfpCacheDoc(A, B), true);
 	
 		if(doc){
 			//console.log('fetch inner', A.source, B.source, doc);
@@ -4702,15 +4870,7 @@ function getInnerNfp(A, B, config){
 	
 	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
 		// insert into db
-		var doc = {
-			A: A.source,
-			B: B.source,
-			Arotation: 0,
-			Brotation: B.rotation,
-			Apolygon: A,
-			Bpolygon: B,
-			nfp: f
-		};
+		var doc = buildInnerNfpCacheDoc(A, B, f);
 		window.db.insert(doc, true);
 	}
 	

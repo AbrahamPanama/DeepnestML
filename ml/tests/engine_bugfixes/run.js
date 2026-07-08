@@ -258,6 +258,110 @@ function testPolygonFingerprintMemoization() {
 	assert.strictEqual(Object.prototype.hasOwnProperty.call(frozen, '__dnFingerprint'), false, 'frozen polygon should skip memoization');
 }
 
+function testNfpBatchPrefetchKeyParity() {
+	const names = [
+		'rotatePolygon',
+		'hashString',
+		'roundedCoordinate',
+		'polygonSignatureText',
+		'polygonFingerprint',
+		'nfpCacheKey',
+		'buildOuterNfpCacheDoc',
+		'buildInnerNfpCacheDoc',
+		'addNfpPrefetchEntry',
+		'buildNfpPrefetchEntries'
+	];
+	const ctx = loadBackgroundFunctions(names, {}, {
+		NFP_CACHE_VERSION: 3,
+		window: { nfpcache: {} }
+	});
+	const sheet = rect(0, 0, 20, 20);
+	sheet.source = 'sheet';
+	const partA = rect(0, 0, 3, 2);
+	partA.source = 'a';
+	partA.id = 'a-1';
+	partA.rotation = 90;
+	partA.children = [rect(0.5, 0.5, 1, 1)];
+	const partB = rect(0, 0, 4, 1);
+	partB.source = 'b';
+	partB.id = 'b-1';
+	partB.rotation = 180;
+
+	const entries = ctx.buildNfpPrefetchEntries([sheet], [partA, partB], {}, false);
+	const keys = entries.map((entry) => entry.key);
+	const rotatedA = ctx.rotatePolygon(partA, partA.rotation);
+	rotatedA.source = partA.source;
+	rotatedA.id = partA.id;
+	rotatedA.rotation = partA.rotation;
+	const rotatedB = ctx.rotatePolygon(partB, partB.rotation);
+	rotatedB.source = partB.source;
+	rotatedB.id = partB.id;
+	rotatedB.rotation = partB.rotation;
+
+	const prepassOuterKey = ctx.nfpCacheKey(ctx.buildOuterNfpCacheDoc(rotatedA, rotatedB, false), false);
+	const reverseOuterKey = ctx.nfpCacheKey(ctx.buildOuterNfpCacheDoc(rotatedB, rotatedA, false), false);
+	const innerKey = ctx.nfpCacheKey(ctx.buildInnerNfpCacheDoc(sheet, rotatedA), true);
+	assert.ok(keys.indexOf(prepassOuterKey) >= 0, 'prefetch should include P0 pre-pass outer key');
+	assert.ok(keys.indexOf(reverseOuterKey) >= 0, 'prefetch should include ordered reverse outer key for placeParts');
+	assert.ok(keys.indexOf(innerKey) >= 0, 'prefetch should include sheet/part inner key');
+	assert.ok(prepassOuterKey.indexOf('-nh-') >= 0, 'processHoles:false key should include no-holes marker');
+	assert.strictEqual(new Set(keys).size, keys.length, 'prefetch keys should be deduped');
+
+	ctx.window.nfpcache[prepassOuterKey] = rect(0, 0, 1, 1);
+	const entriesAfterLocalHit = ctx.buildNfpPrefetchEntries([sheet], [partA, partB], {}, false);
+	assert.strictEqual(entriesAfterLocalHit.some((entry) => entry.key === prepassOuterKey), false, 'prefetch should skip keys already in local mirror');
+}
+
+function testNfpBatchWarmStatsAndLocalMirror() {
+	const names = [
+		'clone',
+		'cloneNfp',
+		'warmLocalNfpCache',
+		'nfpBatchResponseValues',
+		'estimateNfpPayloadBytes',
+		'warmNfpCacheBatch',
+		'nfpBatchTiming'
+	];
+	const ctx = loadBackgroundFunctions(names, {}, {
+		window: { nfpcache: {}, performance: {} }
+	});
+	const outerNfp = rect(0, 0, 1, 1);
+	const innerNfp = [rect(0, 0, 2, 2)];
+	ctx.ipcRendererSafeSendSync = function (channel, keys) {
+		assert.strictEqual(channel, 'nfp-cache-find-batch-sync', 'batch warm should use batch IPC channel');
+		assert.deepStrictEqual(Array.from(keys), ['outer-key', 'inner-key', 'missing-key']);
+		return {
+			values: [outerNfp, innerNfp, null],
+			bytes: 123,
+			elapsedMs: 2
+		};
+	};
+	const stats = ctx.warmNfpCacheBatch([
+		{ key: 'outer-key', inner: false },
+		{ key: 'inner-key', inner: true },
+		{ key: 'missing-key', inner: false }
+	]);
+	assert.strictEqual(stats.eligible, 3, 'batch stats should record eligible keys');
+	assert.strictEqual(stats.requested, 3, 'batch stats should record requested keys');
+	assert.strictEqual(stats.hits, 2, 'batch stats should count hits');
+	assert.strictEqual(stats.misses, 1, 'batch stats should count misses');
+	assert.strictEqual(stats.bytes, 123, 'batch stats should use response byte count');
+	assert.strictEqual(stats.checked['missing-key'], true, 'batch stats should mark checked misses');
+	assert.ok(ctx.window.nfpcache['outer-key'], 'outer hit should warm local mirror');
+	assert.ok(ctx.window.nfpcache['inner-key'], 'inner hit should warm local mirror');
+	assert.strictEqual(ctx.window.nfpcache['missing-key'], undefined, 'miss should not warm local mirror');
+	assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.nfpBatchTiming(stats))), {
+		eligible: 3,
+		requested: 3,
+		chunks: 1,
+		hits: 2,
+		misses: 1,
+		bytes: 123,
+		elapsedMs: stats.elapsedMs,
+		capped: false
+	}, 'timing projection should omit checked map');
+}
+
 function run() {
 	testMergedLengthThreshold();
 	testMergedLengthAfterFarCollinearEdge();
@@ -269,6 +373,8 @@ function run() {
 	testSheetHoleDifferenceFailureFailsClosed();
 	testCandidateTieBreakUsesCurrentBest();
 	testPolygonFingerprintMemoization();
+	testNfpBatchPrefetchKeyParity();
+	testNfpBatchWarmStatsAndLocalMirror();
 	console.log('engine bugfix tests passed');
 }
 

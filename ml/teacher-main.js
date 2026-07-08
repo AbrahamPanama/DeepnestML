@@ -22,6 +22,7 @@ const debugLogPath = path.join(__dirname, 'teacher-main.debug.log');
 const verboseDebug = process.env.DEEPNEST_TEACHER_DEBUG === '1';
 let nativeAddon = null;
 let nativeAddonLoadError = null;
+let teacherNfpCache = {};
 
 function createWindowPreferences() {
 	return {
@@ -251,6 +252,7 @@ ipcMain.on('background-progress', function onBackgroundProgress(event, payload) 
 });
 
 ipcMain.on('background-stop', function onBackgroundStop() {
+	teacherNfpCache = {};
 	destroyBackgroundWindow();
 });
 
@@ -267,6 +269,51 @@ ipcMain.on('settings-op-sync', function onSettingsOperation(event, operation, ar
 			error: err && err.message ? err.message : String(err)
 		};
 	}
+});
+
+function estimateNfpCacheBytes(nfp) {
+	if (!nfp) {
+		return 0;
+	}
+	try {
+		return Buffer.byteLength(JSON.stringify(nfp), 'utf8');
+	}
+	catch (err) {
+		return 0;
+	}
+}
+
+ipcMain.on('nfp-cache-has-sync', function onNfpCacheHas(event, key) {
+	event.returnValue = !!(key && teacherNfpCache[key]);
+});
+
+ipcMain.on('nfp-cache-find-sync', function onNfpCacheFind(event, key) {
+	event.returnValue = key && teacherNfpCache[key] ? teacherNfpCache[key] : null;
+});
+
+ipcMain.on('nfp-cache-find-batch-sync', function onNfpCacheFindBatch(event, keys) {
+	var started = Date.now();
+	var values = [];
+	var bytes = 0;
+	if (Array.isArray(keys)) {
+		for (var i = 0; i < keys.length; i++) {
+			var value = keys[i] && teacherNfpCache[keys[i]] ? teacherNfpCache[keys[i]] : null;
+			values.push(value);
+			bytes += estimateNfpCacheBytes(value);
+		}
+	}
+	event.returnValue = {
+		values: values,
+		bytes: bytes,
+		elapsedMs: Date.now() - started
+	};
+});
+
+ipcMain.on('nfp-cache-insert', function onNfpCacheInsert(event, message) {
+	if (!message || !message.key || !message.nfp) {
+		return;
+	}
+	teacherNfpCache[message.key] = message.nfp;
 });
 
 ipcMain.on('automation-ready', function onAutomationReady() {
@@ -304,6 +351,7 @@ ipcMain.on('minkowski-calculate-nfp-sync', function onCalculateNfp(event, payloa
 
 ipcMain.on('teacher-finished', function onTeacherFinished(event, payload) {
 	debugLog('teacher-finished', JSON.stringify(payload || {}));
+	teacherNfpCache = {};
 	destroyBackgroundWindow();
 	if (teacherWindow) {
 		teacherWindow.destroy();

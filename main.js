@@ -520,9 +520,9 @@ function nfpCacheHas(key) {
 }
 
 function nfpCacheFind(key) {
-  if (!key) {
-    return null;
-  }
+	if (!key) {
+		return null;
+	}
   const manifest = loadNfpCacheManifest();
   const entry = manifest.entries[key];
   if (!entry) {
@@ -548,13 +548,39 @@ function nfpCacheFind(key) {
   }
   catch (err) {
     return null;
-  }
+	}
+}
+
+function nfpCacheFindBatch(keys) {
+	const started = Date.now();
+	const values = [];
+	let bytes = 0;
+	if (!Array.isArray(keys)) {
+		return { values: values, bytes: 0, elapsedMs: Date.now() - started };
+	}
+	for (let i = 0; i < keys.length; i++) {
+		const value = nfpCacheFind(keys[i]);
+		values.push(value);
+		if (value) {
+			try {
+				bytes += Buffer.byteLength(JSON.stringify(value), 'utf8');
+			}
+			catch (err) {
+				// Byte accounting is advisory telemetry/capping only.
+			}
+		}
+	}
+	return {
+		values: values,
+		bytes: bytes,
+		elapsedMs: Date.now() - started
+	};
 }
 
 function nfpCacheInsert(key, nfp) {
-  if (!key || !nfp) {
-    return;
-  }
+	if (!key || !nfp) {
+		return;
+	}
   const manifest = loadNfpCacheManifest();
   const dir = ensureNfpCacheDirSync();
   const file = key + '.json';
@@ -1060,17 +1086,31 @@ ipcMain.on('nfp-cache-has-sync', function (event, key) {
 });
 
 ipcMain.on('nfp-cache-find-sync', function (event, key) {
-  try {
-    event.returnValue = nfpCacheFind(key);
-  }
+	try {
+		event.returnValue = nfpCacheFind(key);
+	}
   catch (err) {
     event.returnValue = null;
-  }
+	}
+});
+
+ipcMain.on('nfp-cache-find-batch-sync', function (event, keys) {
+	try {
+		event.returnValue = nfpCacheFindBatch(keys);
+	}
+	catch (err) {
+		event.returnValue = {
+			values: Array.isArray(keys) ? keys.map(function () { return null; }) : [],
+			bytes: 0,
+			elapsedMs: 0,
+			error: err && err.message ? err.message : String(err)
+		};
+	}
 });
 
 ipcMain.on('nfp-cache-insert', function (event, message) {
-  if (!message || typeof message !== 'object') {
-    return;
+	if (!message || typeof message !== 'object') {
+		return;
   }
   nfpCacheInsert(message.key, message.nfp);
 });

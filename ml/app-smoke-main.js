@@ -607,53 +607,91 @@ function smokeNfpLoadManifest() {
 	return smokeNfpCacheManifest;
 }
 
-function smokeNfpWriteManifest() {
-	var manifestPath = path.join(smokeNfpDir(), SMOKE_NFP_MANIFEST);
-	var tmpPath = manifestPath + '.tmp';
+	function smokeNfpWriteManifest() {
+		var manifestPath = path.join(smokeNfpDir(), SMOKE_NFP_MANIFEST);
+		var tmpPath = manifestPath + '.tmp';
 	try {
 		fs.writeFileSync(tmpPath, JSON.stringify(smokeNfpCacheManifest));
 		fs.renameSync(tmpPath, manifestPath);
 	}
-	catch (err) {}
-}
+		catch (err) {}
+	}
 
-ipcMain.on('nfp-cache-has-sync', function (event, key) {
-	var manifest = smokeNfpLoadManifest();
-	var entry = key && manifest.entries[key];
-	event.returnValue = !!(entry && fs.existsSync(path.join(smokeNfpDir(), entry.file)));
-});
-
-ipcMain.on('nfp-cache-find-sync', function (event, key) {
-	if (!key) {
-		event.returnValue = null;
-		return;
-	}
-	var manifest = smokeNfpLoadManifest();
-	var entry = manifest.entries[key];
-	if (!entry) {
-		event.returnValue = null;
-		return;
-	}
-	var filePath = path.join(smokeNfpDir(), entry.file);
-	if (!fs.existsSync(filePath)) {
-		delete manifest.entries[key];
-		smokeNfpWriteManifest();
-		event.returnValue = null;
-		return;
-	}
-	try {
-		var payload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-		if (!payload || payload.version !== SMOKE_NFP_VERSION || payload.key !== key || !payload.nfp) {
-			event.returnValue = null;
-			return;
+	function smokeNfpFind(key) {
+		if (!key) {
+			return null;
 		}
-		entry.lastAccess = Date.now();
-		event.returnValue = payload.nfp;
+		var manifest = smokeNfpLoadManifest();
+		var entry = manifest.entries[key];
+		if (!entry) {
+			return null;
+		}
+		var filePath = path.join(smokeNfpDir(), entry.file);
+		if (!fs.existsSync(filePath)) {
+			delete manifest.entries[key];
+			smokeNfpWriteManifest();
+			return null;
+		}
+		try {
+			var payload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+			if (!payload || payload.version !== SMOKE_NFP_VERSION || payload.key !== key || !payload.nfp) {
+				return null;
+			}
+			entry.lastAccess = Date.now();
+			return payload.nfp;
+		}
+		catch (err) {
+			return null;
+		}
 	}
-	catch (err) {
-		event.returnValue = null;
+
+	function smokeNfpFindBatch(keys) {
+		var started = Date.now();
+		var values = [];
+		var bytes = 0;
+		if (!Array.isArray(keys)) {
+			return { values: values, bytes: 0, elapsedMs: Date.now() - started };
+		}
+		for (var i = 0; i < keys.length; i++) {
+			var value = smokeNfpFind(keys[i]);
+			values.push(value);
+			if (value) {
+				try {
+					bytes += Buffer.byteLength(JSON.stringify(value), 'utf8');
+				}
+				catch (err) {}
+			}
+		}
+		return {
+			values: values,
+			bytes: bytes,
+			elapsedMs: Date.now() - started
+		};
 	}
-});
+
+	ipcMain.on('nfp-cache-has-sync', function (event, key) {
+		var manifest = smokeNfpLoadManifest();
+		var entry = key && manifest.entries[key];
+		event.returnValue = !!(entry && fs.existsSync(path.join(smokeNfpDir(), entry.file)));
+	});
+
+	ipcMain.on('nfp-cache-find-sync', function (event, key) {
+		event.returnValue = smokeNfpFind(key);
+	});
+
+	ipcMain.on('nfp-cache-find-batch-sync', function (event, keys) {
+		try {
+			event.returnValue = smokeNfpFindBatch(keys);
+		}
+		catch (err) {
+			event.returnValue = {
+				values: Array.isArray(keys) ? keys.map(function () { return null; }) : [],
+				bytes: 0,
+				elapsedMs: 0,
+				error: err && err.message ? err.message : String(err)
+			};
+		}
+	});
 
 ipcMain.on('nfp-cache-insert', function (event, message) {
 	if (!message || !message.key || !message.nfp) {
