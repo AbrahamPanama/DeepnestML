@@ -96,7 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | In progress: S3 GA dispatch token mode completed; S4 local-refinement verification next | 2026-07-08 |
+| Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | In progress: S4 local-refinement token path verified; S5 cleanup/failure telemetry/benchmark next | 2026-07-08 |
 | Codex | PERF-P6 batched NFP warm (pre-pass first) | `main/background.js`, `main.js`, `ml/app-smoke-main.js`, `ml/teacher-main.js`, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: batch find IPC + pre-pass warm landed; telemetry proves path; equivalence/smoke/teacher/benchmark green | 2026-07-08 |
 | Codex | PERF-P3 hull candidate hoists | `main/background.js`, `ml/scripts/run_smoke_battery.sh`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: candidate/sheet hull reuse landed; `svg-hull` in default smoke battery; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P1 fingerprint memoization | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: non-enumerable fingerprint memo landed; targeted tests + equivalence/smoke/benchmark green | 2026-07-08 |
@@ -144,6 +144,13 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P5 S4 local-refinement token verification (Codex)
+
+- No additional code was needed for S4: `requestLocalRefinementForBest` copies the active worker payload, and S3 already made active payloads token-based.
+- Verification passed with the smart local-refinement fixture: `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p5-s4 bash ml/scripts/run_smoke_battery.sh svg-hull-settle-floaters`.
+- Report proof: `/tmp/deepnest-smoke-perf-p5-s4/svg-hull-settle-floaters/report.json` has `details.localRefinement.ran: true`, `movesAccepted: 7`, `pending: false`, and `details.timing.geometryPath: "token"` on the final refined nest.
+- Next slice: P5 S5 cleanup/failure telemetry, benchmark dispatch proof, full battery, then close P5.
 
 ### 2026-07-08 - PERF-P5 S3 GA dispatch token migration (Codex)
 
