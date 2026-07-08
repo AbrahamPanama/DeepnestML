@@ -1,0 +1,17 @@
+{
+  "name": "svg-gravity-processholes-off",
+  "description": "SVG import with hole-bearing parts, gravity nesting with hole processing disabled, SVG export.",
+  "input": "ml/examples/app-smoke-holes.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "rotations": 1
+  }
+}

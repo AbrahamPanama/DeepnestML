@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-06-11 by Codex): _dirty: Local Refinement v3 WP-R0/WP-R0.1/WP-R0.2/WP-R0.3 plus promoted relocate/swap and S1 settle foundations are implemented locally (`main/util/separation.js`, `main/background.html`, `main/background.js`, `main/index.html`, `main/deepnest.js`, `ml/tests/separation/`, `ml/tests/engine_equivalence/`, docs updates). Benchmark refinement flags are added in `ml/cli/run_benchmark.js`; bounded efficacy result JSONs are untracked under `ml/benchmark/results/`. S1 is opt-in and did not pass the full substantive/visual gate because ESICUP had no detected floaters and the real laurel visual fixture is not present._
+State (verified 2026-07-07 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after PERF-P0; committed code/docs are expected clean after the PERF-P0 cache-key commit. Exact `perf-p0-baseline`/`perf-p0-after` benchmark attempts are also untracked there and failed at `shirts` with `no_nest_before_time_budget`._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,7 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | PERF-P0 baseline freeze + pre-pass cache-key fix | `package-lock.json`, `main/background.js`, smoke/equivalence coverage, `AGENT_COLLABORATION.md` | In progress | 2026-07-07 |
+| Codex | PERF-P0 baseline freeze + pre-pass cache-key fix | `package-lock.json`, `main/background.js`, `main/deepnest.js`, smoke/equivalence coverage, `AGENT_COLLABORATION.md` | Completed: baseline frozen; processHoles key/telemetry gate passed; exact benchmark command still fails on `shirts` before first nest | 2026-07-07 |
 | Claude-Code | LRv3-S1 completion: convexhull support + candidate/legality fixes + fixture gates | `main/background.js` (smart engine), gate scenario runs | Completed: machinery landed and verified (battery green); capture gate not yet demonstrated — see plan §1.9.4 and handoff note | 2026-06-11 |
 | Codex | LRv3-S1 legality predicate + settle pass | `main/util/separation.js`, `main/background.js`, `ml/tests/separation/`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; ESICUP gate failed/no floaters; visual laurel fixture still needed | 2026-06-11 |
 | Codex | LRv3-R3-promoted relocate + swap | `main/background.js`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; substantive bounded gate failed; WP-R1 remains blocked | 2026-06-11 |
@@ -139,6 +139,30 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-07 - PERF-P0 baseline freeze + processHoles pre-pass cache-key fix (Codex)
+
+- Baseline freeze landed first as commit `05c0ce9` (`[codex] PERF-P0: freeze 0.7.5 baseline`): package-lock reconciled to `0.7.5`, current 0.7.4/0.7.5 legality/NFP-normalization work committed separately from the P0 cache-key edit, and plan docs committed.
+- Implemented the P0 cache-key fix: `main/background.js` now includes `processHoles` in pair pre-pass `db.has` docs and post-process `window.db.insert` docs, skips child-hole NFP accounting when `processHoles === false`, and attaches `pairsCacheHits`/`pairsMissing` telemetry to the background response and smoke report.
+- Found and fixed a related active-path gap: `main/deepnest.js` had no `processHoles` engine config field/setter, so renderer settings and smoke overrides were silently dropped before reaching the worker. Added the default and boolean setter.
+- Added deterministic equivalence coverage and fixtures: `svg-hull`, `svg-gravity-merge`, `svg-gravity-processholes-off` (hole-bearing fixture), and `svg-gravity-simplify`; regenerated `ml/tests/engine_equivalence/golden.json`. Updated boot-check title invariant to `0.7.5`.
+- P0 cache proof passed with `/tmp/deepnest-perf-p0-processholes`: run1 `processHoles:false`, `pairsCacheHits:0`, `pairsMissing:1`; run2 same digest, `pairsCacheHits:1`, `pairsMissing:0`.
+- Verification passed:
+  - `node --check main/background.js`
+  - `node --check main/deepnest.js`
+  - `node --check ml/tests/engine_equivalence/run.js`
+  - `node --check ml/boot-check-main.js`
+  - `node ml/tests/engine_bugfixes/run.js`
+  - `node ml/tests/separation/run.js`
+  - `node ml/tests/engine_equivalence/run.js`
+  - `bash ml/scripts/run_boot_check.sh`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p0 bash ml/scripts/run_smoke_battery.sh`
+  - `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p0-extra bash ml/scripts/run_smoke_battery.sh svg-hull svg-gravity-merge svg-gravity-processholes-off svg-gravity-simplify`
+- Benchmark note: the exact command from §8, `npm run ml:nest-benchmark -- --label perf-p0-baseline --instances albano,shirts,shapes0 --time-budget-sec 10 --runs 2`, was attempted twice at the frozen baseline and failed both times at `shirts/run-01` with `no_nest_before_time_budget`. The same command after P0 as `perf-p0-after` failed identically. Artifacts:
+  - `ml/artifacts/nest-benchmark/20260707T234942Z-perf-p0-baseline/shirts/run-01/report.json`
+  - `ml/artifacts/nest-benchmark/20260707T235047Z-perf-p0-baseline/shirts/run-01/report.json`
+  - `ml/artifacts/nest-benchmark/20260708T000018Z-perf-p0-after/shirts/run-01/report.json`
+- Do not start PERF-P1/P2 until the team decides whether to change the benchmark corpus/time gate for `shirts` or accept a partial benchmark protocol for PERF work.
 
 ### 2026-07-06 - 0.7.5: final legality gate for the slide local-refinement engine (Claude-Code)
 

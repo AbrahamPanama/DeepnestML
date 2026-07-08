@@ -14,6 +14,22 @@
       "placementsDigest": "d8814e87ece2d0a4bff45fa76e7473170a8dfe51",
       "fingerprint": "46e328dd06109dc4b568c380da84a69a3e50e991"
     },
+    "svg-hull": {
+      "placementsDigest": "7f61c317289450a71f979115780ecc40169c9ba8",
+      "fingerprint": "4dc8b2d9a413a7d3ca71ee843cdb9d8f21d2c668"
+    },
+    "svg-gravity-merge": {
+      "placementsDigest": "7f61c317289450a71f979115780ecc40169c9ba8",
+      "fingerprint": "54d6263c342fb89225f094541607ff8e7a4b1cbd"
+    },
+    "svg-gravity-processholes-off": {
+      "placementsDigest": "deb1df9e465f25d50045608c6022358f483583dc",
+      "fingerprint": "3ec59ca2be5ef53784f5150af230f8c346811e30"
+    },
+    "svg-gravity-simplify": {
+      "placementsDigest": "7f61c317289450a71f979115780ecc40169c9ba8",
+      "fingerprint": "bf61d2b2a9caf6ac96a8117d753fff135b0f9d13"
+    },
     "svg-steprepeat": {
       "placementsDigest": "169ee08bbe0b5c29a57f347a807dd7af4e8dcd85",
       "fingerprint": "43f1bfeda144c22a9c4d7671d41bb13f0eb32560"

@@ -1,0 +1,15 @@
+{
+  "name": "svg-gravity-simplify",
+  "description": "SVG import, gravity nesting with simplify enabled, SVG export.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "gravity",
+    "simplify": true,
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 2
+  }
+}

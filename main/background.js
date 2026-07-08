@@ -334,6 +334,9 @@ window.onload = function () {
 		}
 		
 		// preprocess
+		var processHoles = !data.config || data.config.processHoles !== false;
+		var pairsCacheHits = 0;
+		var pairsMissing = 0;
 		var pairs = [];
 		var inpairs = function(key, p){
 			for(var i=0; i<p.length; i++){
@@ -361,13 +364,20 @@ window.onload = function () {
 					Arotation: A.rotation,
 					Brotation: B.rotation,
 					Apolygon: rotatePolygon(A, A.rotation),
-					Bpolygon: rotatePolygon(B, B.rotation)
+					Bpolygon: rotatePolygon(B, B.rotation),
+					processHoles: processHoles
 				}
-				if(!inpairs(key, pairs) && !db.has(doc)){
-					pairs.push(key);
+				if(!inpairs(key, pairs)){
+					if(db.has(doc)){
+						pairsCacheHits++;
+					}
+					else{
+						pairs.push(key);
+					}
 				}
 			}
 		}
+		pairsMissing = pairs.length;
 		
 		console.log('pairs: ',pairs.length);
 		  
@@ -466,8 +476,14 @@ window.onload = function () {
 			}
 			console.log('nfp cached:', c);
 		  	var placement = placeParts(data.sheets, parts, data.config, index);
-	
+
 			placement.index = data.index;
+			placement.pairsCacheHits = pairsCacheHits;
+			placement.pairsMissing = pairsMissing;
+			placement.timing = placement.timing || {};
+			placement.timing.pairsCacheHits = pairsCacheHits;
+			placement.timing.pairsMissing = pairsMissing;
+			placement.timing.processHoles = processHoles;
 			if(data.postProcessRefinement){
 				placement.postProcessRefinement = true;
 				placement.refinementToken = data.refinementToken;
@@ -515,7 +531,7 @@ window.onload = function () {
 					var Achildren = [];
 					
 					var j;
-					if(A.children){
+					if(processHoles && A.children){
 						for(j=0; j<A.children.length; j++){
 							Achildren.push(rotatePolygon(A.children[j], processed[i].Arotation));
 						}
@@ -546,6 +562,7 @@ window.onload = function () {
 						Brotation: processed[i].Brotation,
 						Apolygon: rotatePolygon(A, processed[i].Arotation),
 						Bpolygon: rotatePolygon(B, processed[i].Brotation),
+						processHoles: processHoles,
 						nfp: processed[i].nfp
 					};
 					window.db.insert(doc);

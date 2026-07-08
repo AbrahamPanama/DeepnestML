@@ -1,0 +1,14 @@
+{
+  "name": "svg-hull",
+  "description": "SVG import, convex-hull nesting, SVG export.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "convexhull",
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 2
+  }
+}

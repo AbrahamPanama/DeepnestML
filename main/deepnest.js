@@ -41,6 +41,7 @@
 			localRefinementBudgetMs: 1500,
 			localRefinementRotations: false,
 			localRefinementMaxColdAnglesPerPart: 3,
+			processHoles: true,
 			mergeLines: true,
 			timeRatio: 0.5,
 			scale: 72,
@@ -777,12 +778,16 @@
 				config.localRefinementRotations = !!c.localRefinementRotations;
 			}
 
-			var maxColdAngles = Number(c.localRefinementMaxColdAnglesPerPart);
-			if(typeof maxColdAngles == 'number' && !isNaN(maxColdAngles) && isFinite(maxColdAngles) && maxColdAngles >= 0){
-				config.localRefinementMaxColdAnglesPerPart = Math.min(Math.floor(maxColdAngles), 12);
-			}
-			
-			if(c.mergeLines === true || c.mergeLines === false){
+				var maxColdAngles = Number(c.localRefinementMaxColdAnglesPerPart);
+				if(typeof maxColdAngles == 'number' && !isNaN(maxColdAngles) && isFinite(maxColdAngles) && maxColdAngles >= 0){
+					config.localRefinementMaxColdAnglesPerPart = Math.min(Math.floor(maxColdAngles), 12);
+				}
+
+				if(c.processHoles === true || c.processHoles === false){
+					config.processHoles = !!c.processHoles;
+				}
+
+				if(c.mergeLines === true || c.mergeLines === false){
 				config.mergeLines = !!c.mergeLines;
 			}
 			

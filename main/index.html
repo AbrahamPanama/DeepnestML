@@ -3358,6 +3358,9 @@
 							usedSheetCount: selectedNest && selectedNest.placements ? selectedNest.placements.length : 0,
 							fitness: selectedNest ? selectedNest.fitness : null,
 							fitnessBreakdown: selectedNest && selectedNest.fitnessBreakdown ? selectedNest.fitnessBreakdown : null,
+							timing: selectedNest && selectedNest.timing ? selectedNest.timing : null,
+							pairsCacheHits: selectedNest && typeof selectedNest.pairsCacheHits !== 'undefined' ? selectedNest.pairsCacheHits : null,
+							pairsMissing: selectedNest && typeof selectedNest.pairsMissing !== 'undefined' ? selectedNest.pairsMissing : null,
 							localRefinement: localRefinement,
 							localRefinementSummary: localRefinement ? {
 								enabled: !!localRefinement.enabled,

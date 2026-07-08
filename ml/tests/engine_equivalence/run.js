@@ -12,6 +12,10 @@ const DEFAULT_SCENARIOS = [
 	'svg-gravity',
 	'svg-gravity-improved-scoring',
 	'svg-gravity-sheet-margin-outline',
+	'svg-hull',
+	'svg-gravity-merge',
+	'svg-gravity-processholes-off',
+	'svg-gravity-simplify',
 	'svg-steprepeat',
 	'svg-export-pdf'
 ];

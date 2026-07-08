@@ -270,7 +270,7 @@ function evaluateInvariants(snapshot) {
 	}
 
 	// Core boot invariants
-	assert('title matches 0.7.3', snapshot.title === 'Deepnest ML 0.7.3');
+	assert('title matches 0.7.5', snapshot.title === 'Deepnest ML 0.7.5');
 	assert('DeepNest global present', snapshot.hasDeepNest);
 	assert('DeepNestAutomation hook present', snapshot.hasAutomation);
 	assert('DeepNestAutomation exposes runAppSmokeTest',

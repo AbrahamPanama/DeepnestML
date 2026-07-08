@@ -1,0 +1,14 @@
+{
+  "name": "svg-gravity-merge",
+  "description": "SVG import, gravity nesting with common-line merge scoring, SVG export.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": true,
+    "populationSize": 8,
+    "threads": 2
+  }
+}

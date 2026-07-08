@@ -1,6 +1,6 @@
 # Performance Plan — Deepnest ML engine hot paths
 
-Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; not started.
+Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P1+ not started.
 Author: Claude-Code, 2026-06-12. Review findings verified against live code the same day;
 all accepted except one mechanism correction (§9a — digest determinism), noted inline.
 
@@ -42,6 +42,11 @@ number from the benchmark harness (§8), not a claim.
 ---
 
 ## 0.5 PERF-P0 — Baseline freeze + NFP pre-pass cache-key correctness (PREREQUISITE)
+
+Implementation status 2026-07-07: landed by Codex. Baseline freeze commit: `05c0ce9`.
+The processHoles cache-key/telemetry gate passed; the exact §8 benchmark command still
+fails at `shirts/run-01` before first nest at the 10-second budget, both before and after P0
+(see `AGENT_COLLABORATION.md` handoff for artifact paths).
 
 Do this before ANY perf WP. Verified state (2026-06-12): `package.json` and the app title
 are `0.7.5`, `package-lock.json` is still `0.7.3`, the tree has ~32 dirty entries, and the
