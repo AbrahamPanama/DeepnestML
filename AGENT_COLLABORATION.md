@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-08 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after the PERF-P2 commit; code/docs are expected clean after `[codex] PERF-P2: remove hot-loop logs and add timing telemetry`. Generated benchmark artifacts remain untracked by convention._
+State (verified 2026-07-08 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after the PERF-P1 commit; code/docs are expected clean after `[codex] PERF-P1: memoize polygon fingerprints`. Generated benchmark artifacts remain untracked by convention._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | PERF-P1 fingerprint memoization | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: non-enumerable fingerprint memo landed; targeted tests + equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P2 hot-loop logging + timing telemetry | `main/background.js`, `ml/cli/run_benchmark.js`, smoke/equivalence/benchmark reports, `AGENT_COLLABORATION.md` | Completed: hot-loop logs removed; placement timing persisted in smoke + benchmark JSONs; equivalence gate green | 2026-07-08 |
 | Codex | PERF-P0 baseline freeze + pre-pass cache-key fix | `package-lock.json`, `main/background.js`, `main/deepnest.js`, smoke/equivalence coverage, `AGENT_COLLABORATION.md` | Completed: baseline frozen; processHoles key/telemetry gate passed; exact benchmark command still fails on `shirts` before first nest | 2026-07-07 |
 | Claude-Code | LRv3-S1 completion: convexhull support + candidate/legality fixes + fixture gates | `main/background.js` (smart engine), gate scenario runs | Completed: machinery landed and verified (battery green); capture gate not yet demonstrated — see plan §1.9.4 and handoff note | 2026-06-11 |
@@ -140,6 +141,17 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P1 fingerprint memoization (Codex)
+
+- Implemented `PERF-P1`: `polygonFingerprint` now stores the computed hash on the polygon array as non-enumerable configurable `__dnFingerprint`, with frozen/sealed inputs falling back to recomputation.
+- Added targeted coverage in `ml/tests/engine_bugfixes/run.js`: same-object memo reuse (second call would throw if it missed the memo), structurally equal distinct polygons matching, JSON/structured-clone-style copies not carrying `__dnFingerprint`, recomputation after JSON copy, and frozen polygon fallback.
+- Safety audit: `polygonFingerprint` is only called by `nfpCacheKey`; `nfpCacheKey` is only used by `window.db.has/find/insert`; key inputs are `Apolygon/Bpolygon` or `Ashape/Bshape`. Shifted NFP results are cloned and mutated after lookup, not fingerprinted. Placement and refinement rotation probes create fresh copied polygons before keying.
+- Benchmark before reference: `ml/benchmark/results/20260708T030350Z-perf-p2-after.json` (P2 committed state). P1 after artifact: `ml/benchmark/results/20260708T143709Z-perf-p1-after.json`.
+- Benchmark medians (P2 before → P1 after): albano `0.7813197112640429` → `0.7887593307035137`; blaz1 `0.24653888520188993` → `0.26140644229159055`; shapes0 unchanged at `0.16120748980179334`. Run-level GA output varies stochastically; deterministic `engine_equivalence` is the output-identity gate and passed.
+- P1 after timing samples: albano `placementMs` 1078/451 ms, blaz1 2038/938 ms, shapes0 2791/789 ms. The first run on a cold-ish cache is noisy; cache-hit telemetry remains present.
+- Verification passed: `node --check main/background.js`; `node --check ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_bugfixes/run.js`; `git diff --check`; `node ml/tests/engine_equivalence/run.js`; `bash ml/scripts/run_boot_check.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p1 bash ml/scripts/run_smoke_battery.sh`; amended `npm run ml:nest-benchmark -- --label perf-p1-after --instances albano,blaz1,shapes0 --time-budget-sec 10 --runs 2`.
+- Next claim per plan: `PERF-P3 hull candidate hoists`.
 
 ### 2026-07-08 - PERF-P2 hot-loop logging + timing telemetry (Codex)
 

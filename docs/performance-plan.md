@@ -1,6 +1,6 @@
 # Performance Plan — Deepnest ML engine hot paths
 
-Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P2 implemented 2026-07-08; PERF-P1+ not started.
+Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P2/P1 implemented 2026-07-08; PERF-P3+ not started.
 Author: Claude-Code, 2026-06-12. Review findings verified against live code the same day;
 all accepted except one mechanism correction (§9a — digest determinism), noted inline.
 
@@ -120,6 +120,11 @@ trip of a memoized polygon contains no `__dnFingerprint`; structured-clone-like 
 (`JSON.parse(JSON.stringify(p))`) re-computes and matches.
 
 **Expected**: 5–15% of placement CPU on part-heavy jobs (more with many placed parts).
+
+Implementation status 2026-07-08: landed by Codex. `polygonFingerprint`
+now memoizes via a non-enumerable `__dnFingerprint` property; the engine
+bugfix harness verifies memo reuse, distinct-object equality, and JSON copy
+behavior.
 
 ---
 

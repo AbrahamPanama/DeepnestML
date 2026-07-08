@@ -223,6 +223,41 @@ function testCandidateTieBreakUsesCurrentBest() {
 	assert.strictEqual(ctx.candidatePlacementIsBetter(9, 6, 3, 9, 8, 0), false, 'worse x should not beat current best');
 }
 
+function testPolygonFingerprintMemoization() {
+	const names = ['hashString', 'roundedCoordinate', 'polygonSignatureText', 'polygonFingerprint'];
+	const ctx = loadBackgroundFunctions(names);
+	const polygon = rect(0, 0, 4, 2);
+	polygon.children = [rect(1, 0.5, 1, 1)];
+	const first = ctx.polygonFingerprint(polygon);
+	const descriptor = Object.getOwnPropertyDescriptor(polygon, '__dnFingerprint');
+	assert.ok(descriptor, 'fingerprint should be memoized on polygon');
+	assert.strictEqual(descriptor.value, first, 'memoized fingerprint should match return value');
+	assert.strictEqual(descriptor.enumerable, false, 'memoized fingerprint must be non-enumerable');
+	assert.strictEqual(descriptor.configurable, true, 'memoized fingerprint should be configurable');
+
+	ctx.hashString = function () {
+		throw new Error('second fingerprint should use memo');
+	};
+	assert.strictEqual(ctx.polygonFingerprint(polygon), first, 'same polygon should return memoized fingerprint');
+
+	const ctx2 = loadBackgroundFunctions(names);
+	const distinctA = rect(0, 0, 4, 2);
+	const distinctB = rect(0, 0, 4, 2);
+	assert.notStrictEqual(distinctA, distinctB, 'test setup should use distinct polygon objects');
+	assert.strictEqual(ctx2.polygonFingerprint(distinctA), ctx2.polygonFingerprint(distinctB), 'structurally equal polygons should fingerprint equally');
+
+	const serialized = JSON.stringify(distinctA);
+	assert.strictEqual(serialized.indexOf('__dnFingerprint'), -1, 'JSON serialization should not include fingerprint memo');
+	const copy = JSON.parse(serialized);
+	assert.strictEqual(Object.prototype.hasOwnProperty.call(copy, '__dnFingerprint'), false, 'structured-clone-like copy should not carry memo');
+	assert.strictEqual(ctx2.polygonFingerprint(copy), ctx2.polygonFingerprint(distinctA), 'structured-clone-like copy should recompute matching fingerprint');
+
+	const frozen = rect(0, 0, 2, 2);
+	Object.freeze(frozen);
+	assert.strictEqual(typeof ctx2.polygonFingerprint(frozen), 'string', 'frozen polygon should still fingerprint');
+	assert.strictEqual(Object.prototype.hasOwnProperty.call(frozen, '__dnFingerprint'), false, 'frozen polygon should skip memoization');
+}
+
 function run() {
 	testMergedLengthThreshold();
 	testMergedLengthAfterFarCollinearEdge();
@@ -233,6 +268,7 @@ function run() {
 	testSheetHoleFailsClosed();
 	testSheetHoleDifferenceFailureFailsClosed();
 	testCandidateTieBreakUsesCurrentBest();
+	testPolygonFingerprintMemoization();
 	console.log('engine bugfix tests passed');
 }
 

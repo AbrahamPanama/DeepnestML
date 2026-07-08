@@ -169,7 +169,23 @@ function polygonSignatureText(polygon){
 }
 
 function polygonFingerprint(polygon){
-	return hashString(polygonSignatureText(polygon));
+	if(polygon && polygon.__dnFingerprint){
+		return polygon.__dnFingerprint;
+	}
+	var fp = hashString(polygonSignatureText(polygon));
+	if(polygon && typeof polygon === 'object'){
+		try {
+			Object.defineProperty(polygon, '__dnFingerprint', {
+				value: fp,
+				enumerable: false,
+				configurable: true
+			});
+		}
+		catch(e){
+			// Frozen/sealed inputs still get a correct fingerprint; they just skip memoization.
+		}
+	}
+	return fp;
 }
 
 function nfpCacheKey(obj, inner){
