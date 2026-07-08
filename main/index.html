@@ -4849,9 +4849,9 @@
 								<input type="checkbox" data-config="localRefinement" /> <span class="radiolabel">Jiggle placed parts after nesting</span>
 							</dd>
 
-							<dt class="steprepeat-disabled">Fine rotation</dt>
+							<dt class="steprepeat-disabled">Fine rotation snugging</dt>
 							<dd class="steprepeat-disabled">
-								<input type="checkbox" data-config="localRefinementFineRotation" /> <span class="radiolabel">Snug final angles after refinement</span>
+								<input type="checkbox" data-config="localRefinementFineRotation" /> <span class="radiolabel">Smart local refinement, merge lines off</span>
 							</dd>
 
 							<dt class="steprepeat-disabled">Refinement engine</dt>
@@ -5325,6 +5325,11 @@
 				<div class="config_explain" id="explain_localRefinement">
 					<h1>Local refinement</h1>
 					After a normal nest is generated, Deepnest can run a post-process refinement pass on each sheet. The classic slide engine tries legal translation nudges; the shrink-separate engine lightly compresses a rectangular layout, repairs overlaps with NFP-based separation, and keeps only legal score improvements. This is experimental and disabled by default.
+				</div>
+
+				<div class="config_explain" id="explain_localRefinementFineRotation">
+					<h1>Fine rotation snugging</h1>
+					After Smart local refinement finishes, Deepnest can try tiny final angle changes using exact overlap checks only. It is disabled by default and skips automatically while merge-lines is enabled.
 				</div>
 
 				<div class="config_explain" id="explain_processHoles">
