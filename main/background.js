@@ -4775,6 +4775,7 @@ function placeParts(sheets, parts, config, nestindex){
 		var sheet = sheets.shift();
 		var sheetarea = Math.abs(GeometryUtil.polygonArea(sheet));
 		var sheetboundsForScoring = config.improvedPlacementScoring === true ? GeometryUtil.getPolygonBounds(sheet) : null;
+		var sheetHull = config.placementType == 'gravity' || config.placementType == 'box' ? null : getHull(sheet);
 		totalsheetarea += sheetarea;
 		
 		if(!useFitnessV2){
@@ -5016,15 +5017,15 @@ function placeParts(sheets, parts, config, nestindex){
 					else{
 						// must be convex hull
 						var localpoints = clone(allpoints);
-						
 						for(m=0; m<part.length; m++){
 							localpoints.push({x: part[m].x+shiftvector.x, y:part[m].y+shiftvector.y});
 						}
 						
-						area = Math.abs(GeometryUtil.polygonArea(getHull(localpoints)));
+						var candidateHull = getHull(localpoints);
+						area = Math.abs(GeometryUtil.polygonArea(candidateHull));
 						candidateBounds = GeometryUtil.getPolygonBounds(localpoints);
-						shiftvector.hull = getHull(localpoints);
-						shiftvector.hullsheet = getHull(sheet);
+						shiftvector.hull = candidateHull;
+						shiftvector.hullsheet = sheetHull;
 					}
 					
 					//console.timeEnd('evalbounds');

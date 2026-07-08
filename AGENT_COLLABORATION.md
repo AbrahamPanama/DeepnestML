@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-08 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after the PERF-P1 commit; code/docs are expected clean after `[codex] PERF-P1: memoize polygon fingerprints`. Generated benchmark artifacts remain untracked by convention._
+State (verified 2026-07-08 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after the PERF-P3 commit; code/docs are expected clean after `[codex] PERF-P3: hoist convex hull candidate work`. Generated benchmark artifacts remain untracked by convention._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | PERF-P3 hull candidate hoists | `main/background.js`, `ml/scripts/run_smoke_battery.sh`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: candidate/sheet hull reuse landed; `svg-hull` in default smoke battery; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P1 fingerprint memoization | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: non-enumerable fingerprint memo landed; targeted tests + equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P2 hot-loop logging + timing telemetry | `main/background.js`, `ml/cli/run_benchmark.js`, smoke/equivalence/benchmark reports, `AGENT_COLLABORATION.md` | Completed: hot-loop logs removed; placement timing persisted in smoke + benchmark JSONs; equivalence gate green | 2026-07-08 |
 | Codex | PERF-P0 baseline freeze + pre-pass cache-key fix | `package-lock.json`, `main/background.js`, `main/deepnest.js`, smoke/equivalence coverage, `AGENT_COLLABORATION.md` | Completed: baseline frozen; processHoles key/telemetry gate passed; exact benchmark command still fails on `shirts` before first nest | 2026-07-07 |
@@ -141,6 +142,17 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P3 hull candidate hoists (Codex)
+
+- Implemented `PERF-P3`: in convex-hull placement mode, each candidate now computes `candidateHull = getHull(localpoints)` once and reuses it for both the area score and `shiftvector.hull`; each sheet computes `sheetHull = getHull(sheet)` once and reuses it for `shiftvector.hullsheet`.
+- Added `svg-hull` to the default smoke battery. The deterministic engine equivalence harness already included `svg-hull`, so no golden regeneration was needed.
+- Swarm audit: explorer confirmed no active consumer mutates `position.hull` or `position.hullsheet`; they are stored in nest results but display/export/smoke/benchmark/teacher canonicalization ignore or treat them read-only. Sharing one `sheetHull` array per sheet is safe under current consumers.
+- Direct hull signal: `/tmp/deepnest-smoke-perf-p3/svg-hull/report.json` completed with `timing.placementMs: 234`, `pairsMissing: 3`, `parts: 3`, digest `234688e7a64641a63937087c4f4edd0aa2fc625b`.
+- Benchmark before reference: `ml/benchmark/results/20260708T143709Z-perf-p1-after.json`. P3 after artifact: `ml/benchmark/results/20260708T144732Z-perf-p3-after.json`. The standard benchmark remains gravity-mode broad regression evidence, not a direct hull-hoist measurement.
+- Benchmark medians (P1 before → P3 after): albano `0.7887593307035137` → `0.7901515158895724`; blaz1 `0.26140644229159055` → `0.25914372861195734`; shapes0 unchanged at `0.16120748980179334`. Run-level GA output varies stochastically; deterministic `engine_equivalence` is the output-identity gate and passed.
+- Verification passed: `node --check main/background.js`; `bash -n ml/scripts/run_smoke_battery.sh`; `git diff --check`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/separation/run.js`; `node ml/tests/engine_equivalence/run.js`; `bash ml/scripts/run_boot_check.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p3 bash ml/scripts/run_smoke_battery.sh`; amended `npm run ml:nest-benchmark -- --label perf-p3-after --instances albano,blaz1,shapes0 --time-budget-sec 10 --runs 2`.
+- Next claim per plan: `PERF-P6 batched NFP warm (pre-pass first)`.
 
 ### 2026-07-08 - PERF-P1 fingerprint memoization (Codex)
 

@@ -1,6 +1,6 @@
 # Performance Plan — Deepnest ML engine hot paths
 
-Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P2/P1 implemented 2026-07-08; PERF-P3+ not started.
+Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P2/P1/P3 implemented 2026-07-08; PERF-P6+ not started.
 Author: Claude-Code, 2026-06-12. Review findings verified against live code the same day;
 all accepted except one mechanism correction (§9a — digest determinism), noted inline.
 
@@ -182,6 +182,9 @@ add to `ml/scripts/run_smoke_battery.sh` and regenerate the equivalence golden w
 
 **Expected**: ~3× cheaper hull-mode candidate scoring (hull is the dominant per-candidate
 cost in that mode).
+
+Implementation status 2026-07-08: landed by Codex. `svg-hull` already existed in the
+equivalence harness; the default smoke battery now includes it too.
 
 ---
 
