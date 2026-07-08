@@ -5,10 +5,12 @@ const electronSettings = require('electron-settings');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const nestGeometryBrokerModule = require('../main/nest-geometry-broker');
 
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const ipcMain = electron.ipcMain;
+const nestGeometryBroker = nestGeometryBrokerModule.createNestGeometryBroker(2);
 
 let backgroundWindow = null;
 let teacherWindow = null;
@@ -239,6 +241,14 @@ ipcMain.on('background-start', function onBackgroundStart(event, payload) {
 	backgroundWindow.webContents.send('background-start', payload);
 });
 
+ipcMain.on('nest-geometry-set', function onNestGeometrySet(event, geometry) {
+	nestGeometryBroker.set(geometry);
+});
+
+ipcMain.on('nest-geometry-get-sync', function onNestGeometryGet(event, token) {
+	event.returnValue = nestGeometryBroker.get(token);
+});
+
 ipcMain.on('background-response', function onBackgroundResponse(event, payload) {
 	if (teacherWindow) {
 		teacherWindow.webContents.send('background-response', payload);
@@ -253,6 +263,7 @@ ipcMain.on('background-progress', function onBackgroundProgress(event, payload) 
 
 ipcMain.on('background-stop', function onBackgroundStop() {
 	teacherNfpCache = {};
+	nestGeometryBroker.clear();
 	destroyBackgroundWindow();
 });
 
@@ -352,6 +363,7 @@ ipcMain.on('minkowski-calculate-nfp-sync', function onCalculateNfp(event, payloa
 ipcMain.on('teacher-finished', function onTeacherFinished(event, payload) {
 	debugLog('teacher-finished', JSON.stringify(payload || {}));
 	teacherNfpCache = {};
+	nestGeometryBroker.clear();
 	destroyBackgroundWindow();
 	if (teacherWindow) {
 		teacherWindow.destroy();

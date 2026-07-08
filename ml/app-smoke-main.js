@@ -7,10 +7,12 @@ const os = require('os');
 const path = require('path');
 const url = require('url');
 const electronSettings = require('electron-settings');
+const nestGeometryBrokerModule = require('../main/nest-geometry-broker');
 
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const ipcMain = electron.ipcMain;
+const nestGeometryBroker = nestGeometryBrokerModule.createNestGeometryBroker(2);
 
 let backgroundWindow = null;
 let mainWindow = null;
@@ -516,6 +518,14 @@ ipcMain.on('background-start', function (event, payload) {
 	dispatchBackgroundQueue();
 });
 
+ipcMain.on('nest-geometry-set', function (event, geometry) {
+	nestGeometryBroker.set(geometry);
+});
+
+ipcMain.on('nest-geometry-get-sync', function (event, token) {
+	event.returnValue = nestGeometryBroker.get(token);
+});
+
 ipcMain.on('background-response', function (event, payload) {
 	backgroundBusy = false;
 	if (mainWindow) {
@@ -531,6 +541,7 @@ ipcMain.on('background-progress', function (event, payload) {
 });
 
 ipcMain.on('background-stop', function () {
+	nestGeometryBroker.clear();
 	backgroundQueue.length = 0;
 	backgroundBusy = false;
 	if (backgroundWindow) {

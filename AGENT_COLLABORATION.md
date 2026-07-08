@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | In progress: S1 broker IPC completed; S2 worker token pull next | 2026-07-08 |
 | Codex | PERF-P6 batched NFP warm (pre-pass first) | `main/background.js`, `main.js`, `ml/app-smoke-main.js`, `ml/teacher-main.js`, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: batch find IPC + pre-pass warm landed; telemetry proves path; equivalence/smoke/teacher/benchmark green | 2026-07-08 |
 | Codex | PERF-P3 hull candidate hoists | `main/background.js`, `ml/scripts/run_smoke_battery.sh`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: candidate/sheet hull reuse landed; `svg-hull` in default smoke battery; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P1 fingerprint memoization | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: non-enumerable fingerprint memo landed; targeted tests + equivalence/smoke/benchmark green | 2026-07-08 |
@@ -143,6 +144,14 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P5 S1 broker IPC (Codex)
+
+- Implemented P5 S1 only: added `main/nest-geometry-broker.js`, a bounded two-token in-memory geometry broker, plus `nest-geometry-set` and `nest-geometry-get-sync` IPC handlers in `main.js`, `ml/app-smoke-main.js`, and `ml/teacher-main.js`.
+- This slice is behavior-inert: no renderer dispatch or background worker code uses the broker yet. It exists so later P5 slices can migrate payload shape with IPC parity already in place.
+- Added `ml/tests/nest_geometry_broker/run.js` for bounded retention, replacement recency, targeted clear, full clear, and invalid geometry rejection.
+- Verification passed: `node --check main/nest-geometry-broker.js main.js ml/app-smoke-main.js ml/teacher-main.js ml/tests/nest_geometry_broker/run.js`; `node ml/tests/nest_geometry_broker/run.js`; `git diff --check`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/separation/run.js`; `node ml/tests/engine_equivalence/run.js`; `bash ml/scripts/run_boot_check.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p5-s1 bash ml/scripts/run_smoke_battery.sh`.
+- Next slice: P5 S2 worker-side token pull and reconstruction behind the legacy fallback.
 
 ### 2026-07-08 - PERF-P6 batched NFP warm (pre-pass first) (Codex)
 

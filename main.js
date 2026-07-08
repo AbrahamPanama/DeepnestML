@@ -7,6 +7,7 @@ const url = require('url');
 const electronSettings = require('electron-settings');
 const packageJson = require('./package.json');
 const backgroundDispatcherModule = require('./main/background-dispatcher');
+const nestGeometryBrokerModule = require('./main/nest-geometry-broker');
 
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
@@ -14,6 +15,7 @@ const dialog = electron.dialog;
 const ipcMain = electron.ipcMain;
 const utilityProcess = electron.utilityProcess;
 const createBackgroundDispatcher = backgroundDispatcherModule.createBackgroundDispatcher;
+const nestGeometryBroker = nestGeometryBrokerModule.createNestGeometryBroker(2);
 
 if (typeof app.setName === 'function' && packageJson.productName) {
   app.setName(packageJson.productName);
@@ -1010,6 +1012,14 @@ ipcMain.on('background-start', function (event, payload) {
   backgroundDispatcher.enqueue(payload);
 });
 
+ipcMain.on('nest-geometry-set', function (event, geometry) {
+  nestGeometryBroker.set(geometry);
+});
+
+ipcMain.on('nest-geometry-get-sync', function (event, token) {
+  event.returnValue = nestGeometryBroker.get(token);
+});
+
 ipcMain.on('background-response', function (event, payload) {
   backgroundDispatcher.handleResponse(event.sender, payload);
 });
@@ -1021,6 +1031,7 @@ ipcMain.on('background-progress', function (event, payload) {
 });
 
 ipcMain.on('background-stop', function () {
+  nestGeometryBroker.clear();
   recreateBackgroundWindows();
 });
 
