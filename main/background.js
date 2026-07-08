@@ -129,6 +129,173 @@ function cloneNfp(nfp, inner){
 // all persisted entries. The size / byte / manifest-path constants used to
 // live here too — they moved to main.js along with cache ownership.
 var NFP_CACHE_VERSION = 3;
+var backgroundGeometryCache = {};
+var backgroundGeometryCacheOrder = [];
+
+function cacheBackgroundNestGeometry(token, geometry){
+	if(!token || !geometry){
+		return null;
+	}
+	if(backgroundGeometryCache[token]){
+		var existingIndex = backgroundGeometryCacheOrder.indexOf(token);
+		if(existingIndex >= 0){
+			backgroundGeometryCacheOrder.splice(existingIndex, 1);
+		}
+	}
+	backgroundGeometryCache[token] = geometry;
+	backgroundGeometryCacheOrder.push(token);
+	while(backgroundGeometryCacheOrder.length > 2){
+		var staleToken = backgroundGeometryCacheOrder.shift();
+		delete backgroundGeometryCache[staleToken];
+	}
+	return geometry;
+}
+
+function getBackgroundNestGeometry(token){
+	if(!token){
+		return null;
+	}
+	if(backgroundGeometryCache[token]){
+		return backgroundGeometryCache[token];
+	}
+	var geometry = ipcRendererSafeSendSync('nest-geometry-get-sync', token);
+	if(!geometry){
+		return null;
+	}
+	return cacheBackgroundNestGeometry(token, geometry);
+}
+
+function cloneGeometryTree(tree, includeChildren){
+	var newtree = [];
+	if(!tree || !tree.length){
+		return newtree;
+	}
+	for(var i=0; i<tree.length; i++){
+		newtree.push({x: tree[i].x, y: tree[i].y, exact: tree[i].exact});
+	}
+	if(includeChildren && tree.children && tree.children.length > 0){
+		newtree.children = cloneGeometryChildren(tree.children);
+	}
+	return newtree;
+}
+
+function cloneGeometryChildren(children){
+	if(!children || !children.length){
+		return children;
+	}
+	var cloned = [];
+	for(var i=0; i<children.length; i++){
+		cloned.push(cloneGeometryTree(children[i], true));
+	}
+	return cloned;
+}
+
+function geometryChildrenForSource(geometry, source, sourceTree){
+	if(geometry.partsChildrenBySource && Object.prototype.hasOwnProperty.call(geometry.partsChildrenBySource, source)){
+		return geometry.partsChildrenBySource[source];
+	}
+	if(geometry.partchildren && Object.prototype.hasOwnProperty.call(geometry.partchildren, source)){
+		return geometry.partchildren[source];
+	}
+	return sourceTree ? sourceTree.children : null;
+}
+
+function hydrateLegacyBackgroundStartData(data){
+	var individual = data.individual;
+	var parts = individual.placement;
+	var rotations = individual.rotation;
+	var ids = data.ids;
+	var sources = data.sources;
+	var children = data.children;
+
+	for(var i=0; i<parts.length; i++){
+		parts[i].rotation = rotations[i];
+		parts[i].id = ids[i];
+		parts[i].source = sources[i];
+		if(!data.config || !data.config.simplify){
+			parts[i].children = children[i];
+		}
+	}
+
+	for(i=0; i<data.sheets.length; i++){
+		data.sheets[i].id = data.sheetids[i];
+		data.sheets[i].source = data.sheetsources[i];
+		data.sheets[i].children = data.sheetchildren[i];
+	}
+
+	return {
+		parts: parts,
+		sheets: data.sheets,
+		geometryPath: 'legacy'
+	};
+}
+
+function hydrateTokenBackgroundStartData(data){
+	var geometry = getBackgroundNestGeometry(data.nestToken);
+	if(!geometry){
+		return { error: 'Nest geometry was unavailable. Please restart the nest.' };
+	}
+	var ids = data.ids || [];
+	var sources = data.sources || [];
+	var rotations = data.rotations || [];
+	if(ids.length !== sources.length || ids.length !== rotations.length){
+		return { error: 'Nest geometry payload was incomplete.' };
+	}
+	if(!geometry.partsBySource || !geometry.sheets){
+		return { error: 'Nest geometry payload was missing source geometry.' };
+	}
+
+	var parts = [];
+	for(var i=0; i<sources.length; i++){
+		var source = sources[i];
+		var sourceTree = geometry.partsBySource[source];
+		if(!sourceTree){
+			return { error: 'Nest geometry was missing part source ' + source + '.' };
+		}
+		var part = cloneGeometryTree(sourceTree, false);
+		part.rotation = rotations[i];
+		part.id = ids[i];
+		part.source = source;
+		if(!data.config || !data.config.simplify){
+			var children = geometryChildrenForSource(geometry, source, sourceTree);
+			if(children){
+				part.children = cloneGeometryChildren(children);
+			}
+		}
+		parts.push(part);
+	}
+
+	var sheets = [];
+	var sheetids = geometry.sheetids || [];
+	var sheetsources = geometry.sheetsources || [];
+	var sheetchildren = geometry.sheetchildren || [];
+	for(i=0; i<geometry.sheets.length; i++){
+		var sheet = cloneGeometryTree(geometry.sheets[i], false);
+		sheet.id = sheetids[i];
+		sheet.source = sheetsources[i];
+		var sheetChildren = sheetchildren[i] || geometry.sheets[i].children;
+		if(sheetChildren){
+			sheet.children = cloneGeometryChildren(sheetChildren);
+		}
+		sheets.push(sheet);
+	}
+
+	return {
+		parts: parts,
+		sheets: sheets,
+		geometryPath: 'token'
+	};
+}
+
+function resolveBackgroundStartGeometry(data){
+	if(data && data.individual && data.individual.placement){
+		return hydrateLegacyBackgroundStartData(data);
+	}
+	if(data && data.nestToken){
+		return hydrateTokenBackgroundStartData(data);
+	}
+	return { error: 'Background worker received a nest without geometry.' };
+}
 
 function hashString(value){
 	var hash = 2166136261;
@@ -507,34 +674,27 @@ window.onload = function () {
 	  
 	ipcRenderer.on('background-start', (event, data) => {
 		var index = data.index;
-	    var individual = data.individual;
-
-	    var parts = individual.placement;
-		var rotations = individual.rotation;
-		var ids = data.ids;
-		var sources = data.sources;
-		var children = data.children;
-		
-		for(var i=0; i<parts.length; i++){
-			parts[i].rotation = rotations[i];
-			parts[i].id = ids[i];
-			parts[i].source = sources[i];
-			if(!data.config.simplify){
-				parts[i].children = children[i];
-			}
+		var geometryData = resolveBackgroundStartGeometry(data);
+		if(geometryData.error){
+			ipcRenderer.send('background-progress', {index: index, progress: -1});
+			ipcRenderer.send('background-response', {
+				index: data.index,
+				fitness: Number.MAX_VALUE,
+				placements: [],
+				error: geometryData.error
+			});
+			return;
 		}
-		
-		for(i=0; i<data.sheets.length; i++){
-			data.sheets[i].id = data.sheetids[i];
-			data.sheets[i].source = data.sheetsources[i];
-			data.sheets[i].children = data.sheetchildren[i];
-		}
+	    var parts = geometryData.parts;
+		data.sheets = geometryData.sheets;
 
 		if(data.config && data.config.placementType === 'steprepeat'){
 			try{
 				var stepPlacement = placePartsStepRepeat(data.sheets, parts, data.config, index);
 				stepPlacement.index = data.index;
 				stepPlacement.localRefinement = createLocalRefinementStats(false);
+				stepPlacement.timing = stepPlacement.timing || {};
+				stepPlacement.timing.geometryPath = geometryData.geometryPath;
 				ipcRenderer.send('background-response', stepPlacement);
 			}
 			catch(stepRepeatError){
@@ -701,6 +861,7 @@ window.onload = function () {
 			placement.timing.pairsMissing = pairsMissing;
 			placement.timing.processHoles = processHoles;
 			placement.timing.nfpBatch = nfpBatchTiming(nfpBatchStats);
+			placement.timing.geometryPath = geometryData.geometryPath;
 			if(data.postProcessRefinement){
 				placement.postProcessRefinement = true;
 				placement.refinementToken = data.refinementToken;

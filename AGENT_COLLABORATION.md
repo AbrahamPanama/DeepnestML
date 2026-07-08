@@ -96,7 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | In progress: S1 broker IPC completed; S2 worker token pull next | 2026-07-08 |
+| Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | In progress: S2 worker token pull completed; S3 GA dispatch migration next | 2026-07-08 |
 | Codex | PERF-P6 batched NFP warm (pre-pass first) | `main/background.js`, `main.js`, `ml/app-smoke-main.js`, `ml/teacher-main.js`, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: batch find IPC + pre-pass warm landed; telemetry proves path; equivalence/smoke/teacher/benchmark green | 2026-07-08 |
 | Codex | PERF-P3 hull candidate hoists | `main/background.js`, `ml/scripts/run_smoke_battery.sh`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: candidate/sheet hull reuse landed; `svg-hull` in default smoke battery; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P1 fingerprint memoization | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: non-enumerable fingerprint memo landed; targeted tests + equivalence/smoke/benchmark green | 2026-07-08 |
@@ -144,6 +144,14 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P5 S2 worker token hydration (Codex)
+
+- Implemented P5 S2 in `main/background.js`: worker-side token geometry pull via `nest-geometry-get-sync`, two-token worker cache, recursive geometry clone preserving `exact`, legacy payload fallback, and `timing.geometryPath` telemetry (`legacy` today until dispatch migrates).
+- Token hydration reconstructs per-instance `id` / `source` / `rotation`, clones sheets per dispatch, restores sheet holes, supports `partsChildrenBySource` / legacy `partchildren` sidecars for hole-bearing source parts, and mirrors legacy `simplify` child suppression.
+- Added targeted `ml/tests/engine_bugfixes/run.js` coverage for legacy hydration, token hydration clone/child/exact semantics, cached token reuse, simplify-mode child suppression, and missing-token fail-closed behavior.
+- Verification passed: `node --check main/background.js ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/nest_geometry_broker/run.js`; `node ml/tests/separation/run.js`; `bash ml/scripts/run_boot_check.sh`; `node ml/tests/engine_equivalence/run.js`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p5-s2 bash ml/scripts/run_smoke_battery.sh`; `git diff --check`.
+- Next slice: P5 S3 migrate normal GA dispatch to token payloads and require reports to show `timing.geometryPath: "token"`.
 
 ### 2026-07-08 - PERF-P5 S1 broker IPC (Codex)
 

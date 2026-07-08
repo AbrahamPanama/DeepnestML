@@ -362,6 +362,153 @@ function testNfpBatchWarmStatsAndLocalMirror() {
 	}, 'timing projection should omit checked map');
 }
 
+function testBackgroundStartLegacyHydration() {
+	const names = [
+		'cloneGeometryTree',
+		'cloneGeometryChildren',
+		'geometryChildrenForSource',
+		'hydrateLegacyBackgroundStartData',
+		'resolveBackgroundStartGeometry'
+	];
+	const ctx = loadBackgroundFunctions(names);
+	const part = rect(0, 0, 3, 2);
+	const child = rect(0.5, 0.5, 1, 1);
+	const sheet = rect(0, 0, 20, 20);
+	const sheetChild = rect(4, 4, 2, 2);
+	const data = {
+		individual: {
+			placement: [part],
+			rotation: [90]
+		},
+		ids: ['part-id'],
+		sources: ['source-a'],
+		children: [[child]],
+		sheets: [sheet],
+		sheetids: ['sheet-id'],
+		sheetsources: ['sheet-source'],
+		sheetchildren: [[sheetChild]],
+		config: { simplify: false }
+	};
+	const result = ctx.resolveBackgroundStartGeometry(data);
+	assert.strictEqual(result.geometryPath, 'legacy', 'legacy payload should stay on legacy path');
+	assert.strictEqual(result.parts[0], part, 'legacy path should use the original placement array');
+	assert.strictEqual(part.rotation, 90, 'legacy path should restore rotation');
+	assert.strictEqual(part.id, 'part-id', 'legacy path should restore id');
+	assert.strictEqual(part.source, 'source-a', 'legacy path should restore source');
+	assert.strictEqual(part.children[0], child, 'legacy path should restore child sidecar');
+	assert.strictEqual(sheet.children[0], sheetChild, 'legacy path should restore sheet child sidecar');
+}
+
+function testBackgroundStartTokenHydration() {
+	const names = [
+		'ipcRendererSafeSendSync',
+		'cacheBackgroundNestGeometry',
+		'getBackgroundNestGeometry',
+		'cloneGeometryTree',
+		'cloneGeometryChildren',
+		'geometryChildrenForSource',
+		'hydrateTokenBackgroundStartData',
+		'resolveBackgroundStartGeometry'
+	];
+	const sourcePart = rect(0, 0, 3, 2);
+	const partChild = rect(0.5, 0.5, 1, 1);
+	const sheet = rect(0, 0, 20, 20);
+	const sheetChild = rect(4, 4, 2, 2);
+	const geometry = {
+		token: 'nest-a',
+		partsBySource: {
+			7: sourcePart
+		},
+		partsChildrenBySource: {
+			7: [partChild]
+		},
+		sheets: [sheet],
+		sheetids: ['sheet-id'],
+		sheetsources: ['sheet-source'],
+		sheetchildren: [[sheetChild]]
+	};
+	let pulls = 0;
+	const ctx = loadBackgroundFunctions(names, {}, {
+		backgroundGeometryCache: {},
+		backgroundGeometryCacheOrder: [],
+		window: {
+			ipcRenderer: {
+				sendSync: function (channel, token) {
+					pulls += 1;
+					assert.strictEqual(channel, 'nest-geometry-get-sync', 'token path should pull from geometry broker');
+					assert.strictEqual(token, 'nest-a', 'token path should request the nest token');
+					return geometry;
+				}
+			}
+		}
+	});
+	const data = {
+		nestToken: 'nest-a',
+		ids: ['part-1', 'part-2'],
+		sources: [7, 7],
+		rotations: [90, 180],
+		config: { simplify: false }
+	};
+	const result = ctx.resolveBackgroundStartGeometry(data);
+	assert.strictEqual(result.geometryPath, 'token', 'token payload should use token path');
+	assert.strictEqual(pulls, 1, 'first token use should pull geometry once');
+	assert.strictEqual(result.parts.length, 2, 'token path should rebuild one part per source entry');
+	assert.notStrictEqual(result.parts[0], sourcePart, 'rebuilt part should be cloned');
+	assert.notStrictEqual(result.parts[0], result.parts[1], 'each rebuilt part should be a distinct clone');
+	assert.strictEqual(result.parts[0][0].exact, true, 'clone should preserve exact point flags');
+	assert.strictEqual(result.parts[0].rotation, 90, 'token path should restore rotation');
+	assert.strictEqual(result.parts[1].rotation, 180, 'token path should restore second rotation');
+	assert.strictEqual(result.parts[0].id, 'part-1', 'token path should restore id');
+	assert.strictEqual(result.parts[0].source, 7, 'token path should restore source');
+	assert.strictEqual(result.parts[0].children[0][0].exact, true, 'token path should preserve child exact flags');
+	assert.notStrictEqual(result.parts[0].children[0], partChild, 'part child sidecar should be cloned');
+	assert.strictEqual(result.sheets[0].id, 'sheet-id', 'token path should restore sheet id');
+	assert.strictEqual(result.sheets[0].source, 'sheet-source', 'token path should restore sheet source');
+	assert.strictEqual(result.sheets[0].children[0][0].exact, true, 'token path should preserve sheet child exact flags');
+	assert.notStrictEqual(result.sheets[0], sheet, 'rebuilt sheet should be cloned per dispatch');
+
+	const second = ctx.resolveBackgroundStartGeometry(data);
+	assert.strictEqual(second.geometryPath, 'token', 'cached token should still hydrate');
+	assert.strictEqual(pulls, 1, 'cached token should not pull geometry again');
+
+	const simplified = ctx.resolveBackgroundStartGeometry(Object.assign({}, data, {
+		config: { simplify: true }
+	}));
+	assert.strictEqual(simplified.parts[0].children, undefined, 'simplify mode should mirror legacy child suppression');
+}
+
+function testBackgroundStartMissingTokenFailsClosed() {
+	const names = [
+		'ipcRendererSafeSendSync',
+		'cacheBackgroundNestGeometry',
+		'getBackgroundNestGeometry',
+		'cloneGeometryTree',
+		'cloneGeometryChildren',
+		'geometryChildrenForSource',
+		'hydrateTokenBackgroundStartData',
+		'resolveBackgroundStartGeometry'
+	];
+	const ctx = loadBackgroundFunctions(names, {}, {
+		backgroundGeometryCache: {},
+		backgroundGeometryCacheOrder: [],
+		window: {
+			ipcRenderer: {
+				sendSync: function () {
+					return null;
+				}
+			}
+		}
+	});
+	const result = ctx.resolveBackgroundStartGeometry({
+		nestToken: 'missing',
+		ids: ['part-1'],
+		sources: ['a'],
+		rotations: [0],
+		config: {}
+	});
+	assert.ok(result.error, 'missing token geometry should fail closed instead of throwing');
+}
+
 function run() {
 	testMergedLengthThreshold();
 	testMergedLengthAfterFarCollinearEdge();
@@ -375,6 +522,9 @@ function run() {
 	testPolygonFingerprintMemoization();
 	testNfpBatchPrefetchKeyParity();
 	testNfpBatchWarmStatsAndLocalMirror();
+	testBackgroundStartLegacyHydration();
+	testBackgroundStartTokenHydration();
+	testBackgroundStartMissingTokenFailsClosed();
 	console.log('engine bugfix tests passed');
 }
 
