@@ -3187,6 +3187,35 @@ function localRefinementMaterialOverlap(A, B, config){
 	});
 }
 
+function localRefinementOuterMaterialOverlap(A, B, config){
+	if(typeof ClipperLib === 'undefined' || !A || !B || A.length < 3 || B.length < 3){
+		return true;
+	}
+	var scale = Number(config.clipperScale) || 10000000;
+	var aPath = toClipperCoordinates(A);
+	var bPath = toClipperCoordinates(B);
+	ClipperLib.JS.ScaleUpPath(aPath, scale);
+	ClipperLib.JS.ScaleUpPath(bPath, scale);
+	var solution = new ClipperLib.Paths();
+	var clipper = new ClipperLib.Clipper();
+	clipper.AddPaths([aPath], ClipperLib.PolyType.ptSubject, true);
+	clipper.AddPaths([bPath], ClipperLib.PolyType.ptClip, true);
+	if(!clipper.Execute(ClipperLib.ClipType.ctIntersection, solution, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)){
+		return true;
+	}
+	return localRefinementClipperPathsHaveArea(solution, config);
+}
+
+function localRefinementExactMaterialOverlap(A, B, config){
+	if(localRefinementHasChildren(A) || localRefinementHasChildren(B)){
+		if(config && config.processHoles === false){
+			return localRefinementOuterMaterialOverlap(A, B, config);
+		}
+		return true;
+	}
+	return localRefinementMaterialOverlap(A, B, config);
+}
+
 function localRefinementHasChildren(part){
 	return !!(part && part.children && part.children.length > 0);
 }
@@ -3249,7 +3278,7 @@ function localRefinementExactSheetContains(part, placement, sheet, config){
 	}
 	if(sheet.children && sheet.children.length > 0){
 		for(var h=0; h<sheet.children.length; h++){
-			if(localRefinementMaterialOverlap(world, sheet.children[h], config)){
+			if(localRefinementOuterMaterialOverlap(world, sheet.children[h], config)){
 				return false;
 			}
 		}
@@ -3274,10 +3303,7 @@ function localRefinementFinalLayoutLegalExact(sheet, placed, placements, config)
 			if(!localRefinementBoundsOverlap(bounds[i], bounds[j], eps)){
 				continue;
 			}
-			if(localRefinementHasChildren(placed[i]) || localRefinementHasChildren(placed[j])){
-				return false;
-			}
-			if(localRefinementMaterialOverlap(
+			if(localRefinementExactMaterialOverlap(
 				shiftPolygon(placed[i], placements[i]),
 				shiftPolygon(placed[j], placements[j]),
 				config
@@ -3496,6 +3522,9 @@ function localRefinementFineRotationCandidate(basePart, basePlacement, delta){
 }
 
 function localRefinementFineRotationHasHoleRisk(placed, placements, config, index){
+	if(config && config.processHoles === false){
+		return false;
+	}
 	if(localRefinementHasChildren(placed[index])){
 		return true;
 	}
@@ -3534,13 +3563,7 @@ function localRefinementFineRotationCandidateLegal(sheet, placed, placements, co
 			if(!localRefinementBoundsOverlap(candidateBounds, neighborBounds, eps)){
 				continue;
 			}
-			if(localRefinementHasChildren(candidatePart) || localRefinementHasChildren(placed[j])){
-				if(stats){
-					stats.fineRotateSkippedHoles = (stats.fineRotateSkippedHoles || 0) + 1;
-				}
-				return false;
-			}
-			if(localRefinementMaterialOverlap(candidateWorld, shiftPolygon(placed[j], placements[j]), config)){
+			if(localRefinementExactMaterialOverlap(candidateWorld, shiftPolygon(placed[j], placements[j]), config)){
 				return false;
 			}
 		}

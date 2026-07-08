@@ -147,6 +147,12 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 
 Use newest notes at the top.
 
+### 2026-07-08 - LR fine rotation slotted-part follow-up (Codex)
+
+- User testing showed slotted oval parts with `Process part holes` off still appeared to receive no fine rotations. Root cause: v1 fine-rotation skipped any child-bearing part before checking `processHoles`, so every slotted part was skipped.
+- Updated `main/background.js` so fine rotation still fails closed for child-bearing pairs when hole processing is on, but when `processHoles === false` it validates child-bearing parts using outer-contour exact overlap. This matches the active setting: holes are not nestable, but outer contours still cannot overlap.
+- Verification passed: `node --check main/background.js ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_bugfixes/run.js`; `bash ml/scripts/run_boot_check.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-fine-rotation-holefix bash ml/scripts/run_smoke_battery.sh svg-hull-fine-rotation`. Smoke stats: `fineRotateCandidates=40`, `fineRotateSkippedHoles=0`, `nonCanonicalNfpLookups=0`.
+
 ### 2026-07-08 - LR fine rotation Phase 1 default-off operator (Codex)
 
 - Implemented default-off `localRefinementFineRotation` for the `smart` local-refinement engine. It runs strictly last, uses centroid-pivot continuous rotation candidates, skips hole-risk targets/neighbors, auto-skips when `mergeLines` is enabled, and accepts only strict smart-metric improvements.

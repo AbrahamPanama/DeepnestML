@@ -289,6 +289,60 @@ function testFineRotationAcceptancePath() {
 	assert.strictEqual(stats.operatorStats.fineRotate.accepted, 1, 'operator stats should count accepted fine rotation');
 }
 
+function testFineRotationHoleRiskHonorsProcessHoles() {
+	const ctx = loadBackgroundFunctions([
+		'localRefinementBboxDiagonal',
+		'localRefinementHasChildren',
+		'localRefinementBoundsOverlap',
+		'localRefinementWorldBounds',
+		'localRefinementFineRotationHasHoleRisk'
+	], {
+		getPolygonBounds: function (points) {
+			let minX = Infinity;
+			let minY = Infinity;
+			let maxX = -Infinity;
+			let maxY = -Infinity;
+			points.forEach((point) => {
+				minX = Math.min(minX, point.x);
+				minY = Math.min(minY, point.y);
+				maxX = Math.max(maxX, point.x);
+				maxY = Math.max(maxY, point.y);
+			});
+			return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+		}
+	});
+	const part = rect(0, 0, 10, 4);
+	part.children = [rect(4, 1, 2, 2)];
+	const placed = [part];
+	const placements = [{ x: 0, y: 0, rotation: 0 }];
+	assert.strictEqual(ctx.localRefinementFineRotationHasHoleRisk(placed, placements, { processHoles: true, fineRotationMaxDeg: 6 }, 0), true, 'hole-bearing target should be skipped when hole processing is on');
+	assert.strictEqual(ctx.localRefinementFineRotationHasHoleRisk(placed, placements, { processHoles: false, fineRotationMaxDeg: 6 }, 0), false, 'hole-bearing target should use outer-only checks when hole processing is off');
+}
+
+function testFineRotationExactOverlapOuterOnlyWhenProcessHolesOff() {
+	let outerCalls = 0;
+	let materialCalls = 0;
+	const ctx = loadBackgroundFunctions([
+		'localRefinementHasChildren',
+		'localRefinementExactMaterialOverlap'
+	], {}, {
+		localRefinementOuterMaterialOverlap: function () {
+			outerCalls += 1;
+			return false;
+		},
+		localRefinementMaterialOverlap: function () {
+			materialCalls += 1;
+			return true;
+		}
+	});
+	const part = rect(0, 0, 10, 4);
+	part.children = [rect(4, 1, 2, 2)];
+	assert.strictEqual(ctx.localRefinementExactMaterialOverlap(part, rect(20, 0, 10, 4), { processHoles: false }), false, 'processHoles=false should allow outer-only overlap checks for child-bearing parts');
+	assert.strictEqual(outerCalls, 1, 'outer-only overlap helper should be used');
+	assert.strictEqual(materialCalls, 0, 'child-skipping materialOverlap should not be used');
+	assert.strictEqual(ctx.localRefinementExactMaterialOverlap(part, rect(20, 0, 10, 4), { processHoles: true }), true, 'processHoles=true should still fail closed for child-bearing exact fine-rotation pairs');
+}
+
 function testSheetHoleForbiddenNfp() {
 	const calls = [];
 	const forbiddenRing = rect(0, 0, 10, 10);
@@ -699,6 +753,8 @@ function run() {
 	testFineRotationCandidatePreservesCentroidPivot();
 	testFineRotationExactGateSelection();
 	testFineRotationAcceptancePath();
+	testFineRotationHoleRiskHonorsProcessHoles();
+	testFineRotationExactOverlapOuterOnlyWhenProcessHolesOff();
 	testSheetHoleForbiddenNfp();
 	testSheetHoleFailsClosed();
 	testSheetHoleDifferenceFailureFailsClosed();
