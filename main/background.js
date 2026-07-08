@@ -4428,7 +4428,7 @@ function getInnerNfpWithGeometryUtil(A, B, config){
 	}
 	else{
 		nfp = GeometryUtil.noFitPolygon(A, B, true, false);
-	}
+		}
 
 	if(!nfp || nfp.length == 0){
 		return null;
@@ -4522,9 +4522,6 @@ function getOuterNfp(A, B, inside, config){
 				// Treat A as hole-free (either it has no children, or the
 				// user disabled processHoles). ClipperLib MinkowskiSum works
 				// on the outer ring only.
-				console.log('minkowski', A.length, B.length, A.source, B.source);
-				console.time('clipper');
-
 				var Ac = toClipperCoordinates(A);
 				ClipperLib.JS.ScaleUpPath(Ac, 10000000);
 				var Bc = toClipperCoordinates(B);
@@ -4541,15 +4538,13 @@ function getOuterNfp(A, B, inside, config){
 				solution = ClipperLib.Clipper.SimplifyPolygons(solution, ClipperLib.PolyFillType.pftNonZero);
 				var clipperNfp = buildClipperNfpFromMinkowskiSolution(solution, B, 10000000);
 				if(!clipperNfp){
-					console.timeEnd('clipper');
 					return null;
 				}
 
 				nfp = [clipperNfp];
-				console.timeEnd('clipper');
 			}
 		}
-	}
+		}
 
 	if(!nfp || nfp.length == 0){
 		return null;
@@ -4691,7 +4686,6 @@ function getInnerNfp(A, B, config){
 	
 	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
 		// insert into db
-		console.log('inserting inner: ',A.source, B.source, B.rotation, f);
 		var doc = {
 			A: A.source,
 			B: B.source,
@@ -4717,6 +4711,8 @@ function placeParts(sheets, parts, config, nestindex){
 	
 	var totalnum = parts.length;
 	var totalsheetarea = 0;
+	var placementMs = 0;
+	var placementIterations = 0;
 	
 	// total length of merged lines
 	var totalMerged = 0;
@@ -4772,8 +4768,9 @@ function placeParts(sheets, parts, config, nestindex){
 		var clipCache = [];
 		//console.log('new sheet');
 		for(i=0; i<parts.length; i++){
-			console.time('placement');
-			part = parts[i];
+			var placementStartedAt = Date.now();
+			try{
+				part = parts[i];
 			
 			// inner NFP
 			var sheetNfp = null;
@@ -4891,8 +4888,6 @@ function placeParts(sheets, parts, config, nestindex){
 				nfp: combinedNfp,
 				index: placed.length
 			};
-			
-			console.log('save cache', placed.length);
 			
 			// difference with sheet polygon
 			var finalNfp = new ClipperLib.Paths();
@@ -5060,7 +5055,11 @@ function placeParts(sheets, parts, config, nestindex){
 			}
 			//console.log(placednum, totalnum);
 			ipcRenderer.send('background-progress', {index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum)});
-			console.timeEnd('placement');
+			}
+			finally{
+				placementMs += Date.now() - placementStartedAt;
+				placementIterations++;
+			}
 		}
 		
 		if(runLocalRefinement){
@@ -5143,7 +5142,23 @@ function placeParts(sheets, parts, config, nestindex){
 	// send finish progerss signal
 	ipcRenderer.send('background-progress', {index: nestindex, progress: -1});
 	
-	var result = {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged, localRefinement: localRefinement };
+	var placedCount = 0;
+	for(i=0; i<allplacements.length; i++){
+		placedCount += allplacements[i].sheetplacements.length;
+	}
+
+	var result = {
+		placements: allplacements,
+		fitness: fitness,
+		area: sheetarea,
+		mergedLength: totalMerged,
+		localRefinement: localRefinement,
+		timing: {
+			placementMs: placementMs,
+			parts: placedCount,
+			placementIterations: placementIterations
+		}
+	};
 	if(fitnessBreakdown){
 		result.fitnessBreakdown = fitnessBreakdown;
 	}

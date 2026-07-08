@@ -1,6 +1,6 @@
 # Performance Plan — Deepnest ML engine hot paths
 
-Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P1+ not started.
+Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P2 implemented 2026-07-08; PERF-P1+ not started.
 Author: Claude-Code, 2026-06-12. Review findings verified against live code the same day;
 all accepted except one mechanism correction (§9a — digest determinism), noted inline.
 
@@ -144,6 +144,10 @@ one-line summaries only.
 
 **Gate**: equivalence harness (placements identical — logging cannot change outputs, but the
 harness also proves you didn't fat-finger the loop while editing).
+
+**Implementation note 2026-07-08.** PERF-P2 also persists `report.details.timing`
+into benchmark run JSONs so later WPs can quote the placement telemetry from §8
+artifacts directly.
 
 ---
 
@@ -342,14 +346,21 @@ Nothing to do in this plan.
 
 ## 8. Measurement protocol (every WP reports these)
 
-1. **Benchmark — exact command (AMENDED, flags verified against `ml/cli/run_benchmark.js`)**:
+1. **Benchmark — exact command (AMENDED 2026-07-07: `shirts` → `blaz1`)**:
    ```
    npm run ml:nest-benchmark -- \
      --label perf-p<N>-<before|after> \
-     --instances albano,shirts,shapes0 \
+     --instances albano,blaz1,shapes0 \
      --time-budget-sec 10 \
      --runs 2
    ```
+   Rationale: `shirts` (99 parts) cannot reliably produce a first nest within 10 s under
+   the legacy x64 smoke runtime (no native addon) — it failed `no_nest_before_time_budget`
+   both before and after P0, so it measures nothing at this budget. The perf gate needs
+   reliable completion and RELATIVE timing, not corpus breadth: `albano` (curved),
+   `blaz1` (concave), `shapes0` (rectilinear, many parts) are the trio proven to complete
+   at 10 s across all the LR bounded probes. `shirts` stays in the full corpus for the
+   SOTA utilization gates, where the frozen 240 s budget applies.
    Report per-instance `timeToBestSec`, total wall time, and utilization (must be unchanged
    for output-identical WPs — identical placements imply identical utilization; any delta
    means the equivalence gate was bypassed).

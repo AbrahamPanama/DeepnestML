@@ -396,6 +396,7 @@ function runBenchmark(options) {
 				timeToBestSec: report.details.timeToBestSec,
 				fitness: report.details.fitness,
 				fitnessBreakdown: report.details.fitnessBreakdown,
+				timing: report.details.timing || null,
 				localRefinement: report.details.localRefinement || null,
 				localRefinementSummary: report.details.localRefinementSummary || null,
 				placementsDigest: report.details.placementsDigest,

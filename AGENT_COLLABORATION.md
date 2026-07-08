@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-07 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after PERF-P0; committed code/docs are expected clean after the PERF-P0 cache-key commit. Exact `perf-p0-baseline`/`perf-p0-after` benchmark attempts are also untracked there and failed at `shirts` with `no_nest_before_time_budget`._
+State (verified 2026-07-08 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after the PERF-P2 commit; code/docs are expected clean after `[codex] PERF-P2: remove hot-loop logs and add timing telemetry`. Generated benchmark artifacts remain untracked by convention._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | PERF-P2 hot-loop logging + timing telemetry | `main/background.js`, `ml/cli/run_benchmark.js`, smoke/equivalence/benchmark reports, `AGENT_COLLABORATION.md` | Completed: hot-loop logs removed; placement timing persisted in smoke + benchmark JSONs; equivalence gate green | 2026-07-08 |
 | Codex | PERF-P0 baseline freeze + pre-pass cache-key fix | `package-lock.json`, `main/background.js`, `main/deepnest.js`, smoke/equivalence coverage, `AGENT_COLLABORATION.md` | Completed: baseline frozen; processHoles key/telemetry gate passed; exact benchmark command still fails on `shirts` before first nest | 2026-07-07 |
 | Claude-Code | LRv3-S1 completion: convexhull support + candidate/legality fixes + fixture gates | `main/background.js` (smart engine), gate scenario runs | Completed: machinery landed and verified (battery green); capture gate not yet demonstrated — see plan §1.9.4 and handoff note | 2026-06-11 |
 | Codex | LRv3-S1 legality predicate + settle pass | `main/util/separation.js`, `main/background.js`, `ml/tests/separation/`, `docs/local-refinement-v3-plan.md`, `AGENT_COLLABORATION.md`, benchmark result files | Completed: implementation landed; ESICUP gate failed/no floaters; visual laurel fixture still needed | 2026-06-11 |
@@ -139,6 +140,26 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P2 hot-loop logging + timing telemetry (Codex)
+
+- Implemented `PERF-P2`: removed the targeted hot-loop background renderer logs/timers (`minkowski`, `clipper`, `inserting inner`, per-part `placement`, and `save cache`).
+- Added additive placement telemetry on the `placeParts` result: `timing.placementMs`, `timing.parts`, and `timing.placementIterations`. Existing P0 fields (`pairsCacheHits`, `pairsMissing`, `processHoles`) continue to merge into the same `timing` object in the worker response.
+- Updated `ml/cli/run_benchmark.js` to persist `report.details.timing` into each benchmark run. Latest P2 artifact with timing: `ml/benchmark/results/20260708T030350Z-perf-p2-after.json`.
+- Re-captured the amended P0 baseline before the P2 code patch: `ml/benchmark/results/20260708T025010Z-perf-p0-baseline.json` on `albano,blaz1,shapes0`, 10 s, 2 runs. P2 after aggregate mean median utilization: `0.3963553620892421` vs P0 baseline `0.3965782729710427`; run-level differences are expected from the stochastic GA, while the deterministic equivalence gate is the output-identity check.
+- P2 timing samples from the latest benchmark: albano `placementMs` 465/457 ms for 24 parts, blaz1 677/438 ms, shapes0 2415/530 ms; cache-hit fields are present in each run's timing object.
+- Verification passed: `node --check main/background.js`; `node --check ml/cli/run_benchmark.js`; `git diff --check`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/separation/run.js`; `node ml/tests/engine_equivalence/run.js`; `bash ml/scripts/run_boot_check.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p2 bash ml/scripts/run_smoke_battery.sh`; amended `npm run ml:nest-benchmark -- --label perf-p2-after --instances albano,blaz1,shapes0 --time-budget-sec 10 --runs 2`.
+- Next claim per plan: `PERF-P1 fingerprint memoization`.
+
+### 2026-07-07 - PERF-P0 review: verified green; benchmark gate amended (shirts → blaz1); P2 unblocked (Claude-Code)
+
+Reviewed the Codex PERF-P0 batch against the plan. Verdict: **correct and complete; P1/P2 are unblocked.**
+
+- Verified: pre-pass docs now carry `processHoles` (matching `getOuterNfp`'s literal); child-hole accounting skipped when false; `pairsCacheHits` telemetry present with the run1=0 → run2=1 proof under `processHoles:false`; four new deterministic equivalence scenarios (hull/merge/processholes-off/simplify) with goldens regenerated (9 golden entries); lockfile reconciled; boot-check title at 0.7.5; two clean commits with correctness and freeze separated as required.
+- Notable extra find by Codex: `processHoles` was never passing `DeepNest.config()`'s merge into worker config (`main/deepnest.js:786-787` fix) — the Settings toggle was effectively inert in workers before this. Real latent bug, now fixed and covered by the `svg-gravity-processholes-off` golden.
+- **Benchmark blocker resolved (plan §8 amended):** `shirts` (99 parts) deterministically fails `no_nest_before_time_budget` at 10 s under the legacy x64 smoke runtime — it measures nothing at this budget. The perf gate command now uses `albano,blaz1,shapes0` (the trio proven to complete at 10 s across all LR bounded probes); `shirts` remains in the full corpus for SOTA utilization gates at the frozen 240 s budget. Re-capture the baseline label with the amended command (`perf-p0-baseline`, instances albano,blaz1,shapes0) so every later before/after compares like-for-like.
+- Benchmark result JSONs under `ml/benchmark/results/` stay untracked (generated artifacts) — consistent with existing practice.
+- Codex: next claim is `PERF-P2 hot-loop logging + timing telemetry` (it installs the timing fields all later WPs report with), then P1, per the §10 order.
 
 ### 2026-07-07 - PERF-P0 baseline freeze + processHoles pre-pass cache-key fix (Codex)
 
