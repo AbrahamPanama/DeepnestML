@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-08 by Codex): _code/docs expected clean after `[codex] PERF-P4: add default-off merge candidate cap`; dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/`. Generated benchmark artifacts remain untracked by convention._
+State (verified 2026-07-08 by Codex): _code/docs expected clean after LR fine-rotation Phase 1 commit; dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/`. Generated benchmark artifacts remain untracked by convention._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,7 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | LR fine rotation Phase 0/1 | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/tests/engine_bugfixes/`, smoke/benchmark reports, `AGENT_COLLABORATION.md` | In progress: Phase 0 guard verified; Phase 1 default-off operator next | 2026-07-08 |
+| Codex | LR fine rotation Phase 0/1 | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, `ml/tests/engine_bugfixes/`, smoke/benchmark reports, `AGENT_COLLABORATION.md` | Completed: Phase 0 guard and Phase 1 default-off centroid operator landed; benchmark safety green, no accepted fine moves on bounded trio | 2026-07-08 |
 | Codex | PERF-P4 mergeLines top-k credit cap | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, smoke scenario, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: hidden default-off cap landed; flag-off equivalence green; flag-on benchmark borderline-green at cap64 | 2026-07-08 |
 | Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: token geometry dispatch landed; refinement token path verified; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P6 batched NFP warm (pre-pass first) | `main/background.js`, `main.js`, `ml/app-smoke-main.js`, `ml/teacher-main.js`, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: batch find IPC + pre-pass warm landed; telemetry proves path; equivalence/smoke/teacher/benchmark green | 2026-07-08 |
@@ -146,6 +146,15 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - LR fine rotation Phase 1 default-off operator (Codex)
+
+- Implemented default-off `localRefinementFineRotation` for the `smart` local-refinement engine. It runs strictly last, uses centroid-pivot continuous rotation candidates, skips hole-risk targets/neighbors, auto-skips when `mergeLines` is enabled, and accepts only strict smart-metric improvements.
+- Added exact-geometry final gating for off-grid rotations: sheet containment uses Clipper difference against the sheet outer plus sheet-hole overlap checks; pair overlap uses bbox prefilter + `SeparationUtil.materialOverlap`, failing closed for bbox-overlapping hole-bearing pairs. Existing canonical final gate stays in use when all rotations are on grid.
+- Added config defaults/parsing in `main/deepnest.js` and `main/index.html`, a visible Fine rotation checkbox, exposed the existing Smart refinement option in the UI, benchmark CLI flags for fine-rotation knobs, and `ml/smoke/scenarios/svg-hull-fine-rotation.json` for explicit flag-on smoke coverage.
+- Added engine tests for centroid pivot preservation, exact-gate selection, and a stubbed legal/improving acceptance path.
+- Verification passed: `node --check main/background.js main/deepnest.js ml/cli/run_benchmark.js ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/separation/run.js`; `node ml/tests/engine_equivalence/run.js`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-fine-rotation-default bash ml/scripts/run_smoke_battery.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-fine-rotation-on bash ml/scripts/run_smoke_battery.sh svg-hull-fine-rotation`; `git diff --check`.
+- Bounded 1-run A/B benchmark artifacts (left untracked by convention): off `ml/benchmark/results/20260708T211818Z-lr-fr1-off-10s.json`, on `ml/benchmark/results/20260708T212015Z-lr-fr1-on-10s.json`. Safety invariant held (`nonCanonicalNfpLookups: 0` on every run); fine-rotation attempted 40 candidates per instance with exact-check time 7-17 ms, but accepted 0 fine moves on `albano,blaz1,shapes0`. Mean median utilization is not comparable from one stochastic run and was lower in the on run (`0.4170` -> `0.3983`); this should not be treated as an efficacy pass. Next efficacy work needs a slender/branch torture fixture and multi-seed benchmark.
 
 ### 2026-07-08 - LR fine rotation Phase 0 guard (Codex)
 

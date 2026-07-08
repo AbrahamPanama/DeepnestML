@@ -116,7 +116,12 @@ function localRefinementOptions(options) {
 		localRefinementEngine: engine,
 		localRefinementBudgetMs: Math.floor(numberOption(optionValue(options, 'localRefinementBudgetMs', 'local-refinement-budget-ms', optionValue(options, 'refinementBudgetMs', 'refinement-budget-ms', 1500)), 1500, 100, 30000)),
 		localRefinementRotations: booleanOption(optionValue(options, 'localRefinementRotations', 'local-refinement-rotations', undefined), false),
-		localRefinementMaxColdAnglesPerPart: Math.floor(numberOption(optionValue(options, 'localRefinementMaxColdAnglesPerPart', 'local-refinement-max-cold-angles-per-part', undefined), 3, 0, 12))
+		localRefinementMaxColdAnglesPerPart: Math.floor(numberOption(optionValue(options, 'localRefinementMaxColdAnglesPerPart', 'local-refinement-max-cold-angles-per-part', undefined), 3, 0, 12)),
+		localRefinementFineRotation: booleanOption(optionValue(options, 'localRefinementFineRotation', 'local-refinement-fine-rotation', undefined), false),
+		fineRotationMaxDeg: numberOption(optionValue(options, 'fineRotationMaxDeg', 'fine-rotation-max-deg', undefined), 6, 0.01, 45),
+		fineRotationMinDeg: numberOption(optionValue(options, 'fineRotationMinDeg', 'fine-rotation-min-deg', undefined), 0.25, 0.001, 45),
+		fineRotationMaxTargets: Math.floor(numberOption(optionValue(options, 'fineRotationMaxTargets', 'fine-rotation-max-targets', undefined), 8, 0, 64)),
+		fineRotationMinBudgetMs: Math.floor(numberOption(optionValue(options, 'fineRotationMinBudgetMs', 'fine-rotation-min-budget-ms', undefined), 300, 0, 30000))
 	};
 }
 
@@ -286,7 +291,12 @@ function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeCo
 		localRefinementEngine: refinementOptions.localRefinementEngine,
 		localRefinementBudgetMs: refinementOptions.localRefinementBudgetMs,
 		localRefinementRotations: refinementOptions.localRefinementRotations,
-		localRefinementMaxColdAnglesPerPart: refinementOptions.localRefinementMaxColdAnglesPerPart
+		localRefinementMaxColdAnglesPerPart: refinementOptions.localRefinementMaxColdAnglesPerPart,
+		localRefinementFineRotation: refinementOptions.localRefinementFineRotation,
+		fineRotationMaxDeg: refinementOptions.fineRotationMaxDeg,
+		fineRotationMinDeg: refinementOptions.fineRotationMinDeg,
+		fineRotationMaxTargets: refinementOptions.fineRotationMaxTargets,
+		fineRotationMinBudgetMs: refinementOptions.fineRotationMinBudgetMs
 	};
 }
 

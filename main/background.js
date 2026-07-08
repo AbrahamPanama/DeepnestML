@@ -3187,6 +3187,127 @@ function localRefinementMaterialOverlap(A, B, config){
 	});
 }
 
+function localRefinementHasChildren(part){
+	return !!(part && part.children && part.children.length > 0);
+}
+
+function localRefinementBoundsOverlap(a, b, padding){
+	if(!a || !b){
+		return false;
+	}
+	var pad = Number(padding) || 0;
+	return !(a.x + a.width < b.x - pad ||
+		b.x + b.width < a.x - pad ||
+		a.y + a.height < b.y - pad ||
+		b.y + b.height < a.y - pad);
+}
+
+function localRefinementScaleClipperPath(path, config){
+	var scaled = path.slice();
+	var scale = Number(config.clipperScale) || 10000000;
+	ClipperLib.JS.ScaleUpPath(scaled, scale);
+	return scaled;
+}
+
+function localRefinementClipperPathsHaveArea(paths, config){
+	if(!paths || paths.length === 0 || typeof ClipperLib === 'undefined'){
+		return false;
+	}
+	var scale = Number(config.clipperScale) || 10000000;
+	var epsDepth = Math.max(1e-9, 1e-4 * (Number(config.curveTolerance) || 0));
+	var eroded = new ClipperLib.Paths();
+	var offset = new ClipperLib.ClipperOffset(2, epsDepth * scale);
+	offset.AddPaths(paths, ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
+	offset.Execute(eroded, -0.5 * epsDepth * scale);
+	if(!eroded || eroded.length === 0){
+		return false;
+	}
+	for(var i=0; i<eroded.length; i++){
+		if(eroded[i] && eroded[i].length >= 3 && Math.abs(ClipperLib.Clipper.Area(eroded[i])) > 0){
+			return true;
+		}
+	}
+	return false;
+}
+
+function localRefinementExactSheetContains(part, placement, sheet, config){
+	if(!part || part.length < 3 || !sheet || sheet.length < 3 || typeof ClipperLib === 'undefined'){
+		return false;
+	}
+	var world = shiftPolygon(part, placement);
+	var subject = [localRefinementScaleClipperPath(toClipperCoordinates(world), config)];
+	var sheetOuter = [localRefinementScaleClipperPath(toClipperCoordinates(sheet), config)];
+	var outside = new ClipperLib.Paths();
+	var clipper = new ClipperLib.Clipper();
+	clipper.AddPaths(subject, ClipperLib.PolyType.ptSubject, true);
+	clipper.AddPaths(sheetOuter, ClipperLib.PolyType.ptClip, true);
+	if(!clipper.Execute(ClipperLib.ClipType.ctDifference, outside, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)){
+		return false;
+	}
+	if(localRefinementClipperPathsHaveArea(outside, config)){
+		return false;
+	}
+	if(sheet.children && sheet.children.length > 0){
+		for(var h=0; h<sheet.children.length; h++){
+			if(localRefinementMaterialOverlap(world, sheet.children[h], config)){
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+function localRefinementFinalLayoutLegalExact(sheet, placed, placements, config){
+	if(typeof SeparationUtil === 'undefined'){
+		return false;
+	}
+	var bounds = [];
+	for(var i=0; i<placed.length; i++){
+		if(!localRefinementExactSheetContains(placed[i], placements[i], sheet, config)){
+			return false;
+		}
+		bounds[i] = localRefinementWorldBounds(placed[i], placements[i]);
+	}
+	var eps = Math.max(1e-9, 1e-4 * (Number(config.curveTolerance) || 0));
+	for(i=0; i<placed.length; i++){
+		for(var j=i+1; j<placed.length; j++){
+			if(!localRefinementBoundsOverlap(bounds[i], bounds[j], eps)){
+				continue;
+			}
+			if(localRefinementHasChildren(placed[i]) || localRefinementHasChildren(placed[j])){
+				return false;
+			}
+			if(localRefinementMaterialOverlap(
+				shiftPolygon(placed[i], placements[i]),
+				shiftPolygon(placed[j], placements[j]),
+				config
+			)){
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+function localRefinementRequiresExactFinalGate(placements, config){
+	if(!placements){
+		return false;
+	}
+	for(var i=0; i<placements.length; i++){
+		if(placements[i] && !localRefinementRotationOnCanonicalGrid(placements[i].rotation || 0, config)){
+			return true;
+		}
+	}
+	return false;
+}
+
+function localRefinementFinalLayoutLegalForRotations(sheet, placed, placements, config){
+	if(localRefinementRequiresExactFinalGate(placements, config)){
+		return localRefinementFinalLayoutLegalExact(sheet, placed, placements, config);
+	}
+	return localRefinementFinalLayoutLegal(sheet, placed, placements, config);
+}
+
 function localRefinementFinalLayoutLegal(sheet, placed, placements, config){
 	if(typeof SeparationUtil === 'undefined'){
 		return false;
@@ -3312,6 +3433,241 @@ function localRefinementSmartTargetOrder(placed, placements, config){
 	return order;
 }
 
+function localRefinementQuantizedRotation(rotation){
+	return Math.round(normalizedRotation(rotation) * 1000) / 1000;
+}
+
+function localRefinementRotatePoint(point, degrees){
+	var angle = degrees * Math.PI / 180;
+	return {
+		x: point.x * Math.cos(angle) - point.y * Math.sin(angle),
+		y: point.x * Math.sin(angle) + point.y * Math.cos(angle)
+	};
+}
+
+function localRefinementPolygonCentroid(part){
+	var area2 = 0;
+	var cx = 0;
+	var cy = 0;
+	for(var i=0; i<part.length; i++){
+		var j = i === part.length - 1 ? 0 : i + 1;
+		var cross = part[i].x * part[j].y - part[j].x * part[i].y;
+		area2 += cross;
+		cx += (part[i].x + part[j].x) * cross;
+		cy += (part[i].y + part[j].y) * cross;
+	}
+	if(Math.abs(area2) > 1e-12){
+		return {
+			x: cx / (3 * area2),
+			y: cy / (3 * area2)
+		};
+	}
+	cx = 0;
+	cy = 0;
+	for(i=0; i<part.length; i++){
+		cx += part[i].x;
+		cy += part[i].y;
+	}
+	return {
+		x: part.length > 0 ? cx / part.length : 0,
+		y: part.length > 0 ? cy / part.length : 0
+	};
+}
+
+function localRefinementFineRotationCandidate(basePart, basePlacement, delta){
+	var pivotLocal = localRefinementPolygonCentroid(basePart);
+	var pivotWorld = {
+		x: basePlacement.x + pivotLocal.x,
+		y: basePlacement.y + pivotLocal.y
+	};
+	var rotatedPivot = localRefinementRotatePoint(pivotLocal, delta);
+	var candidatePart = rotatePolygon(basePart, delta);
+	var candidatePlacement = clonePlacementPosition(basePlacement);
+	candidatePlacement.x = pivotWorld.x - rotatedPivot.x;
+	candidatePlacement.y = pivotWorld.y - rotatedPivot.y;
+	candidatePlacement.rotation = localRefinementQuantizedRotation((basePlacement.rotation || basePart.rotation || 0) + delta);
+	candidatePart.source = basePart.source;
+	candidatePart.id = basePart.id;
+	candidatePart.rotation = candidatePlacement.rotation;
+	return {
+		part: candidatePart,
+		placement: candidatePlacement
+	};
+}
+
+function localRefinementFineRotationHasHoleRisk(placed, placements, config, index){
+	if(localRefinementHasChildren(placed[index])){
+		return true;
+	}
+	var bounds = localRefinementWorldBounds(placed[index], placements[index]);
+	var maxDeg = Math.max(0, Number(config.fineRotationMaxDeg) || 6);
+	var padding = localRefinementBboxDiagonal(placed[index]) * Math.sin(maxDeg * Math.PI / 180) + Math.max(1e-9, Number(config.curveTolerance) || 0);
+	for(var i=0; i<placed.length; i++){
+		if(i === index || !localRefinementHasChildren(placed[i])){
+			continue;
+		}
+		if(localRefinementBoundsOverlap(bounds, localRefinementWorldBounds(placed[i], placements[i]), padding)){
+			return true;
+		}
+	}
+	return false;
+}
+
+function localRefinementFineRotationCandidateLegal(sheet, placed, placements, config, index, candidatePart, candidatePlacement, stats){
+	var started = Date.now();
+	if(stats){
+		stats.fineRotateExactChecks = (stats.fineRotateExactChecks || 0) + 1;
+	}
+	var legal = false;
+	try {
+		if(!localRefinementExactSheetContains(candidatePart, candidatePlacement, sheet, config)){
+			return false;
+		}
+		var eps = Math.max(1e-9, 1e-4 * (Number(config.curveTolerance) || 0));
+		var candidateWorld = shiftPolygon(candidatePart, candidatePlacement);
+		var candidateBounds = GeometryUtil.getPolygonBounds(candidateWorld);
+		for(var j=0; j<placed.length; j++){
+			if(j === index){
+				continue;
+			}
+			var neighborBounds = localRefinementWorldBounds(placed[j], placements[j]);
+			if(!localRefinementBoundsOverlap(candidateBounds, neighborBounds, eps)){
+				continue;
+			}
+			if(localRefinementHasChildren(candidatePart) || localRefinementHasChildren(placed[j])){
+				if(stats){
+					stats.fineRotateSkippedHoles = (stats.fineRotateSkippedHoles || 0) + 1;
+				}
+				return false;
+			}
+			if(localRefinementMaterialOverlap(candidateWorld, shiftPolygon(placed[j], placements[j]), config)){
+				return false;
+			}
+		}
+		legal = true;
+		return true;
+	}
+	finally {
+		if(stats){
+			stats.fineRotateExactMs = (stats.fineRotateExactMs || 0) + (Date.now() - started);
+			if(!legal){
+				stats.legalityRejects = (stats.legalityRejects || 0) + 1;
+			}
+		}
+	}
+}
+
+function localRefinementTryFineRotate(sheet, placed, placements, config, index, currentMetric, deadline, stats){
+	var operatorStats = stats ? localRefinementEnsureSmartStats(stats) : null;
+	if(localRefinementFineRotationHasHoleRisk(placed, placements, config, index)){
+		if(stats){
+			stats.fineRotateSkippedHoles = (stats.fineRotateSkippedHoles || 0) + 1;
+		}
+		return {moved: false, metric: currentMetric};
+	}
+
+	var maxDeg = Math.max(0, Number(config.fineRotationMaxDeg) || 6);
+	var minDeg = Math.max(1e-6, Number(config.fineRotationMinDeg) || 0.25);
+	if(maxDeg <= 0 || minDeg > maxDeg){
+		return {moved: false, metric: currentMetric};
+	}
+	var basePart = localRefinementClonePart(placed[index]);
+	var basePlacement = clonePlacementPosition(placements[index]);
+	var step = maxDeg;
+	var netDelta = 0;
+	var moved = false;
+	var metric = currentMetric;
+	var directions = [1, -1];
+
+	while(step >= minDeg && Date.now() < deadline){
+		var acceptedAtStep = false;
+		for(var d=0; d<directions.length && Date.now() < deadline; d++){
+			var candidateDelta = netDelta + directions[d] * step;
+			if(Math.abs(candidateDelta) > maxDeg + 1e-9){
+				continue;
+			}
+			if(stats){
+				stats.fineRotateCandidates = (stats.fineRotateCandidates || 0) + 1;
+				stats.movesTested = (stats.movesTested || 0) + 1;
+			}
+			if(operatorStats){
+				operatorStats.fineRotate.tried++;
+			}
+			var candidate = localRefinementFineRotationCandidate(basePart, basePlacement, candidateDelta);
+			if(!localRefinementFineRotationCandidateLegal(sheet, placed, placements, config, index, candidate.part, candidate.placement, stats)){
+				continue;
+			}
+			var currentPart = placed[index];
+			var currentPlacement = placements[index];
+			placed[index] = candidate.part;
+			placements[index] = candidate.placement;
+			var candidateMetric = localRefinementSmartMetric(sheet, placed, placements, config);
+			if(candidateMetric !== null && localRefinementImproves(candidateMetric, metric)){
+				metric = candidateMetric;
+				netDelta = candidateDelta;
+				moved = true;
+				acceptedAtStep = true;
+				if(operatorStats){
+					operatorStats.fineRotate.accepted++;
+				}
+				if(stats){
+					stats.movesAccepted = (stats.movesAccepted || 0) + 1;
+					stats.fineRotateMaxDeltaDeg = Math.max(stats.fineRotateMaxDeltaDeg || 0, Math.abs(netDelta));
+				}
+				break;
+			}
+			placed[index] = currentPart;
+			placements[index] = currentPlacement;
+		}
+		if(!acceptedAtStep){
+			step /= 2;
+		}
+	}
+	if(Date.now() >= deadline && stats){
+		stats.deadlineHits = (stats.deadlineHits || 0) + 1;
+	}
+	return {
+		moved: moved,
+		metric: metric
+	};
+}
+
+function localRefinementRunFineRotationStage(sheet, placed, placements, config, currentMetric, deadline, stats){
+	if(!config || config.localRefinementFineRotation !== true){
+		return {moved: false, metric: currentMetric};
+	}
+	if(config.mergeLines === true){
+		if(stats){
+			stats.fineRotateSkippedMergeLines = (stats.fineRotateSkippedMergeLines || 0) + 1;
+		}
+		return {moved: false, metric: currentMetric};
+	}
+	var minBudget = Math.max(0, parseInt(config.fineRotationMinBudgetMs, 10) || 300);
+	if(deadline - Date.now() < minBudget){
+		if(stats){
+			stats.fineRotateSkippedBudget = (stats.fineRotateSkippedBudget || 0) + 1;
+		}
+		return {moved: false, metric: currentMetric};
+	}
+	var order = localRefinementSmartTargetOrder(placed, placements, config);
+	var configuredTargets = parseInt(config.fineRotationMaxTargets, 10);
+	var maxTargets = isFinite(configuredTargets) && configuredTargets >= 0 ? configuredTargets : 8;
+	var limit = Math.min(order.length, maxTargets);
+	var moved = false;
+	var metric = currentMetric;
+	for(var t=0; t<limit && Date.now() < deadline; t++){
+		var result = localRefinementTryFineRotate(sheet, placed, placements, config, order[t], metric, deadline, stats);
+		if(result.moved){
+			metric = result.metric;
+			moved = true;
+		}
+	}
+	return {
+		moved: moved,
+		metric: metric
+	};
+}
+
 function localRefinementSinglePlacementLegal(sheet, placed, placements, config, index, skip){
 	var eps = Math.max(1e-9, 1e-4 * (Number(config.curveTolerance) || 0));
 	var q = {
@@ -3354,11 +3710,23 @@ function localRefinementEnsureSmartStats(stats){
 		stats.operatorStats = {
 			settle: {tried: 0, accepted: 0},
 			relocate: {tried: 0, accepted: 0},
-			swap: {tried: 0, accepted: 0}
+			swap: {tried: 0, accepted: 0},
+			fineRotate: {tried: 0, accepted: 0}
 		};
 	}
-	else if(!stats.operatorStats.settle){
-		stats.operatorStats.settle = {tried: 0, accepted: 0};
+	else{
+		if(!stats.operatorStats.settle){
+			stats.operatorStats.settle = {tried: 0, accepted: 0};
+		}
+		if(!stats.operatorStats.relocate){
+			stats.operatorStats.relocate = {tried: 0, accepted: 0};
+		}
+		if(!stats.operatorStats.swap){
+			stats.operatorStats.swap = {tried: 0, accepted: 0};
+		}
+		if(!stats.operatorStats.fineRotate){
+			stats.operatorStats.fineRotate = {tried: 0, accepted: 0};
+		}
 	}
 	return stats.operatorStats;
 }
@@ -4360,6 +4728,11 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 		}
 	}
 
+	var fineRotated = localRefinementRunFineRotationStage(sheet, placed, placements, config, currentMetric, deadline, stats);
+	if(fineRotated.moved){
+		currentMetric = fineRotated.metric;
+	}
+
 	if(Date.now() >= deadline){
 		stats.deadlineHits++;
 	}
@@ -4370,7 +4743,7 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.relativeImprovement = stats.scoreBefore > 0 ? (stats.scoreBefore - stats.scoreAfter) / stats.scoreBefore : 0;
 
 	var moved = localRefinementPlacementsMoved(original, placements) || localRefinementPlacedMoved(originalPlaced, placed);
-	if(moved && !localRefinementFinalLayoutLegal(sheet, placed, placements, config)){
+	if(moved && !localRefinementFinalLayoutLegalForRotations(sheet, placed, placements, config)){
 		localRefinementRestorePlaced(placed, originalPlaced);
 		localRefinementRestorePlacements(placements, original);
 		stats.reason = 'legalityRevert';
@@ -4402,6 +4775,13 @@ function createLocalRefinementStats(enabled){
 		movesTested: 0,
 		movesAccepted: 0,
 		nonCanonicalNfpLookups: 0,
+		fineRotateCandidates: 0,
+		fineRotateExactChecks: 0,
+		fineRotateExactMs: 0,
+		fineRotateSkippedHoles: 0,
+		fineRotateSkippedBudget: 0,
+		fineRotateSkippedMergeLines: 0,
+		fineRotateMaxDeltaDeg: 0,
 		scoreBefore: null,
 		scoreAfter: null
 	};
@@ -4454,7 +4834,7 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'nonCanonicalNfpLookups'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
 	}
@@ -4472,6 +4852,9 @@ function mergeLocalRefinementStats(total, stats){
 	}
 	if(typeof stats.maxResidualDepth === 'number'){
 		total.maxResidualDepth = Math.max(total.maxResidualDepth || 0, stats.maxResidualDepth);
+	}
+	if(typeof stats.fineRotateMaxDeltaDeg === 'number'){
+		total.fineRotateMaxDeltaDeg = Math.max(total.fineRotateMaxDeltaDeg || 0, stats.fineRotateMaxDeltaDeg);
 	}
 	if(typeof stats.finalAlpha !== 'undefined' && stats.finalAlpha !== null){
 		total.finalAlpha = stats.finalAlpha;

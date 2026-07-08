@@ -177,6 +177,118 @@ function testNonCanonicalNfpGuardHelpers() {
 	assert.strictEqual(ctx.localRefinementNonCanonicalNfpLookupDelta(0), 1, 'delta should report guard trips since baseline');
 }
 
+function testFineRotationCandidatePreservesCentroidPivot() {
+	const ctx = loadBackgroundFunctions([
+		'clonePlacementPosition',
+		'rotatePolygon',
+		'normalizedRotation',
+		'localRefinementQuantizedRotation',
+		'localRefinementRotatePoint',
+		'localRefinementPolygonCentroid',
+		'localRefinementFineRotationCandidate'
+	]);
+	const part = rect(0, 0, 2, 2);
+	part.source = 'part-a';
+	part.id = 'part-a-1';
+	part.rotation = 0;
+	const placement = { x: 10, y: 20, id: part.id, source: part.source, rotation: 0 };
+	const pivot = ctx.localRefinementPolygonCentroid(part);
+	const before = { x: placement.x + pivot.x, y: placement.y + pivot.y };
+	const candidate = ctx.localRefinementFineRotationCandidate(part, placement, 90);
+	const rotatedPivot = ctx.localRefinementRotatePoint(pivot, 90);
+	const after = {
+		x: candidate.placement.x + rotatedPivot.x,
+		y: candidate.placement.y + rotatedPivot.y
+	};
+	assertClose(after.x, before.x, 1e-9, 'fine rotation should preserve pivot world x');
+	assertClose(after.y, before.y, 1e-9, 'fine rotation should preserve pivot world y');
+	assert.strictEqual(candidate.placement.rotation, 90, 'candidate placement should carry quantized rotation');
+	assert.strictEqual(candidate.part.rotation, 90, 'candidate part should carry matching rotation');
+	assert.strictEqual(candidate.part.source, part.source, 'candidate part should preserve source');
+	assert.strictEqual(candidate.part.id, part.id, 'candidate part should preserve id');
+}
+
+function testFineRotationExactGateSelection() {
+	const ctx = loadBackgroundFunctions([
+		'normalizedRotation',
+		'rotationRetryCount',
+		'rotationRetryStep',
+		'localRefinementRotationOnCanonicalGrid',
+		'localRefinementRequiresExactFinalGate'
+	]);
+	const config = { rotations: 4 };
+	assert.strictEqual(ctx.localRefinementRequiresExactFinalGate([{ rotation: 0 }, { rotation: 180 }], config), false, 'canonical layout should use normal final gate');
+	assert.strictEqual(ctx.localRefinementRequiresExactFinalGate([{ rotation: 0 }, { rotation: 45.5 }], config), true, 'fine-rotated layout should use exact final gate');
+}
+
+function testFineRotationAcceptancePath() {
+	const ctx = loadBackgroundFunctions([
+		'clonePlacementPosition',
+		'localRefinementNormalizeDirection',
+		'localRefinementImproves',
+		'rotatePolygon',
+		'localRefinementClonePart',
+		'localRefinementBboxDiagonal',
+		'localRefinementWorldBounds',
+		'localRefinementHasChildren',
+		'localRefinementBoundsOverlap',
+		'localRefinementEnsureSmartStats',
+		'normalizedRotation',
+		'localRefinementQuantizedRotation',
+		'localRefinementRotatePoint',
+		'localRefinementPolygonCentroid',
+		'localRefinementFineRotationCandidate',
+		'localRefinementFineRotationHasHoleRisk',
+		'localRefinementTryFineRotate'
+	], {
+		getPolygonBounds: function (points) {
+			let minX = Infinity;
+			let minY = Infinity;
+			let maxX = -Infinity;
+			let maxY = -Infinity;
+			points.forEach((point) => {
+				minX = Math.min(minX, point.x);
+				minY = Math.min(minY, point.y);
+				maxX = Math.max(maxX, point.x);
+				maxY = Math.max(maxY, point.y);
+			});
+			return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+		}
+	}, {
+		clone: function (value) {
+			return JSON.parse(JSON.stringify(value));
+		},
+		localRefinementFineRotationCandidateLegal: function () {
+			return true;
+		},
+		localRefinementSmartMetric: function (sheet, placed, placements) {
+			return Math.abs((placements[0].rotation || 0) - 6);
+		}
+	});
+	const part = rect(0, 0, 2, 1);
+	part.source = 'part-a';
+	part.id = 'part-a-1';
+	part.rotation = 0;
+	const placed = [part];
+	const placements = [{ x: 0, y: 0, id: part.id, source: part.source, rotation: 0 }];
+	const stats = { movesTested: 0, movesAccepted: 0 };
+	const result = ctx.localRefinementTryFineRotate(
+		rect(0, 0, 20, 20),
+		placed,
+		placements,
+		{ fineRotationMaxDeg: 6, fineRotationMinDeg: 6, rotations: 4, curveTolerance: 0.3 },
+		0,
+		10,
+		Date.now() + 10000,
+		stats
+	);
+	assert.strictEqual(result.moved, true, 'fine rotation should accept a legal strict improvement');
+	assert.strictEqual(result.metric, 0, 'accepted fine rotation should update metric');
+	assert.strictEqual(placements[0].rotation, 6, 'accepted placement should keep fine rotation');
+	assert.strictEqual(placed[0].rotation, 6, 'accepted part should keep fine rotation');
+	assert.strictEqual(stats.operatorStats.fineRotate.accepted, 1, 'operator stats should count accepted fine rotation');
+}
+
 function testSheetHoleForbiddenNfp() {
 	const calls = [];
 	const forbiddenRing = rect(0, 0, 10, 10);
@@ -584,6 +696,9 @@ function run() {
 	testEmptyClipperFallback();
 	testRotationRetries();
 	testNonCanonicalNfpGuardHelpers();
+	testFineRotationCandidatePreservesCentroidPivot();
+	testFineRotationExactGateSelection();
+	testFineRotationAcceptancePath();
 	testSheetHoleForbiddenNfp();
 	testSheetHoleFailsClosed();
 	testSheetHoleDifferenceFailureFailsClosed();

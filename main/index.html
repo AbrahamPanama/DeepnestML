@@ -420,6 +420,12 @@
 			  localRefinementBudgetMs: 1500,
 			  localRefinementRotations: false,
 			  localRefinementMaxColdAnglesPerPart: 3,
+			  localRefinementFineRotation: false,
+			  fineRotationMaxDeg: 6,
+			  fineRotationMinDeg: 0.25,
+			  fineRotationMaxTargets: 8,
+			  fineRotationPivot: 'centroid',
+			  fineRotationMinBudgetMs: 300,
 			  processHoles: true, // when true, NFP generation subtracts A's holes; when false, holes on A are ignored (faster for hole-free jobs)
 			  exportSheetOutline: false, // when true, exports include the sheet boundary with the nested parts
 			  exportFormat: 'svg',
@@ -477,7 +483,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							val = i.checked;
 						}
 					
@@ -582,7 +588,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -4843,11 +4849,17 @@
 								<input type="checkbox" data-config="localRefinement" /> <span class="radiolabel">Jiggle placed parts after nesting</span>
 							</dd>
 
+							<dt class="steprepeat-disabled">Fine rotation</dt>
+							<dd class="steprepeat-disabled">
+								<input type="checkbox" data-config="localRefinementFineRotation" /> <span class="radiolabel">Snug final angles after refinement</span>
+							</dd>
+
 							<dt class="steprepeat-disabled">Refinement engine</dt>
 							<dd class="steprepeat-disabled">
 								<select data-config="localRefinementEngine">
 									<option value="slide">Slide</option>
 									<option value="shrinkSeparate">Shrink-separate</option>
+									<option value="smart">Smart</option>
 								</select>
 							</dd>
 

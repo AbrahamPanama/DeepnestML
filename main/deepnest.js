@@ -41,6 +41,12 @@
 			localRefinementBudgetMs: 1500,
 			localRefinementRotations: false,
 			localRefinementMaxColdAnglesPerPart: 3,
+			localRefinementFineRotation: false,
+			fineRotationMaxDeg: 6,
+			fineRotationMinDeg: 0.25,
+			fineRotationMaxTargets: 8,
+			fineRotationPivot: 'centroid',
+			fineRotationMinBudgetMs: 300,
 			processHoles: true,
 			mergeLines: true,
 			mergeCandidateCap: 0,
@@ -814,6 +820,34 @@
 
 			if(c.localRefinementRotations === true || c.localRefinementRotations === false){
 				config.localRefinementRotations = !!c.localRefinementRotations;
+			}
+
+			if(c.localRefinementFineRotation === true || c.localRefinementFineRotation === false){
+				config.localRefinementFineRotation = !!c.localRefinementFineRotation;
+			}
+
+			var fineRotationMaxDeg = Number(c.fineRotationMaxDeg);
+			if(typeof fineRotationMaxDeg == 'number' && !isNaN(fineRotationMaxDeg) && isFinite(fineRotationMaxDeg) && fineRotationMaxDeg > 0){
+				config.fineRotationMaxDeg = Math.min(fineRotationMaxDeg, 45);
+			}
+
+			var fineRotationMinDeg = Number(c.fineRotationMinDeg);
+			if(typeof fineRotationMinDeg == 'number' && !isNaN(fineRotationMinDeg) && isFinite(fineRotationMinDeg) && fineRotationMinDeg > 0){
+				config.fineRotationMinDeg = Math.min(fineRotationMinDeg, config.fineRotationMaxDeg);
+			}
+
+			var fineRotationMaxTargets = Number(c.fineRotationMaxTargets);
+			if(typeof fineRotationMaxTargets == 'number' && !isNaN(fineRotationMaxTargets) && isFinite(fineRotationMaxTargets) && fineRotationMaxTargets >= 0){
+				config.fineRotationMaxTargets = Math.min(Math.floor(fineRotationMaxTargets), 64);
+			}
+
+			if(c.fineRotationPivot === 'centroid' || c.fineRotationPivot === 'contact'){
+				config.fineRotationPivot = String(c.fineRotationPivot);
+			}
+
+			var fineRotationMinBudgetMs = Number(c.fineRotationMinBudgetMs);
+			if(typeof fineRotationMinBudgetMs == 'number' && !isNaN(fineRotationMinBudgetMs) && isFinite(fineRotationMinBudgetMs) && fineRotationMinBudgetMs >= 0){
+				config.fineRotationMinBudgetMs = Math.min(Math.floor(fineRotationMinBudgetMs), 30000);
 			}
 
 				var maxColdAngles = Number(c.localRefinementMaxColdAnglesPerPart);
