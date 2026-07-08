@@ -63,10 +63,11 @@
 		
 		var GA = null;
 		var best = null;
-		var workerTimer = null;
-		var progress = 0;
-		var activeWorkerPayloads = {};
-		var refinementCounter = 0;
+			var workerTimer = null;
+			var progress = 0;
+			var activeWorkerPayloads = {};
+			var activeNestToken = null;
+			var refinementCounter = 0;
 		
 		var progressCallback = null;
 		var displayCallback = null;
@@ -86,9 +87,9 @@
 			return workerConfig;
 		}
 
-		function createPendingLocalRefinementStats(){
-			return {
-				enabled: true,
+			function createPendingLocalRefinementStats(){
+				return {
+					enabled: true,
 				pending: true,
 				ran: false,
 				sheetsChecked: 0,
@@ -96,10 +97,45 @@
 				movesAccepted: 0,
 				scoreBefore: null,
 				scoreAfter: null
-			};
-		}
+				};
+			}
 
-		function requestLocalRefinementForBest(basePayload, userConfig){
+			function createNestToken(){
+				return 'nest-' + Date.now() + '-' + Math.floor(Math.random()*1e9);
+			}
+
+			function buildNestGeometry(parts, token, cloneTree){
+				var geometry = {
+					token: token,
+					partsBySource: {},
+					partsChildrenBySource: {},
+					sheets: [],
+					sheetids: [],
+					sheetsources: [],
+					sheetchildren: []
+				};
+				var sid = 0;
+				for(var i=0; i<parts.length; i++){
+					if(parts[i].sheet){
+						for(var j=0; j<parts[i].quantity; j++){
+							var sheet = cloneTree(parts[i].polygontree);
+							geometry.sheets.push(sheet);
+							geometry.sheetids.push(sid);
+							geometry.sheetsources.push(i);
+							geometry.sheetchildren.push(sheet.children);
+							sid++;
+						}
+					}
+					else{
+						var part = cloneTree(parts[i].polygontree);
+						geometry.partsBySource[i] = part;
+						geometry.partsChildrenBySource[i] = part.children;
+					}
+				}
+				return geometry;
+			}
+
+			function requestLocalRefinementForBest(basePayload, userConfig){
 			if(!basePayload || basePayload.postProcessRefinement || !userConfig || userConfig.localRefinement !== true){
 				return;
 			}
@@ -1322,6 +1358,8 @@
 			}
 			
 			var self = this;
+			activeNestToken = createNestToken();
+			ipcRenderer.send('nest-geometry-set', buildNestGeometry(parts, activeNestToken, this.cloneTree.bind(this)));
 			this.working = true;
 			
 			if(!workerTimer){
@@ -1482,61 +1520,27 @@
 			var workerLimit = GA.deterministic ? 1 : Math.min(configuredThreads, 8);
 			
 			
-			var sheets = [];
-			var sheetids = [];
-			var sheetsources = [];
-			var sheetchildren = [];
-			var sid = 0;
-			for(i=0; i<parts.length; i++){
-				if(parts[i].sheet){
-					for(j=0; j<parts[i].quantity; j++){
-						// Deep clone per instance. Pushing the same polygontree
-						// reference multiple times would be preserved by the
-						// structured-clone IPC, and the subsequent id/source
-						// assignments in background.js would then mutate a
-						// shared object — collapsing every sheet's id into the
-						// last one and causing duplicate #sheet<id> DOM groups
-						// during render (first sheet ends up with no boundary).
-						var poly = this.cloneTree(parts[i].polygontree);
-						sheets.push(poly);
-						sheetids.push(sid);
-						sheetsources.push(i);
-						sheetchildren.push(poly.children);
-						sid++;
-					}
-				}
-			}
-			
-			
 			for(i=0; i<GA.population.length; i++){
 				if(running < workerLimit && !GA.population[i].processing && !GA.population[i].fitness){
 					GA.population[i].processing = true;
 										
-					// hash values on arrays don't make it across ipc, store them in an array and reassemble on the other side....
 					var ids = [];
 					var sources = [];
-					var children = [];
 					
 					for(j=0; j<GA.population[i].placement.length; j++){
 						var id = GA.population[i].placement[j].id;
 						var source = GA.population[i].placement[j].source;
-						var child = GA.population[i].placement[j].children;
 						ids[j] = id;
 						sources[j] = source;
-						children[j] = child;
 					}
 
 					var workerPayload = {
 						index: i,
-						sheets: sheets,
-						sheetids: sheetids,
-						sheetsources: sheetsources,
-						sheetchildren: sheetchildren,
-						individual: GA.population[i],
+						nestToken: activeNestToken,
 						config: copyConfigForWorker(config, false),
 						ids: ids,
 						sources: sources,
-						children: children
+						rotations: GA.population[i].rotation
 					};
 					activeWorkerPayloads[i] = workerPayload;
 					ipcRenderer.send('background-start', workerPayload);
@@ -1702,11 +1706,12 @@
 		// running after the renderer has decided to abort (error path). The UI
 		// stop/back/reset paths already send background-stop themselves, so
 		// they call stop() without the flag to avoid redundant teardown.
-		this.stop = function(drainBackground){
-			this.working = false;
-			if(GA && GA.population && GA.population.length > 0){
-				GA.population.forEach(function(i){
-					i.processing = false;
+			this.stop = function(drainBackground){
+				this.working = false;
+				activeNestToken = null;
+				if(GA && GA.population && GA.population.length > 0){
+					GA.population.forEach(function(i){
+						i.processing = false;
 				});
 			}
 			if(workerTimer){
@@ -1723,12 +1728,13 @@
 			}
 		};
 		
-		this.reset = function(){
-			GA = null;
-			activeWorkerPayloads = {};
-			while(this.nests.length > 0){
-				this.nests.pop();
-			}
+			this.reset = function(){
+				GA = null;
+				activeWorkerPayloads = {};
+				activeNestToken = null;
+				while(this.nests.length > 0){
+					this.nests.pop();
+				}
 			progressCallback = null;
 			displayCallback = null;
 		}
