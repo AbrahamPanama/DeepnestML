@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-08 by Codex): _code/docs expected clean after `[codex] PERF-P5 S5: add dispatch telemetry and closeout`; dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/`. Generated benchmark artifacts remain untracked by convention._
+State (verified 2026-07-08 by Codex): _code/docs expected clean after `[codex] PERF-P4: add default-off merge candidate cap`; dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/`. Generated benchmark artifacts remain untracked by convention._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | PERF-P4 mergeLines top-k credit cap | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, smoke scenario, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: hidden default-off cap landed; flag-off equivalence green; flag-on benchmark borderline-green at cap64 | 2026-07-08 |
 | Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: token geometry dispatch landed; refinement token path verified; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P6 batched NFP warm (pre-pass first) | `main/background.js`, `main.js`, `ml/app-smoke-main.js`, `ml/teacher-main.js`, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: batch find IPC + pre-pass warm landed; telemetry proves path; equivalence/smoke/teacher/benchmark green | 2026-07-08 |
 | Codex | PERF-P3 hull candidate hoists | `main/background.js`, `ml/scripts/run_smoke_battery.sh`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: candidate/sheet hull reuse landed; `svg-hull` in default smoke battery; equivalence/smoke/benchmark green | 2026-07-08 |
@@ -144,6 +145,16 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P4 mergeLines candidate cap (Codex)
+
+- Implemented hidden/default-off `mergeCandidateCap` (`0` = old behavior) in `main/deepnest.js` and `main/index.html`. Worker config propagation rides through the existing `copyConfigForWorker` copy.
+- `main/background.js` now keeps flag-off merge scoring on the old path. When `mergeLines && mergeCandidateCap > 0`, candidates are first ranked by the existing base score (including `improvedPlacementScore`, excluding only merge credit), only the top-k are retained, and the final winner is selected after exact `mergedLength` credit using the existing tie-break rules.
+- Added `ml/smoke/scenarios/svg-gravity-merge-cap.json` for cap64 smoke testing and `ml/cli/run_benchmark.js` flags `--merge-lines` / `--merge-candidate-cap` so P4 benchmark gates are reproducible.
+- Verification passed: `node --check main/background.js main/deepnest.js ml/cli/run_benchmark.js ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/nest_geometry_broker/run.js`; `node ml/tests/separation/run.js`; `bash ml/scripts/run_boot_check.sh`; `node ml/tests/engine_equivalence/run.js`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p4 bash ml/scripts/run_smoke_battery.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p4-merge bash ml/scripts/run_smoke_battery.sh svg-gravity-merge svg-gravity-merge-cap`; `git diff --check`.
+- Flag-on benchmark artifacts: cap off `ml/benchmark/results/20260708T154330Z-perf-p4-merge-off.json`; cap64 `ml/benchmark/results/20260708T154459Z-perf-p4-merge-cap64.json`; cap128 probe `ml/benchmark/results/20260708T154721Z-perf-p4-merge-cap128.json`.
+- Cap64 gate summary vs cap-off: aggregate mean median utilization `0.3950649969412868` -> `0.39808590908978214` (`+0.302pp`, borderline but positive; blaz1/shapes0 unchanged). PlacementMs mostly improved: blaz1 `2315/949` -> `2007/790`, shapes0 `2623/370` -> `2465/375`, albano mixed `2244/1772` -> `2378/932`. Cap128 was slightly worse than the strict band (`-0.321pp`) and is not the recommended value.
+- Default remains `mergeCandidateCap: 0`; no ML checkpoint/bakeoff needed while the flag stays off.
 
 ### 2026-07-08 - PERF-P5 S5 closeout telemetry + benchmark (Codex)
 

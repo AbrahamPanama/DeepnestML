@@ -4679,6 +4679,55 @@ function candidatePlacementIsBetter(currentScore, currentX, currentY, candidateS
 	return false;
 }
 
+function normalizeMergeCandidateCap(config){
+	var cap = config ? parseInt(config.mergeCandidateCap, 10) : 0;
+	return cap > 0 ? cap : 0;
+}
+
+function mergeCandidateCompare(a, b){
+	if(!b){
+		return -1;
+	}
+	if(a.baseScore < b.baseScore){
+		return -1;
+	}
+	if(a.baseScore > b.baseScore){
+		return 1;
+	}
+	if(a.x < b.x){
+		return -1;
+	}
+	if(a.x > b.x){
+		return 1;
+	}
+	if(a.y < b.y){
+		return -1;
+	}
+	if(a.y > b.y){
+		return 1;
+	}
+	return a.ordinal - b.ordinal;
+}
+
+function recordMergeCandidate(candidates, cap, candidate){
+	if(cap <= 0){
+		return;
+	}
+	if(candidates.length < cap){
+		candidates.push(candidate);
+		return;
+	}
+	var worstIndex = 0;
+	for(var i=1; i<candidates.length; i++){
+		if(mergeCandidateCompare(candidates[i], candidates[worstIndex]) > 0){
+			worstIndex = i;
+		}
+	}
+	if(mergeCandidateCompare(candidate, candidates[worstIndex]) < 0){
+		candidates[worstIndex] = candidate;
+	}
+}
+
 function buildTreeFromOuterNfpList(nfpList, A){
 	if(!nfpList || nfpList.length == 0){
 		return null;
@@ -5298,6 +5347,9 @@ function placeParts(sheets, parts, config, nestindex){
 			var shiftedplaced = null;
 			var mergeMinLength = null;
 			var mergeTolerance = null;
+			var mergeCandidateCap = config.mergeLines ? normalizeMergeCandidateCap(config) : 0;
+			var mergeCandidates = mergeCandidateCap > 0 ? [] : null;
+			var mergeCandidateOrdinal = 0;
 			if(config.mergeLines){
 				shiftedplaced = [];
 				for(m=0; m<placed.length; m++){
@@ -5367,6 +5419,20 @@ function placeParts(sheets, parts, config, nestindex){
 					//console.timeEnd('evalbounds');
 					//console.time('evalmerge');
 					
+					if(config.mergeLines && mergeCandidateCap > 0){
+						var baseScore = improvedPlacementScore(area, candidateBounds, sheetboundsForScoring, config);
+						recordMergeCandidate(mergeCandidates, mergeCandidateCap, {
+							area: area,
+							baseScore: baseScore,
+							bounds: candidateBounds,
+							ordinal: mergeCandidateOrdinal++,
+							position: shiftvector,
+							x: shiftvector.x,
+							y: shiftvector.y
+						});
+						continue;
+					}
+
 					if(config.mergeLines){
 						// if lines can be merged, subtract savings from area calculation						
 						var shiftedpart = shiftPolygon(part, shiftvector);
@@ -5392,7 +5458,29 @@ function placeParts(sheets, parts, config, nestindex){
 					}
 				}
 			}
-			
+
+			if(mergeCandidateCap > 0){
+				for(var ci=0; ci<mergeCandidates.length; ci++){
+					var mergeCandidate = mergeCandidates[ci];
+					shiftvector = mergeCandidate.position;
+					candidateBounds = mergeCandidate.bounds;
+					area = mergeCandidate.area;
+					var cappedShiftedPart = shiftPolygon(part, shiftvector);
+					var cappedMerged = mergedLength(shiftedplaced, cappedShiftedPart, mergeMinLength, mergeTolerance);
+					area -= cappedMerged.totalLength*config.timeRatio;
+					score = improvedPlacementScore(area, candidateBounds, sheetboundsForScoring, config);
+					if(candidatePlacementIsBetter(minarea, minx, miny, score, shiftvector.x, shiftvector.y)){
+						minarea = score;
+						minwidth = candidateBounds ? candidateBounds.width : 0;
+						position = shiftvector;
+						minx = shiftvector.x;
+						miny = shiftvector.y;
+						position.mergedLength = cappedMerged.totalLength;
+						position.mergedSegments = cappedMerged.segments;
+					}
+				}
+			}
+
 			if(position){
 				placed.push(part);
 				placements.push(position);

@@ -1,6 +1,6 @@
 # Performance Plan — Deepnest ML engine hot paths
 
-Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P2/P1/P3/P6 implemented 2026-07-08; PERF-P5+ not started.
+Status: PLAN v2 — AMENDED 2026-06-12 after implementing-coder review; PERF-P0 implemented 2026-07-07; PERF-P2/P1/P3/P6/P5/P4 implemented 2026-07-08.
 Author: Claude-Code, 2026-06-12. Review findings verified against live code the same day;
 all accepted except one mechanism correction (§9a — digest determinism), noted inline.
 

@@ -1,0 +1,15 @@
+{
+  "name": "svg-gravity-merge-cap",
+  "description": "SVG import, gravity nesting with common-line merge scoring capped to the top 64 base candidates, SVG export.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": true,
+    "mergeCandidateCap": 64,
+    "populationSize": 8,
+    "threads": 2
+  }
+}

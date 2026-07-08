@@ -43,6 +43,7 @@
 			localRefinementMaxColdAnglesPerPart: 3,
 			processHoles: true,
 			mergeLines: true,
+			mergeCandidateCap: 0,
 			timeRatio: 0.5,
 			scale: 72,
 			simplify: false
@@ -825,12 +826,17 @@
 				}
 
 				if(c.mergeLines === true || c.mergeLines === false){
-				config.mergeLines = !!c.mergeLines;
-			}
-			
-			if(c.simplify === true || c.simplify === false){
-				config.simplify = !!c.simplify;
-			}
+					config.mergeLines = !!c.mergeLines;
+				}
+
+				if('mergeCandidateCap' in c){
+					var mergeCandidateCap = parseInt(c.mergeCandidateCap, 10);
+					config.mergeCandidateCap = mergeCandidateCap > 0 ? mergeCandidateCap : 0;
+				}
+
+				if(c.simplify === true || c.simplify === false){
+					config.simplify = !!c.simplify;
+				}
 			
 			var n = Number(c.timeRatio);
 			if(typeof n == 'number' && !isNaN(n) && isFinite(n)){

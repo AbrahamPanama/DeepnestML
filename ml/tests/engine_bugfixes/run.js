@@ -516,6 +516,36 @@ function testBackgroundDispatchTiming() {
 	assert.ok(ctx.backgroundDispatchMs({ dispatchStartedAt: Date.now() - 5 }) >= 0, 'dispatch timing should be non-negative');
 }
 
+function testMergeCandidateCapHelpers() {
+	const ctx = loadBackgroundFunctions([
+		'normalizeMergeCandidateCap',
+		'mergeCandidateCompare',
+		'recordMergeCandidate'
+	]);
+	assert.strictEqual(ctx.normalizeMergeCandidateCap({}), 0, 'missing cap should default off');
+	assert.strictEqual(ctx.normalizeMergeCandidateCap({ mergeCandidateCap: 0 }), 0, 'zero cap should be off');
+	assert.strictEqual(ctx.normalizeMergeCandidateCap({ mergeCandidateCap: '64' }), 64, 'positive cap should parse');
+	assert.strictEqual(ctx.normalizeMergeCandidateCap({ mergeCandidateCap: -5 }), 0, 'negative cap should be off');
+
+	function candidate(name, score, x, y, ordinal) {
+		return { name, baseScore: score, x, y, ordinal };
+	}
+	const candidates = [];
+	ctx.recordMergeCandidate(candidates, 2, candidate('worse-score', 10, 0, 0, 0));
+	ctx.recordMergeCandidate(candidates, 2, candidate('best-score-right', 9, 8, 0, 1));
+	ctx.recordMergeCandidate(candidates, 2, candidate('best-score-left', 9, 6, 0, 2));
+	ctx.recordMergeCandidate(candidates, 2, candidate('too-far-right', 9, 9, 0, 3));
+	assert.deepStrictEqual(
+		candidates.map((entry) => entry.name).sort(),
+		['best-score-left', 'best-score-right'],
+		'top-k should keep best base scores and lower-x ties'
+	);
+	assert.ok(
+		ctx.mergeCandidateCompare(candidate('a', 9, 6, 0, 1), candidate('b', 9, 6, 0, 2)) < 0,
+		'ordinal should make otherwise identical candidates deterministic'
+	);
+}
+
 function run() {
 	testMergedLengthThreshold();
 	testMergedLengthAfterFarCollinearEdge();
@@ -533,6 +563,7 @@ function run() {
 	testBackgroundStartTokenHydration();
 	testBackgroundStartMissingTokenFailsClosed();
 	testBackgroundDispatchTiming();
+	testMergeCandidateCapHelpers();
 	console.log('engine bugfix tests passed');
 }
 

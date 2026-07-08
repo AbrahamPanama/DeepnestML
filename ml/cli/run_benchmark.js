@@ -120,6 +120,13 @@ function localRefinementOptions(options) {
 	};
 }
 
+function mergeOptions(options) {
+	return {
+		mergeLines: booleanOption(optionValue(options, 'mergeLines', 'merge-lines', undefined), false),
+		mergeCandidateCap: Math.floor(numberOption(optionValue(options, 'mergeCandidateCap', 'merge-candidate-cap', undefined), 0, 0, 100000))
+	};
+}
+
 function ensureDir(dir) {
 	if (!fs.existsSync(dir)) {
 		fs.mkdirSync(dir, { recursive: true });
@@ -261,13 +268,15 @@ function rotationsForMeta(meta) {
 	return rotations;
 }
 
-function buildConfigPreset(rotations, fitnessVersion, refinementOptions) {
+function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig) {
 	fitnessVersion = parseInt(fitnessVersion || 1, 10) === 2 ? 2 : 1;
 	refinementOptions = refinementOptions || localRefinementOptions({});
+	mergeConfig = mergeConfig || mergeOptions({});
 	return {
 		placementType: 'gravity',
 		spacing: 0,
-		mergeLines: false,
+		mergeLines: mergeConfig.mergeLines,
+		mergeCandidateCap: mergeConfig.mergeCandidateCap,
 		processHoles: true,
 		populationSize: 10,
 		mutationRate: 10,
@@ -307,6 +316,7 @@ function runBenchmark(options) {
 	const timeBudgetSec = Math.max(1, Number(options.timeBudgetSec || options['time-budget-sec'] || DEFAULT_TIME_BUDGET_SEC));
 	const fitnessVersion = parseInt(options.fitnessVersion || options['fitness-version'] || 1, 10) === 2 ? 2 : 1;
 	const refinementOptions = localRefinementOptions(options);
+	const mergeConfig = mergeOptions(options);
 	const selectedInstances = listInstances(options.instances || options.instance || 'all');
 	const stamp = timestamp();
 	const artifactRoot = path.join(ARTIFACT_ROOT, stamp + '-' + label);
@@ -322,7 +332,8 @@ function runBenchmark(options) {
 			timeBudgetSec: timeBudgetSec,
 			fitnessVersion: fitnessVersion,
 			localRefinement: refinementOptions,
-			baseConfig: buildConfigPreset('<per-instance rotations>', fitnessVersion, refinementOptions)
+			merge: mergeConfig,
+			baseConfig: buildConfigPreset('<per-instance rotations>', fitnessVersion, refinementOptions, mergeConfig)
 		},
 		artifactRoot: artifactRoot,
 		instances: [],
@@ -345,7 +356,7 @@ function runBenchmark(options) {
 		const instance = readJson(instancePath);
 		const converted = esicup.instanceToSvg(instance);
 		const rotations = rotationsForMeta(converted.meta);
-		const configOverrides = buildConfigPreset(rotations, fitnessVersion, refinementOptions);
+		const configOverrides = buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig);
 		const instanceResult = {
 			name: converted.meta.name || name,
 			file: path.relative(ROOT, instancePath),
