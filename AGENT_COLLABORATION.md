@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-08 by Codex): _dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/` after the PERF-P6 commit; code/docs are expected clean after `[codex] PERF-P6: batch warm NFP cache lookups`. Generated benchmark artifacts remain untracked by convention._
+State (verified 2026-07-08 by Codex): _code/docs expected clean after `[codex] PERF-P5 S5: add dispatch telemetry and closeout`; dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/`. Generated benchmark artifacts remain untracked by convention._
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,7 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | In progress: S4 local-refinement token path verified; S5 cleanup/failure telemetry/benchmark next | 2026-07-08 |
+| Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: token geometry dispatch landed; refinement token path verified; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P6 batched NFP warm (pre-pass first) | `main/background.js`, `main.js`, `ml/app-smoke-main.js`, `ml/teacher-main.js`, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: batch find IPC + pre-pass warm landed; telemetry proves path; equivalence/smoke/teacher/benchmark green | 2026-07-08 |
 | Codex | PERF-P3 hull candidate hoists | `main/background.js`, `ml/scripts/run_smoke_battery.sh`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: candidate/sheet hull reuse landed; `svg-hull` in default smoke battery; equivalence/smoke/benchmark green | 2026-07-08 |
 | Codex | PERF-P1 fingerprint memoization | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: non-enumerable fingerprint memo landed; targeted tests + equivalence/smoke/benchmark green | 2026-07-08 |
@@ -144,6 +144,15 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-08 - PERF-P5 S5 closeout telemetry + benchmark (Codex)
+
+- Added `dispatchStartedAt` to normal GA and local-refinement worker payloads; `main/background.js` now reports non-negative `timing.dispatchMs` on normal, Step & Repeat, refinement, and missing-geometry failure responses. Missing token geometry still fails closed with `fitness: Number.MAX_VALUE`, `placements: []`, and an error.
+- Full verification passed: `node --check main/background.js main/deepnest.js ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/nest_geometry_broker/run.js`; `node ml/tests/separation/run.js`; `bash ml/scripts/run_boot_check.sh`; `node ml/tests/engine_equivalence/run.js`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p5-s5 bash ml/scripts/run_smoke_battery.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-perf-p5-s5-lr bash ml/scripts/run_smoke_battery.sh svg-hull-settle-floaters`; `git diff --check`.
+- Smoke telemetry proof: `/tmp/deepnest-smoke-perf-p5-s5/*/report.json` all reported `geometryPath: "token"` and `dispatchMs` 2-4 ms; local-refinement fixture reported `geometryPath: "token"`, `dispatchMs: 66`, `localRefinement.ran: true`, `movesAccepted: 1`.
+- Benchmark artifact: `ml/benchmark/results/20260708T153527Z-perf-p5-after.json` (`albano,blaz1,shapes0`, 10 s, 2 runs). All benchmark runs reported `geometryPath: "token"` and `dispatchMs` 3-4 ms.
+- P6 reference -> P5 after mean median utilization: `0.3940293188744975` -> `0.4036020126152047`. Medians: albano `0.7619901808483602` -> `0.7829603263049422`; blaz1 `0.2588902859733389` -> `0.2666382217388785`; shapes0 unchanged `0.16120748980179334`.
+- PERF-P5 is closed. Next perf WP per plan: `PERF-P4 mergeLines top-k credit cap` (flagged/default-off).
 
 ### 2026-07-08 - PERF-P5 S4 local-refinement token verification (Codex)
 

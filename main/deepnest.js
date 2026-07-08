@@ -160,6 +160,7 @@
 			refinePayload.postProcessRefinement = true;
 			refinePayload.refinementToken = token;
 			refinePayload.refinementBaseFitness = basePayload.fitness;
+			refinePayload.dispatchStartedAt = Date.now();
 			ipcRenderer.send('background-start', refinePayload);
 		}
 
@@ -1540,7 +1541,8 @@
 						config: copyConfigForWorker(config, false),
 						ids: ids,
 						sources: sources,
-						rotations: GA.population[i].rotation
+						rotations: GA.population[i].rotation,
+						dispatchStartedAt: Date.now()
 					};
 					activeWorkerPayloads[i] = workerPayload;
 					ipcRenderer.send('background-start', workerPayload);

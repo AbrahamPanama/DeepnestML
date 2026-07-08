@@ -297,6 +297,14 @@ function resolveBackgroundStartGeometry(data){
 	return { error: 'Background worker received a nest without geometry.' };
 }
 
+function backgroundDispatchMs(data){
+	if(!data || typeof data.dispatchStartedAt !== 'number'){
+		return null;
+	}
+	var elapsed = Date.now() - data.dispatchStartedAt;
+	return elapsed >= 0 ? elapsed : 0;
+}
+
 function hashString(value){
 	var hash = 2166136261;
 	for(var i=0; i<value.length; i++){
@@ -674,6 +682,7 @@ window.onload = function () {
 	  
 	ipcRenderer.on('background-start', (event, data) => {
 		var index = data.index;
+		var dispatchMs = backgroundDispatchMs(data);
 		var geometryData = resolveBackgroundStartGeometry(data);
 		if(geometryData.error){
 			ipcRenderer.send('background-progress', {index: index, progress: -1});
@@ -681,7 +690,11 @@ window.onload = function () {
 				index: data.index,
 				fitness: Number.MAX_VALUE,
 				placements: [],
-				error: geometryData.error
+				error: geometryData.error,
+				timing: {
+					dispatchMs: dispatchMs,
+					geometryPath: data && data.nestToken ? 'missing' : 'none'
+				}
 			});
 			return;
 		}
@@ -694,6 +707,7 @@ window.onload = function () {
 				stepPlacement.index = data.index;
 				stepPlacement.localRefinement = createLocalRefinementStats(false);
 				stepPlacement.timing = stepPlacement.timing || {};
+				stepPlacement.timing.dispatchMs = dispatchMs;
 				stepPlacement.timing.geometryPath = geometryData.geometryPath;
 				ipcRenderer.send('background-response', stepPlacement);
 			}
@@ -857,6 +871,7 @@ window.onload = function () {
 			placement.pairsCacheHits = pairsCacheHits;
 			placement.pairsMissing = pairsMissing;
 			placement.timing = placement.timing || {};
+			placement.timing.dispatchMs = dispatchMs;
 			placement.timing.pairsCacheHits = pairsCacheHits;
 			placement.timing.pairsMissing = pairsMissing;
 			placement.timing.processHoles = processHoles;

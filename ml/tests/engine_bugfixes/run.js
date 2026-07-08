@@ -509,6 +509,13 @@ function testBackgroundStartMissingTokenFailsClosed() {
 	assert.ok(result.error, 'missing token geometry should fail closed instead of throwing');
 }
 
+function testBackgroundDispatchTiming() {
+	const ctx = loadBackgroundFunctions(['backgroundDispatchMs']);
+	assert.strictEqual(ctx.backgroundDispatchMs({}), null, 'missing dispatch timestamp should omit timing');
+	assert.strictEqual(ctx.backgroundDispatchMs({ dispatchStartedAt: Date.now() + 1000 }), 0, 'future timestamp should clamp at zero');
+	assert.ok(ctx.backgroundDispatchMs({ dispatchStartedAt: Date.now() - 5 }) >= 0, 'dispatch timing should be non-negative');
+}
+
 function run() {
 	testMergedLengthThreshold();
 	testMergedLengthAfterFarCollinearEdge();
@@ -525,6 +532,7 @@ function run() {
 	testBackgroundStartLegacyHydration();
 	testBackgroundStartTokenHydration();
 	testBackgroundStartMissingTokenFailsClosed();
+	testBackgroundDispatchTiming();
 	console.log('engine bugfix tests passed');
 }
 
