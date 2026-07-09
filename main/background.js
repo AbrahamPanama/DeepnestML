@@ -3861,6 +3861,7 @@ function localRefinementEnsureSmartStats(stats){
 	if(!stats.operatorStats){
 		stats.operatorStats = {
 			settle: {tried: 0, accepted: 0},
+			pairCompact: {tried: 0, accepted: 0},
 			rotateReflow: {tried: 0, accepted: 0},
 			relocate: {tried: 0, accepted: 0},
 			swap: {tried: 0, accepted: 0},
@@ -3873,6 +3874,9 @@ function localRefinementEnsureSmartStats(stats){
 		}
 		if(!stats.operatorStats.rotateReflow){
 			stats.operatorStats.rotateReflow = {tried: 0, accepted: 0};
+		}
+		if(!stats.operatorStats.pairCompact){
+			stats.operatorStats.pairCompact = {tried: 0, accepted: 0};
 		}
 		if(!stats.operatorStats.relocate){
 			stats.operatorStats.relocate = {tried: 0, accepted: 0};
@@ -4608,6 +4612,374 @@ function localRefinementSettleFloaterGroup(sheet, placed, placements, config, de
 	return {moved: false, metric: currentMetric};
 }
 
+function localRefinementPairCompactionAngles(placement, config){
+	var current = normalizedRotation(placement && placement.rotation || 0);
+	var allowed = localRefinementSourceRotationAngles(placement, config);
+	var angles = [];
+	var configuredLimit = parseInt(config && config.pairCompactionMaxAngles, 10);
+	var limit = isFinite(configuredLimit) && configuredLimit > 0 ? Math.min(configuredLimit, 12) : 8;
+
+	function addAngle(angle){
+		angle = normalizedRotation(angle);
+		if(!localRefinementRotationOnCanonicalGrid(angle, config, placement)){
+			return;
+		}
+		for(var i=0; i<angles.length; i++){
+			if(localRefinementAngularDistance(angles[i], angle) <= 1e-7){
+				return;
+			}
+		}
+		if(angles.length < limit){
+			angles.push(angle);
+		}
+	}
+
+	addAngle(current);
+	for(var i=0; i<allowed.length && angles.length < limit; i++){
+		addAngle(allowed[i]);
+	}
+	return angles;
+}
+
+function localRefinementPairAxisTargets(anchor, mover, axis){
+	var anchorBounds = GeometryUtil.getPolygonBounds(anchor);
+	var moverBounds = GeometryUtil.getPolygonBounds(mover);
+	if(!anchorBounds || !moverBounds){
+		return [];
+	}
+	var isY = axis === 'y';
+	var anchorMin = isY ? anchorBounds.y : anchorBounds.x;
+	var anchorSize = isY ? anchorBounds.height : anchorBounds.width;
+	var moverMin = isY ? moverBounds.y : moverBounds.x;
+	var moverSize = isY ? moverBounds.height : moverBounds.width;
+	var moverReference = isY ? mover[0].y : mover[0].x;
+	return [
+		anchorMin - moverMin + moverReference,
+		anchorMin + anchorSize - moverMin - moverSize + moverReference,
+		anchorMin + anchorSize / 2 - moverMin - moverSize / 2 + moverReference,
+		anchorMin + anchorSize - moverMin + moverReference,
+		anchorMin - moverMin - moverSize + moverReference
+	];
+}
+
+function localRefinementPairAddAxisIntersections(candidates, ring, axis, values, tolerance){
+	if(!ring || ring.length < 2){
+		return;
+	}
+	for(var i=0; i<ring.length; i++){
+		var a = ring[i];
+		var b = ring[(i + 1) % ring.length];
+		var aValue = axis === 'y' ? a.y : a.x;
+		var bValue = axis === 'y' ? b.y : b.x;
+		var delta = bValue - aValue;
+		for(var v=0; v<values.length; v++){
+			if(Math.abs(delta) <= tolerance){
+				if(Math.abs(values[v] - aValue) <= tolerance){
+					localRefinementAddPointCandidate(candidates, a, tolerance);
+					localRefinementAddPointCandidate(candidates, b, tolerance);
+				}
+				continue;
+			}
+			var t = (values[v] - aValue) / delta;
+			if(t < -1e-9 || t > 1 + 1e-9){
+				continue;
+			}
+			localRefinementAddPointCandidate(candidates, {
+				x: a.x + (b.x - a.x) * t,
+				y: a.y + (b.y - a.y) * t
+			}, tolerance);
+		}
+	}
+}
+
+function localRefinementPairSamplePoints(part, config, tolerance){
+	if(!part || part.length === 0){
+		return [];
+	}
+	var configuredLimit = parseInt(config && config.pairCompactionPartSamples, 10);
+	var limit = isFinite(configuredLimit) && configuredLimit > 0 ? Math.min(configuredLimit, 96) : 24;
+	var samples = [];
+	var extrema = [0, 0, 0, 0];
+	for(var i=1; i<part.length; i++){
+		if(part[i].x < part[extrema[0]].x){ extrema[0] = i; }
+		if(part[i].x > part[extrema[1]].x){ extrema[1] = i; }
+		if(part[i].y < part[extrema[2]].y){ extrema[2] = i; }
+		if(part[i].y > part[extrema[3]].y){ extrema[3] = i; }
+	}
+	for(i=0; i<extrema.length; i++){
+		localRefinementAddPointCandidate(samples, part[extrema[i]], tolerance);
+	}
+	var remaining = Math.max(0, limit - samples.length);
+	if(part.length <= remaining){
+		for(i=0; i<part.length; i++){
+			localRefinementAddPointCandidate(samples, part[i], tolerance);
+		}
+		return samples;
+	}
+	for(i=0; i<remaining; i++){
+		var index = remaining === 1 ? 0 : Math.round(i * (part.length - 1) / (remaining - 1));
+		localRefinementAddPointCandidate(samples, part[index], tolerance);
+	}
+	return samples;
+}
+
+function localRefinementPairGeometryContacts(anchor, mover, config, tolerance, deadline){
+	var anchorSamples = localRefinementPairSamplePoints(anchor, config, tolerance);
+	var moverSamples = localRefinementPairSamplePoints(mover, config, tolerance);
+	var contacts = [];
+	for(var a=0; a<anchorSamples.length && (!deadline || Date.now() < deadline); a++){
+		for(var b=0; b<moverSamples.length && (!deadline || Date.now() < deadline); b++){
+			localRefinementAddPointCandidate(contacts, {
+				x: anchorSamples[a].x + mover[0].x - moverSamples[b].x,
+				y: anchorSamples[a].y + mover[0].y - moverSamples[b].y
+			}, tolerance);
+		}
+	}
+	return contacts;
+}
+
+function localRefinementPairProjectContactsToNfp(contacts, rings, tolerance, deadline){
+	var projected = [];
+	for(var c=0; c<contacts.length && (!deadline || Date.now() < deadline); c++){
+		var best = null;
+		var bestDistance = null;
+		for(var r=0; r<rings.length; r++){
+			for(var i=0; i<rings[r].length; i++){
+				var point = localRefinementClosestPointOnSegment(
+					contacts[c],
+					rings[r][i],
+					rings[r][(i + 1) % rings[r].length]
+				);
+				var distance = sqr(point.x - contacts[c].x) + sqr(point.y - contacts[c].y);
+				if(bestDistance === null || distance < bestDistance){
+					bestDistance = distance;
+					best = point;
+				}
+			}
+		}
+		if(best){
+			localRefinementAddPointCandidate(projected, best, tolerance);
+		}
+	}
+	return projected;
+}
+
+function localRefinementPairContactCandidates(nfp, anchor, mover, config, deadline){
+	if(!nfp || nfp.length < 2){
+		return [];
+	}
+	var tolerance = Math.max(1e-8, 1e-6 * (Number(config && config.curveTolerance) || 1));
+	var configuredCap = parseInt(config && config.pairCompactionCandidateCap, 10);
+	var cap = isFinite(configuredCap) && configuredCap > 0 ? Math.min(configuredCap, 8192) : 4096;
+	var rings = [nfp];
+	if(nfp.children && nfp.children.length > 0){
+		for(var h=0; h<nfp.children.length; h++){
+			if(nfp.children[h] && nfp.children[h].length >= 2){
+				rings.push(nfp.children[h]);
+			}
+		}
+	}
+
+	var preferred = [];
+	var xTargets = localRefinementPairAxisTargets(anchor, mover, 'x');
+	var yTargets = localRefinementPairAxisTargets(anchor, mover, 'y');
+	for(var r=0; r<rings.length; r++){
+		localRefinementPairAddAxisIntersections(preferred, rings[r], 'x', xTargets, tolerance);
+		localRefinementPairAddAxisIntersections(preferred, rings[r], 'y', yTargets, tolerance);
+		if(r > 0){
+			var center = {x: 0, y: 0};
+			for(var ci=0; ci<rings[r].length; ci++){
+				center.x += rings[r][ci].x;
+				center.y += rings[r][ci].y;
+			}
+			center.x /= rings[r].length;
+			center.y /= rings[r].length;
+			localRefinementAddPointCandidate(preferred, center, tolerance);
+		}
+	}
+
+	var boundary = [];
+	for(r=0; r<rings.length; r++){
+		for(var i=0; i<rings[r].length; i++){
+			var next = rings[r][(i + 1) % rings[r].length];
+			localRefinementAddPointCandidate(boundary, rings[r][i], tolerance);
+			localRefinementAddPointCandidate(boundary, {
+				x: (rings[r][i].x + next.x) / 2,
+				y: (rings[r][i].y + next.y) / 2
+			}, tolerance);
+		}
+	}
+	var geometryContacts = localRefinementPairProjectContactsToNfp(
+		localRefinementPairGeometryContacts(anchor, mover, config, tolerance, deadline),
+		rings,
+		tolerance,
+		deadline
+	);
+
+	var result = [];
+	for(i=0; i<preferred.length && result.length < cap; i++){
+		localRefinementAddPointCandidate(result, preferred[i], tolerance);
+	}
+	var slots = cap - result.length;
+	if(slots <= 0){
+		return result;
+	}
+	var raw = boundary.concat(geometryContacts);
+	if(raw.length <= slots){
+		for(i=0; i<raw.length; i++){
+			localRefinementAddPointCandidate(result, raw[i], tolerance);
+		}
+		return result;
+	}
+	for(i=0; i<slots; i++){
+		var sampleIndex = slots === 1 ? 0 : Math.round(i * (raw.length - 1) / (slots - 1));
+		localRefinementAddPointCandidate(result, raw[sampleIndex], tolerance);
+	}
+	return result;
+}
+
+function localRefinementTranslatePairIntoSheet(sheet, placed, placements){
+	var points = collectWorldPoints(placed, placements);
+	if(points.length === 0){
+		return false;
+	}
+	var pairBounds = GeometryUtil.getPolygonBounds(points);
+	var sheetBounds = GeometryUtil.getPolygonBounds(sheet);
+	if(!pairBounds || !sheetBounds || pairBounds.width > sheetBounds.width + 1e-7 || pairBounds.height > sheetBounds.height + 1e-7){
+		return false;
+	}
+	var dx = sheetBounds.x - pairBounds.x;
+	var dy = sheetBounds.y - pairBounds.y;
+	for(var i=0; i<placements.length; i++){
+		placements[i].x += dx;
+		placements[i].y += dy;
+	}
+	return true;
+}
+
+// Two parts have no spare anchor for the generic neighbor-reflow operator.
+// Search their exact NFP contact boundary directly, then translate the pair as
+// one rigid group into the sheet. Only a full-layout legal improvement commits.
+function localRefinementTryPairCompaction(sheet, placed, placements, config, currentMetric, deadline, stats){
+	if(!config || config.localRefinementRotationReflow !== true || config.mergeLines === true ||
+		!placed || placed.length !== 2 || !localRefinementRectangleSheet(sheet)){
+		return {moved: false, metric: currentMetric};
+	}
+	var configuredMinBudget = parseInt(config.rotationReflowMinBudgetMs, 10);
+	var minBudget = isFinite(configuredMinBudget) && configuredMinBudget >= 0 ? configuredMinBudget : 400;
+	if(deadline - Date.now() < minBudget){
+		if(stats){
+			stats.pairCompactionSkippedBudget = (stats.pairCompactionSkippedBudget || 0) + 1;
+		}
+		return {moved: false, metric: currentMetric};
+	}
+
+	var snapshotPlaced = localRefinementCopyPlaced(placed);
+	var snapshotPlacements = localRefinementCopyPlacements(placements);
+	var anglesA = localRefinementPairCompactionAngles(snapshotPlacements[0], config);
+	var anglesB = localRefinementPairCompactionAngles(snapshotPlacements[1], config);
+	var bestPlaced = null;
+	var bestPlacements = null;
+	var bestMetric = currentMetric;
+	var operatorStats = stats ? localRefinementEnsureSmartStats(stats) : null;
+
+	for(var a=0; a<anglesA.length && Date.now() < deadline; a++){
+		var partA = localRefinementRotatedPartForRotation(snapshotPlaced[0], anglesA[a]);
+		for(var b=0; b<anglesB.length && Date.now() < deadline; b++){
+			var partB = localRefinementRotatedPartForRotation(snapshotPlaced[1], anglesB[b]);
+			if(operatorStats){
+				operatorStats.pairCompact.tried++;
+			}
+			if(stats){
+				stats.movesTested++;
+				stats.pairCompactionAnglePairs = (stats.pairCompactionAnglePairs || 0) + 1;
+			}
+			var nfp = getOuterNfp(partA, partB, false, config);
+			if(!nfp){
+				if(stats){
+					stats.pairCompactionMissingNfps = (stats.pairCompactionMissingNfps || 0) + 1;
+				}
+				continue;
+			}
+			var contacts = localRefinementPairContactCandidates(nfp, partA, partB, config, deadline);
+			if(stats){
+				stats.pairCompactionCandidates = (stats.pairCompactionCandidates || 0) + contacts.length;
+			}
+			var scored = [];
+			for(var c=0; c<contacts.length && Date.now() < deadline; c++){
+				var candidatePlaced = [partA, partB];
+				var candidatePlacements = [
+					clonePlacementPosition(snapshotPlacements[0]),
+					clonePlacementPosition(snapshotPlacements[1])
+				];
+				candidatePlacements[0].x = 0;
+				candidatePlacements[0].y = 0;
+				candidatePlacements[0].rotation = partA.rotation;
+				candidatePlacements[1].x = contacts[c].x - partB[0].x;
+				candidatePlacements[1].y = contacts[c].y - partB[0].y;
+				candidatePlacements[1].rotation = partB.rotation;
+				if(!localRefinementTranslatePairIntoSheet(sheet, candidatePlaced, candidatePlacements)){
+					continue;
+				}
+				var metric = localRefinementSmartMetric(sheet, candidatePlaced, candidatePlacements, config);
+				if(metric === null){
+					continue;
+				}
+				var delta = metric - currentMetric;
+				if(stats && (typeof stats.pairCompactionBestDelta !== 'number' || delta < stats.pairCompactionBestDelta)){
+					stats.pairCompactionBestDelta = delta;
+				}
+				if(!localRefinementImproves(metric, bestMetric)){
+					continue;
+				}
+				scored.push({
+					metric: metric,
+					placements: candidatePlacements
+				});
+			}
+			scored.sort(function(left, right){
+				return left.metric - right.metric;
+			});
+			var configuredExactCap = parseInt(config && config.pairCompactionExactCandidateCap, 10);
+			var exactCap = isFinite(configuredExactCap) && configuredExactCap > 0 ? Math.min(configuredExactCap, 128) : 24;
+			for(var s=0; s<scored.length && s<exactCap && Date.now() < deadline; s++){
+				if(!localRefinementImproves(scored[s].metric, bestMetric)){
+					break;
+				}
+				var scoredPlaced = [partA, partB];
+				if(!localRefinementFinalLayoutLegalForRotations(sheet, scoredPlaced, scored[s].placements, config)){
+					if(stats){
+						stats.legalityRejects = (stats.legalityRejects || 0) + 1;
+					}
+					continue;
+				}
+				if(stats){
+					stats.pairCompactionLegalLayouts = (stats.pairCompactionLegalLayouts || 0) + 1;
+				}
+				bestMetric = scored[s].metric;
+				bestPlaced = localRefinementCopyPlaced(scoredPlaced);
+				bestPlacements = localRefinementCopyPlacements(scored[s].placements);
+				break;
+			}
+		}
+	}
+
+	if(!bestPlaced || !bestPlacements){
+		return {moved: false, metric: currentMetric};
+	}
+	localRefinementRestorePlaced(placed, bestPlaced);
+	localRefinementRestorePlacements(placements, bestPlacements);
+	if(operatorStats){
+		operatorStats.pairCompact.accepted++;
+	}
+	if(stats){
+		stats.movesAccepted += 2;
+		stats.pairCompactionAccepted = (stats.pairCompactionAccepted || 0) + 1;
+		stats.pairCompactionPartsMoved = (stats.pairCompactionPartsMoved || 0) + 2;
+	}
+	return {moved: true, metric: bestMetric};
+}
+
 // Rotate one target, temporarily remove its nearest blockers, then rebuild the
 // bounded group against the untouched layout. Every angle starts from the same
 // snapshot and only a fully legal strict improvement survives.
@@ -5078,6 +5450,12 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.rotationReflowLegalLayouts = 0;
 	stats.rotationReflowPartsMoved = 0;
 	stats.rotationReflowRotationsAccepted = 0;
+	stats.pairCompactionAnglePairs = 0;
+	stats.pairCompactionCandidates = 0;
+	stats.pairCompactionLegalLayouts = 0;
+	stats.pairCompactionAccepted = 0;
+	stats.pairCompactionPartsMoved = 0;
+	stats.pairCompactionMissingNfps = 0;
 	localRefinementEnsureSmartStats(stats);
 
 	if(!config || config.localRefinement !== true || !placed || placed.length < 2 || typeof SeparationUtil === 'undefined'){
@@ -5106,6 +5484,11 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.ran = true;
 	stats.sheetsChecked = 1;
 	stats.scoreBefore = pureMetricBefore;
+
+	var pairCompacted = localRefinementTryPairCompaction(sheet, placed, placements, config, currentMetric, deadline, stats);
+	if(pairCompacted.moved){
+		currentMetric = pairCompacted.metric;
+	}
 
 	for(var pass=0; pass<3 && Date.now() < deadline; pass++){
 		stats.passes++;
@@ -5274,9 +5657,12 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
+	}
+	if(typeof stats.pairCompactionBestDelta === 'number' && (typeof total.pairCompactionBestDelta !== 'number' || stats.pairCompactionBestDelta < total.pairCompactionBestDelta)){
+		total.pairCompactionBestDelta = stats.pairCompactionBestDelta;
 	}
 	if(stats.settleDebug && !total.settleDebug){
 		total.settleDebug = stats.settleDebug;

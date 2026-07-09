@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-09 by Codex): adaptive placement rotations ready to commit; unrelated/generated benchmark-result JSONs under `ml/benchmark/results/` remain untracked by convention.
+State (verified 2026-07-09 by Codex): code baseline clean; unrelated/generated benchmark-result JSONs under `ml/benchmark/results/` remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | Exact two-part pair compaction | `main/background.js`, engine/smoke tests, `AGENT_COLLABORATION.md` | Completed: exact NFP/outline contact search; same-handed laurel improves 13.3%; all regression gates green | 2026-07-09 |
 | Codex | Smart rotation + neighbor reflow | `main/background.js`, refinement config/UI/CLI, engine tests/smoke, `AGENT_COLLABORATION.md` | Completed: post-stage transactional reflow, exact rollback, UI control, benchmark/equivalence/smoke green | 2026-07-09 |
 | Codex | Adaptive rotation symmetry follow-up | `main/util/rotationutil.js`, `main/deepnest.js`, adaptive tests/smoke, `AGENT_COLLABORATION.md` | Completed: symmetric slotted parts use four unique axes; target and regression gates green | 2026-07-09 |
 | Codex | Adaptive per-part placement rotations | `main/util/rotationutil.js`, `main/deepnest.js`, `main/background.js`, `main/index.html`, benchmark/test/smoke coverage, `AGENT_COLLABORATION.md` | Completed: default-on bounded geometry angles + sibling alignment; exact NFP gate and A/B green | 2026-07-09 |
@@ -150,6 +151,16 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-09 - Exact two-part pair compaction (Codex)
+
+- Root cause: the generic rotation-reflow operator always retains an untouched anchor. With exactly two parts it therefore discards the only neighbor and can never rebuild the pair as a unit. Separately imported copies also have distinct source IDs, so sibling alignment does not connect them.
+- Added a Smart-only exact pair operator for two-part nests on rectangular, hole-free sheets with merge-lines off and Rotation reflow enabled. It enumerates only each source's canonical allowed angles, searches outer-NFP boundary contacts plus bounded outline vertex contacts projected to the nearest NFP boundary, translates the pair as one rigid group into the sheet, and commits only a strict metric improvement that passes the existing full-layout containment/material-overlap gate.
+- Candidate scoring is separated from exact validation: each angle pair is scored cheaply, sorted, and only its best bounded candidates reach the exact gate. All failure paths leave the original polygons and placements untouched. Added pair-specific telemetry under `operatorStats.pairCompact` and additive summary fields.
+- Reproduced with two separately imported same-handed laurel branches derived from `ml/examples/laurel-branches.svg`, deterministic `populationSize:1`, `rotations:4`, Smart/Adaptive/Reflow on, and fine `curveTolerance:0.36`. The poor seed improved from `0.4793696109` to `0.4156170930` (13.30%); the exported pair used canonical 0/180-degree rotations, `pairCompactionAccepted=1`, and `nonCanonicalNfpLookups=0`. Quick Look inspection showed the branches interlocked side-by-side instead of forming the large separated Y.
+- Deterministic tests cover projection onto the NFP boundary, rejection of a lower-score illegal pose, commit of the next legal pose, and full rollback when every pose is illegal.
+- Verification passed: syntax checks; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/adaptive_rotations/run.js`; `node ml/tests/separation/run.js`; `node ml/tests/engine_equivalence/run.js`; `bash ml/scripts/run_boot_check.sh`; the focused real-laurel smoke; the full default smoke battery (SVG, adaptive rotation, Smart reflow, Step & Repeat, PDF); `git diff --check`.
+- `npm run ml:checkpoint -- --name two-part-pair-compaction-pre` was attempted before engine edits and failed because no completed training run with a model exists. No bakeoff was run because manifest/model/output inputs remain unavailable.
 
 ### 2026-07-09 - Smart rotation + neighbor reflow (Codex)
 

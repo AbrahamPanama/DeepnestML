@@ -290,6 +290,106 @@ function testRotationReflowTransactionalCommitAndRollback() {
 	assert.deepStrictEqual(data.placements, originalPlacements, 'rejected reflow should restore every placement');
 }
 
+function testPairContactProjectionLandsOnNfpBoundary() {
+	const ctx = loadBackgroundFunctions([
+		'sqr',
+		'localRefinementAddPointCandidate',
+		'localRefinementClosestPointOnSegment',
+		'localRefinementPairProjectContactsToNfp'
+	]);
+	const ring = rect(-2, -2, 4, 4);
+	const projected = ctx.localRefinementPairProjectContactsToNfp([{x: 0, y: 0}], [ring], 1e-9, Date.now() + 1000);
+	assert.strictEqual(projected.length, 1, 'an interior desired pose should project to one nearest NFP point');
+	const point = projected[0];
+	const onBoundary = Math.abs(Math.abs(point.x) - 2) <= 1e-9 || Math.abs(Math.abs(point.y) - 2) <= 1e-9;
+	assert.strictEqual(onBoundary, true, 'projected pair pose must land on the exact NFP boundary');
+}
+
+function testPairCompactionRejectsUnsafeBestAndCommitsLegalFallback() {
+	function deepClone(value) {
+		return JSON.parse(JSON.stringify(value));
+	}
+	function makeContext(allIllegal) {
+		return loadBackgroundFunctions(['localRefinementTryPairCompaction'], {}, {
+			localRefinementRectangleSheet: function () { return true; },
+			localRefinementCopyPlaced: deepClone,
+			localRefinementCopyPlacements: deepClone,
+			localRefinementRestorePlaced: function (target, source) {
+				target.splice.apply(target, [0, target.length].concat(deepClone(source)));
+			},
+			localRefinementRestorePlacements: function (target, source) {
+				target.splice.apply(target, [0, target.length].concat(deepClone(source)));
+			},
+			localRefinementPairCompactionAngles: function () { return [0]; },
+			localRefinementRotatedPartForRotation: function (part, rotation) {
+				const copy = deepClone(part);
+				copy.rotation = rotation;
+				return copy;
+			},
+			localRefinementEnsureSmartStats: function (stats) {
+				stats.operatorStats = stats.operatorStats || {};
+				stats.operatorStats.pairCompact = stats.operatorStats.pairCompact || {tried: 0, accepted: 0};
+				return stats.operatorStats;
+			},
+			getOuterNfp: function () { return rect(-1, -1, 4, 4); },
+			localRefinementPairContactCandidates: function () {
+				return [{x: 1, y: 0}, {x: 3, y: 0}];
+			},
+			clonePlacementPosition: deepClone,
+			localRefinementTranslatePairIntoSheet: function () { return true; },
+			localRefinementSmartMetric: function (sheet, placed, placements) {
+				return placements[1].x === 1 ? 4 : 6;
+			},
+			localRefinementImproves: function (candidate, current) { return candidate < current; },
+			localRefinementFinalLayoutLegalForRotations: function (sheet, placed, placements) {
+				return !allIllegal && placements[1].x === 3;
+			}
+		});
+	}
+	function fixture() {
+		const first = rect(0, 0, 1, 1);
+		first.source = 1;
+		first.id = 1;
+		first.rotation = 0;
+		const second = rect(0, 0, 1, 1);
+		second.source = 2;
+		second.id = 2;
+		second.rotation = 0;
+		return {
+			placed: [first, second],
+			placements: [
+				{x: 0, y: 0, source: 1, id: 1, rotation: 0},
+				{x: 8, y: 0, source: 2, id: 2, rotation: 0}
+			]
+		};
+	}
+	const config = {
+		localRefinementRotationReflow: true,
+		mergeLines: false,
+		rotationReflowMinBudgetMs: 0
+	};
+	let data = fixture();
+	let stats = {movesTested: 0, movesAccepted: 0};
+	let ctx = makeContext(false);
+	let result = ctx.localRefinementTryPairCompaction({}, data.placed, data.placements, config, 10, Date.now() + 1000, stats);
+	assert.strictEqual(result.moved, true, 'pair compaction should commit the best legal fallback');
+	assert.strictEqual(result.metric, 6, 'illegal lower-score pose must not win');
+	assert.strictEqual(data.placements[1].x, 3, 'legal contact pose should be committed');
+	assert.strictEqual(stats.legalityRejects, 1, 'unsafe best pose should be counted as a legality rejection');
+	assert.strictEqual(stats.operatorStats.pairCompact.accepted, 1, 'pair operator acceptance should be recorded');
+
+	data = fixture();
+	const originalPlaced = data.placed.slice();
+	const originalPlacements = deepClone(data.placements);
+	stats = {movesTested: 0, movesAccepted: 0};
+	ctx = makeContext(true);
+	result = ctx.localRefinementTryPairCompaction({}, data.placed, data.placements, config, 10, Date.now() + 1000, stats);
+	assert.strictEqual(result.moved, false, 'all-illegal pair candidates should fail closed');
+	assert.strictEqual(data.placed[0], originalPlaced[0], 'failed pair compaction must preserve first polygon');
+	assert.strictEqual(data.placed[1], originalPlaced[1], 'failed pair compaction must preserve second polygon');
+	assert.deepStrictEqual(data.placements, originalPlacements, 'failed pair compaction must preserve placements');
+}
+
 function testNonCanonicalNfpGuardHelpers() {
 	const ctx = loadBackgroundFunctions([
 		'normalizedRotation',
@@ -937,6 +1037,8 @@ function run() {
 	testRotationRetries();
 	testRotationReflowSelectionHelpers();
 	testRotationReflowTransactionalCommitAndRollback();
+	testPairContactProjectionLandsOnNfpBoundary();
+	testPairCompactionRejectsUnsafeBestAndCommitsLegalFallback();
 	testNonCanonicalNfpGuardHelpers();
 	testFineRotationCandidatePreservesCentroidPivot();
 	testFineRotationExactGateSelection();
