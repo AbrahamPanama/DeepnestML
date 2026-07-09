@@ -7,7 +7,7 @@ ARTIFACT_ROOT="${DEEPNEST_SMOKE_ARTIFACT_ROOT:-"$ROOT_DIR/ml/artifacts/smoke-bat
 if [ "$#" -gt 0 ]; then
   SCENARIOS=("$@")
 else
-  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-steprepeat" "svg-export-pdf")
+  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-steprepeat" "svg-export-pdf")
 fi
 
 mkdir -p "$ARTIFACT_ROOT"
@@ -82,6 +82,17 @@ if (typeof scenario.expectedNonCanonicalNfpLookups === 'number') {
   if (actual !== scenario.expectedNonCanonicalNfpLookups) {
     console.error('[smoke-battery] unexpected non-canonical NFP lookup count:', actual);
     process.exit(1);
+  }
+}
+if (scenario.expectedLocalRefinementMinimums && typeof scenario.expectedLocalRefinementMinimums === 'object') {
+  const local = report.details && report.details.localRefinement;
+  for (const field of Object.keys(scenario.expectedLocalRefinementMinimums)) {
+    const expected = Number(scenario.expectedLocalRefinementMinimums[field]);
+    const actual = local && typeof local[field] === 'number' ? local[field] : null;
+    if (actual === null || actual < expected) {
+      console.error('[smoke-battery] local refinement minimum not met:', field, expected, actual);
+      process.exit(1);
+    }
   }
 }
 console.log('[smoke-battery] passed:', report.scenarioName, report.outputFormat, stat.size + ' bytes');

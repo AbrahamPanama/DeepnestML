@@ -45,6 +45,10 @@
 			localRefinementBudgetMs: 1500,
 			localRefinementRotations: false,
 			localRefinementMaxColdAnglesPerPart: 3,
+			localRefinementRotationReflow: true,
+			rotationReflowMaxTargets: 2,
+			rotationReflowMaxNeighbors: 3,
+			rotationReflowMinBudgetMs: 400,
 			localRefinementFineRotation: false,
 			fineRotationMaxDeg: 6,
 			fineRotationMinDeg: 0.25,
@@ -843,6 +847,25 @@
 
 			if(c.localRefinementRotations === true || c.localRefinementRotations === false){
 				config.localRefinementRotations = !!c.localRefinementRotations;
+			}
+
+			if(c.localRefinementRotationReflow === true || c.localRefinementRotationReflow === false){
+				config.localRefinementRotationReflow = !!c.localRefinementRotationReflow;
+			}
+
+			var rotationReflowMaxTargets = Number(c.rotationReflowMaxTargets);
+			if(isFinite(rotationReflowMaxTargets) && rotationReflowMaxTargets >= 0){
+				config.rotationReflowMaxTargets = Math.min(Math.floor(rotationReflowMaxTargets), 8);
+			}
+
+			var rotationReflowMaxNeighbors = Number(c.rotationReflowMaxNeighbors);
+			if(isFinite(rotationReflowMaxNeighbors) && rotationReflowMaxNeighbors >= 0){
+				config.rotationReflowMaxNeighbors = Math.min(Math.floor(rotationReflowMaxNeighbors), 8);
+			}
+
+			var rotationReflowMinBudgetMs = Number(c.rotationReflowMinBudgetMs);
+			if(isFinite(rotationReflowMinBudgetMs) && rotationReflowMinBudgetMs >= 0){
+				config.rotationReflowMinBudgetMs = Math.min(Math.floor(rotationReflowMinBudgetMs), 30000);
 			}
 
 			if(c.localRefinementFineRotation === true || c.localRefinementFineRotation === false){

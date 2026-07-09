@@ -3797,6 +3797,29 @@ function localRefinementRunFineRotationStage(sheet, placed, placements, config, 
 	};
 }
 
+function localRefinementRunRotationReflowStage(sheet, placed, placements, config, currentMetric, deadline, stats){
+	if(!config || config.localRefinementRotationReflow !== true){
+		return {moved: false, metric: currentMetric};
+	}
+	var order = localRefinementSmartTargetOrder(placed, placements, config);
+	var configuredTargets = parseInt(config.rotationReflowMaxTargets, 10);
+	var maxTargets = isFinite(configuredTargets) && configuredTargets >= 0 ? configuredTargets : 2;
+	var limit = Math.min(order.length, maxTargets);
+	var moved = false;
+	var metric = currentMetric;
+	for(var target=0; target<limit && Date.now() < deadline; target++){
+		var result = localRefinementTryRotationReflow(sheet, placed, placements, config, order[target], metric, deadline, stats);
+		if(result.moved){
+			metric = result.metric;
+			moved = true;
+		}
+	}
+	return {
+		moved: moved,
+		metric: metric
+	};
+}
+
 function localRefinementSinglePlacementLegal(sheet, placed, placements, config, index, skip){
 	var eps = Math.max(1e-9, 1e-4 * (Number(config.curveTolerance) || 0));
 	var q = {
@@ -3838,6 +3861,7 @@ function localRefinementEnsureSmartStats(stats){
 	if(!stats.operatorStats){
 		stats.operatorStats = {
 			settle: {tried: 0, accepted: 0},
+			rotateReflow: {tried: 0, accepted: 0},
 			relocate: {tried: 0, accepted: 0},
 			swap: {tried: 0, accepted: 0},
 			fineRotate: {tried: 0, accepted: 0}
@@ -3846,6 +3870,9 @@ function localRefinementEnsureSmartStats(stats){
 	else{
 		if(!stats.operatorStats.settle){
 			stats.operatorStats.settle = {tried: 0, accepted: 0};
+		}
+		if(!stats.operatorStats.rotateReflow){
+			stats.operatorStats.rotateReflow = {tried: 0, accepted: 0};
 		}
 		if(!stats.operatorStats.relocate){
 			stats.operatorStats.relocate = {tried: 0, accepted: 0};
@@ -4086,18 +4113,32 @@ function localRefinementAngularDistance(a, b){
 	return delta > 180 ? 360 - delta : delta;
 }
 
+function localRefinementSourceRotationAngles(placement, config){
+	if(config && config.adaptiveRotations === true && config.adaptiveRotationAnglesBySource && placement && typeof placement.source !== 'undefined'){
+		var adaptive = config.adaptiveRotationAnglesBySource[String(placement.source)];
+		if(adaptive && adaptive.length){
+			return adaptive.slice();
+		}
+	}
+	var count = Math.max(1, parseInt(config && config.rotations, 10) || 1);
+	var angles = [];
+	for(var i=0; i<count; i++){
+		angles.push(normalizedRotation(i * 360 / count));
+	}
+	return angles;
+}
+
 function localRefinementFloaterRotations(placements, config, index, cluster){
 	var current = normalizedRotation(placements[index].rotation || 0);
 	var rotations = [current];
 	if(config.localRefinementRotations !== true){
 		return rotations;
 	}
-	var count = Math.max(1, parseInt(config.rotations, 10) || 1);
-	var step = 360 / count;
 	var dominant = localRefinementDominantClusterRotation(placements, cluster);
 	var candidates = [];
-	for(var k=0; k<count; k++){
-		var rotation = normalizedRotation(k * step);
+	var allowed = localRefinementSourceRotationAngles(placements[index], config);
+	for(var k=0; k<allowed.length; k++){
+		var rotation = normalizedRotation(allowed[k]);
 		if(localRefinementAngularDistance(rotation, current) <= 1e-7){
 			continue;
 		}
@@ -4116,6 +4157,100 @@ function localRefinementFloaterRotations(placements, config, index, cluster){
 		rotations.push(candidates[k].rotation);
 	}
 	return rotations;
+}
+
+function localRefinementRotationReflowAngles(placement, config){
+	var current = normalizedRotation(placement && placement.rotation || 0);
+	var allowed = localRefinementSourceRotationAngles(placement, config);
+	var uniform = [];
+	var uniformCount = Math.max(1, parseInt(config && config.rotations, 10) || 1);
+	for(var u=0; u<uniformCount; u++){
+		uniform.push(normalizedRotation(u * 360 / uniformCount));
+	}
+	var candidates = [];
+	for(var i=0; i<allowed.length; i++){
+		var rotation = normalizedRotation(allowed[i]);
+		if(localRefinementAngularDistance(rotation, current) <= 1e-7){
+			continue;
+		}
+		var adaptiveExtra = true;
+		for(var j=0; j<uniform.length; j++){
+			if(localRefinementAngularDistance(rotation, uniform[j]) <= 1e-7){
+				adaptiveExtra = false;
+				break;
+			}
+		}
+		candidates.push({
+			rotation: rotation,
+			adaptiveExtra: adaptiveExtra,
+			distance: localRefinementAngularDistance(rotation, current)
+		});
+	}
+	candidates.sort(function(a, b){
+		if(a.adaptiveExtra !== b.adaptiveExtra){
+			return a.adaptiveExtra ? -1 : 1;
+		}
+		if(a.distance !== b.distance){
+			return a.distance - b.distance;
+		}
+		return a.rotation - b.rotation;
+	});
+	var configuredLimit = parseInt(config && config.localRefinementMaxColdAnglesPerPart, 10);
+	var limit = isFinite(configuredLimit) && configuredLimit >= 0 ? configuredLimit : 3;
+	var result = [];
+	for(i=0; i<candidates.length && result.length < limit; i++){
+		result.push(candidates[i].rotation);
+	}
+	return result;
+}
+
+function localRefinementRotationReflowNeighbors(placed, placements, target, maxNeighbors){
+	maxNeighbors = Math.max(0, parseInt(maxNeighbors, 10) || 0);
+	if(maxNeighbors === 0 || !placed || placed.length < 2){
+		return [];
+	}
+	var targetBounds = localRefinementWorldBounds(placed[target], placements[target]);
+	if(!targetBounds){
+		return [];
+	}
+	var targetCx = targetBounds.x + targetBounds.width / 2;
+	var targetCy = targetBounds.y + targetBounds.height / 2;
+	var candidates = [];
+	for(var i=0; i<placed.length; i++){
+		if(i === target){
+			continue;
+		}
+		var bounds = localRefinementWorldBounds(placed[i], placements[i]);
+		if(!bounds){
+			continue;
+		}
+		var dx = Math.max(0, targetBounds.x - (bounds.x + bounds.width), bounds.x - (targetBounds.x + targetBounds.width));
+		var dy = Math.max(0, targetBounds.y - (bounds.y + bounds.height), bounds.y - (targetBounds.y + targetBounds.height));
+		var cx = bounds.x + bounds.width / 2;
+		var cy = bounds.y + bounds.height / 2;
+		candidates.push({
+			index: i,
+			gap: dx * dx + dy * dy,
+			centerDistance: sqr(cx - targetCx) + sqr(cy - targetCy)
+		});
+	}
+	candidates.sort(function(a, b){
+		if(a.gap !== b.gap){
+			return a.gap - b.gap;
+		}
+		if(a.centerDistance !== b.centerDistance){
+			return a.centerDistance - b.centerDistance;
+		}
+		return a.index - b.index;
+	});
+	var result = [];
+	for(i=0; i<candidates.length && result.length < maxNeighbors; i++){
+		result.push(candidates[i].index);
+	}
+	while(result.length > 0 && result.length + 1 >= placed.length){
+		result.pop();
+	}
+	return result;
 }
 
 function localRefinementRotatedPartForRotation(part, targetRotation){
@@ -4473,6 +4608,165 @@ function localRefinementSettleFloaterGroup(sheet, placed, placements, config, de
 	return {moved: false, metric: currentMetric};
 }
 
+// Rotate one target, temporarily remove its nearest blockers, then rebuild the
+// bounded group against the untouched layout. Every angle starts from the same
+// snapshot and only a fully legal strict improvement survives.
+function localRefinementTryRotationReflow(sheet, placed, placements, config, target, currentMetric, deadline, stats){
+	if(!config || config.localRefinementRotationReflow !== true){
+		return {moved: false, metric: currentMetric};
+	}
+	var configuredMinBudget = parseInt(config.rotationReflowMinBudgetMs, 10);
+	var minBudget = isFinite(configuredMinBudget) && configuredMinBudget >= 0 ? configuredMinBudget : 400;
+	if(deadline - Date.now() < minBudget){
+		if(stats){
+			stats.rotationReflowSkippedBudget = (stats.rotationReflowSkippedBudget || 0) + 1;
+		}
+		return {moved: false, metric: currentMetric};
+	}
+	var angles = localRefinementRotationReflowAngles(placements[target], config);
+	if(angles.length === 0){
+		return {moved: false, metric: currentMetric};
+	}
+	var configuredMaxNeighbors = parseInt(config.rotationReflowMaxNeighbors, 10);
+	var maxNeighbors = isFinite(configuredMaxNeighbors) && configuredMaxNeighbors >= 0 ? configuredMaxNeighbors : 3;
+	var neighbors = localRefinementRotationReflowNeighbors(
+		placed,
+		placements,
+		target,
+		maxNeighbors
+	);
+	var victims = [target].concat(neighbors);
+	var snapshotPlaced = localRefinementCopyPlaced(placed);
+	var snapshotPlacements = localRefinementCopyPlacements(placements);
+	var bestPlaced = null;
+	var bestPlacements = null;
+	var bestMetric = currentMetric;
+	var operatorStats = stats ? localRefinementEnsureSmartStats(stats) : null;
+
+	for(var angleIndex=0; angleIndex<angles.length && Date.now() < deadline; angleIndex++){
+		localRefinementRestorePlaced(placed, snapshotPlaced);
+		localRefinementRestorePlacements(placements, snapshotPlacements);
+		if(operatorStats){
+			operatorStats.rotateReflow.tried++;
+		}
+		if(stats){
+			stats.rotationReflowAttempts = (stats.rotationReflowAttempts || 0) + 1;
+			stats.rotationsTried = (stats.rotationsTried || 0) + 1;
+		}
+
+		placed[target] = localRefinementRotatedPartForRotation(placed[target], angles[angleIndex]);
+		placements[target].rotation = placed[target].rotation;
+		var unsettled = {};
+		for(var victimIndex=0; victimIndex<victims.length; victimIndex++){
+			unsettled[victims[victimIndex]] = true;
+		}
+		var attemptComplete = true;
+
+		for(victimIndex=0; victimIndex<victims.length; victimIndex++){
+			if(Date.now() >= deadline){
+				attemptComplete = false;
+				break;
+			}
+			var index = victims[victimIndex];
+			delete unsettled[index];
+			if(stats){
+				stats.movesTested++;
+				stats.rotationReflowRegionComputations = (stats.rotationReflowRegionComputations || 0) + 1;
+			}
+			var skipRegion = {};
+			skipRegion[index] = true;
+			for(var remaining in unsettled){
+				if(Object.prototype.hasOwnProperty.call(unsettled, remaining)){
+					skipRegion[remaining] = true;
+				}
+			}
+			var excluded = localRefinementBuildExclusionLists(placed, placements, skipRegion);
+			var region = localRefinementBuildStandaloneFeasibleRegion(placed[index], excluded.placed, excluded.placements, sheet, config);
+			if(!region){
+				if(stats){
+					stats.rotationReflowEmptyRegions = (stats.rotationReflowEmptyRegions || 0) + 1;
+				}
+				attemptComplete = false;
+				break;
+			}
+			var currentQ = {
+				x: snapshotPlacements[index].x + placed[index][0].x,
+				y: snapshotPlacements[index].y + placed[index][0].y
+			};
+			var candidates = localRefinementRegionCandidates(region, currentQ, 96, config);
+			var bestVictimPlacement = null;
+			var bestSubsetMetric = null;
+			for(var candidateIndex=0; candidateIndex<candidates.length && Date.now() < deadline; candidateIndex++){
+				localRefinementSetPlacementXY(
+					placements[index],
+					candidates[candidateIndex].x - placed[index][0].x,
+					candidates[candidateIndex].y - placed[index][0].y
+				);
+				placements[index].rotation = placed[index].rotation;
+				if(!localRefinementSinglePlacementLegal(sheet, placed, placements, config, index, unsettled)){
+					if(stats){
+						stats.legalityRejects = (stats.legalityRejects || 0) + 1;
+					}
+					continue;
+				}
+				if(stats){
+					stats.rotationReflowLegalCandidates = (stats.rotationReflowLegalCandidates || 0) + 1;
+				}
+				var subsetMetric = localRefinementSubsetMetric(sheet, placed, placements, config, unsettled);
+				if(subsetMetric !== null && (bestSubsetMetric === null || subsetMetric < bestSubsetMetric - 1e-12)){
+					bestSubsetMetric = subsetMetric;
+					bestVictimPlacement = clonePlacementPosition(placements[index]);
+				}
+			}
+			if(!bestVictimPlacement){
+				attemptComplete = false;
+				break;
+			}
+			localRefinementSetPlacementXY(placements[index], bestVictimPlacement.x, bestVictimPlacement.y);
+			placements[index].rotation = bestVictimPlacement.rotation;
+		}
+
+		if(!attemptComplete || !localRefinementFinalLayoutLegalForRotations(sheet, placed, placements, config)){
+			continue;
+		}
+		if(stats){
+			stats.rotationReflowLegalLayouts = (stats.rotationReflowLegalLayouts || 0) + 1;
+		}
+		var metric = localRefinementSmartMetric(sheet, placed, placements, config);
+		if(metric !== null && metric < bestMetric - 1e-12){
+			bestMetric = metric;
+			bestPlaced = localRefinementCopyPlaced(placed);
+			bestPlacements = localRefinementCopyPlacements(placements);
+		}
+	}
+
+	localRefinementRestorePlaced(placed, snapshotPlaced);
+	localRefinementRestorePlacements(placements, snapshotPlacements);
+	if(!bestPlaced || !bestPlacements){
+		return {moved: false, metric: currentMetric};
+	}
+
+	localRefinementRestorePlaced(placed, bestPlaced);
+	localRefinementRestorePlacements(placements, bestPlacements);
+	var movedCount = 0;
+	for(var i=0; i<placements.length; i++){
+		if(Math.abs(placements[i].x - snapshotPlacements[i].x) > 1e-9 ||
+			Math.abs(placements[i].y - snapshotPlacements[i].y) > 1e-9 ||
+			localRefinementAngularDistance(placements[i].rotation || 0, snapshotPlacements[i].rotation || 0) > 1e-7){
+			movedCount++;
+		}
+	}
+	if(operatorStats){
+		operatorStats.rotateReflow.accepted++;
+	}
+	if(stats){
+		stats.movesAccepted += Math.max(1, movedCount);
+		stats.rotationReflowPartsMoved = (stats.rotationReflowPartsMoved || 0) + movedCount;
+		stats.rotationReflowRotationsAccepted = (stats.rotationReflowRotationsAccepted || 0) + 1;
+	}
+	return {moved: true, metric: bestMetric};
+}
+
 function localRefinementTryRelocate(sheet, placed, placements, config, index, currentMetric, deadline, stats, countStats){
 	var operatorStats = stats ? localRefinementEnsureSmartStats(stats) : null;
 	if(countStats !== false && operatorStats){
@@ -4777,6 +5071,13 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.settleRegionComputations = 0;
 	stats.settleEmptyRegions = 0;
 	stats.rotationsTried = 0;
+	stats.rotationReflowAttempts = 0;
+	stats.rotationReflowRegionComputations = 0;
+	stats.rotationReflowEmptyRegions = 0;
+	stats.rotationReflowLegalCandidates = 0;
+	stats.rotationReflowLegalLayouts = 0;
+	stats.rotationReflowPartsMoved = 0;
+	stats.rotationReflowRotationsAccepted = 0;
 	localRefinementEnsureSmartStats(stats);
 
 	if(!config || config.localRefinement !== true || !placed || placed.length < 2 || typeof SeparationUtil === 'undefined'){
@@ -4855,6 +5156,11 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 		if(!madeProgress){
 			break;
 		}
+	}
+
+	var rotationReflowed = localRefinementRunRotationReflowStage(sheet, placed, placements, config, currentMetric, deadline, stats);
+	if(rotationReflowed.moved){
+		currentMetric = rotationReflowed.metric;
 	}
 
 	var fineRotated = localRefinementRunFineRotationStage(sheet, placed, placements, config, currentMetric, deadline, stats);
@@ -4968,7 +5274,7 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
 	}

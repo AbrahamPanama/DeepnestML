@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | Smart rotation + neighbor reflow | `main/background.js`, refinement config/UI/CLI, engine tests/smoke, `AGENT_COLLABORATION.md` | Completed: post-stage transactional reflow, exact rollback, UI control, benchmark/equivalence/smoke green | 2026-07-09 |
 | Codex | Adaptive rotation symmetry follow-up | `main/util/rotationutil.js`, `main/deepnest.js`, adaptive tests/smoke, `AGENT_COLLABORATION.md` | Completed: symmetric slotted parts use four unique axes; target and regression gates green | 2026-07-09 |
 | Codex | Adaptive per-part placement rotations | `main/util/rotationutil.js`, `main/deepnest.js`, `main/background.js`, `main/index.html`, benchmark/test/smoke coverage, `AGENT_COLLABORATION.md` | Completed: default-on bounded geometry angles + sibling alignment; exact NFP gate and A/B green | 2026-07-09 |
 | Codex | LR fine rotation visible acceptance follow-up | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, `AGENT_COLLABORATION.md`, smoke reports | Completed: legal fine rotations can be accepted visibly with exact collision gates intact | 2026-07-09 |
@@ -149,6 +150,18 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-09 - Smart rotation + neighbor reflow (Codex)
+
+- Added the Smart-only rotation-reflow post-stage. It ranks adaptive diagonal angles before uniform-grid alternatives, rotates at most two target parts, releases up to three nearest blockers while retaining an untouched anchor, and reinserts the bounded group one part at a time through the exact standalone feasible-region builder.
+- Every angle attempt starts from a full polygon/placement snapshot. Each victim passes NFP containment, pair penetration, and material-overlap checks against the current partial layout; a candidate is retained only when the fully rebuilt layout passes the rotation-aware final legality gate and strictly improves the Smart metric. Failure, timeout, or a legal-but-worse result restores every polygon and placement.
+- Reflow runs after the established settle/relocate/swap loop, using only remaining budget. The first implementation ran before relocation and consumed budget; a bounded A/B exposed the opportunity cost, so scheduling was corrected before landing.
+- Added default-on `localRefinementRotationReflow` (effective only when local refinement + Smart are active), visible `Rotation reflow` checkbox, bounded target/neighbor/budget settings, benchmark CLI flags, and detailed stats/operator telemetry.
+- Added deterministic tests for adaptive-first angle ordering, nearest-blocker selection with a retained anchor, successful transactional commit, and exact full rollback for a non-improving legal rebuild.
+- Post-stage A/B at 1x10s (`albano,blaz1,shapes0`, Smart budget 3000 ms): reflow-off `20260709T202341Z-rotation-reflow-off-10s.json` and corrected reflow-on `20260709T202749Z-rotation-reflow-poststage-on-10s.json` matched exactly at mean utilization `0.4012359139` and per-instance medians/local scores. Reflow therefore did not displace existing improvements; all runs reported zero non-canonical NFP lookups.
+- Efficacy proof: a focused comb run accepted one reflow, moved four parts, and improved the metric by ~1.04%. The final full battery run accepted one reflow with three legal full layouts and zero unknown NFPs; total Smart refinement improved `0.1371662 -> 0.1092286`. The default battery now includes `svg-hull-settle-floaters` and asserts `rotationReflowAttempts >= 1`.
+- Verification passed: syntax checks; adaptive, engine-bugfix, and separation tests; engine equivalence; boot check; targeted Smart/fine-rotation smokes; full default smoke battery (SVG, adaptive forced fits, Smart reflow, Step & Repeat, PDF); benchmark A/B; `bash -n`; `git diff --check`.
+- No ML checkpoint/bakeoff was possible: the repository still has no completed trained-model run and no manifest/model/output inputs.
 
 ### 2026-07-09 - Adaptive rotation symmetry follow-up (Codex)
 

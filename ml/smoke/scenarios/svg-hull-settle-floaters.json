@@ -4,6 +4,9 @@
   "input": "ml/examples/comb-branches.svg",
   "sourceFormat": "svg",
   "outputFormat": "svg",
+  "expectedLocalRefinementMinimums": {
+    "rotationReflowAttempts": 1
+  },
   "timeoutMs": 90000,
   "timeBudgetSec": 10,
   "configOverrides": {

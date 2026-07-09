@@ -425,6 +425,10 @@
 			  localRefinementBudgetMs: 1500,
 			  localRefinementRotations: false,
 			  localRefinementMaxColdAnglesPerPart: 3,
+			  localRefinementRotationReflow: true,
+			  rotationReflowMaxTargets: 2,
+			  rotationReflowMaxNeighbors: 3,
+			  rotationReflowMinBudgetMs: 400,
 			  localRefinementFineRotation: false,
 			  fineRotationMaxDeg: 6,
 			  fineRotationMinDeg: 0.25,
@@ -488,7 +492,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							val = i.checked;
 						}
 					
@@ -593,7 +597,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -4866,6 +4870,11 @@
 								<input type="checkbox" data-config="localRefinementFineRotation" /> <span class="radiolabel">Smart local refinement, merge lines off</span>
 							</dd>
 
+							<dt class="steprepeat-disabled">Rotation reflow</dt>
+							<dd class="steprepeat-disabled">
+								<input type="checkbox" checked="checked" data-config="localRefinementRotationReflow" /> <span class="radiolabel">Rotate parts and repack nearby neighbors</span>
+							</dd>
+
 							<dt class="steprepeat-disabled">Refinement engine</dt>
 							<dd class="steprepeat-disabled">
 								<select data-config="localRefinementEngine">
@@ -5342,6 +5351,11 @@
 				<div class="config_explain" id="explain_localRefinementFineRotation">
 					<h1>Fine rotation snugging</h1>
 					After Smart local refinement finishes, Deepnest can try tiny final angle changes using exact overlap checks only. It is disabled by default and skips automatically while merge-lines is enabled.
+				</div>
+
+				<div class="config_explain" id="explain_localRefinementRotationReflow">
+					<h1>Rotation reflow</h1>
+					Smart refinement can rotate a target to one of its placement angles, temporarily release nearby blockers, and rebuild that group through exact legal regions. The whole move is reverted unless the final layout is legal and strictly better.
 				</div>
 
 				<div class="config_explain" id="explain_adaptiveRotations">

@@ -146,6 +146,150 @@ function testRotationRetries() {
 	});
 }
 
+function testRotationReflowSelectionHelpers() {
+	const ctx = loadBackgroundFunctions([
+		'sqr',
+		'normalizedRotation',
+		'localRefinementAngularDistance',
+		'localRefinementSourceRotationAngles',
+		'localRefinementRotationReflowAngles',
+		'localRefinementWorldBounds',
+		'localRefinementRotationReflowNeighbors'
+	], {
+		getPolygonBounds: function (polygon) {
+			let minX = polygon[0].x;
+			let maxX = polygon[0].x;
+			let minY = polygon[0].y;
+			let maxY = polygon[0].y;
+			for (let i = 1; i < polygon.length; i++) {
+				minX = Math.min(minX, polygon[i].x);
+				maxX = Math.max(maxX, polygon[i].x);
+				minY = Math.min(minY, polygon[i].y);
+				maxY = Math.max(maxY, polygon[i].y);
+			}
+			return {x: minX, y: minY, width: maxX - minX, height: maxY - minY};
+		}
+	});
+	const config = {
+		rotations: 4,
+		adaptiveRotations: true,
+		adaptiveRotationAnglesBySource: {7: [0, 90, 45, 135]},
+		localRefinementMaxColdAnglesPerPart: 3
+	};
+	assert.deepStrictEqual(
+		Array.from(ctx.localRefinementRotationReflowAngles({source: 7, rotation: 0}, config)),
+		[45, 135, 90],
+		'rotation reflow should prioritize adaptive diagonals before uniform-grid alternatives'
+	);
+
+	const placed = [rect(0, 0, 2, 2), rect(0, 0, 2, 2), rect(0, 0, 2, 2), rect(0, 0, 2, 2)];
+	const placements = [
+		{x: 0, y: 0},
+		{x: 3, y: 0},
+		{x: 9, y: 0},
+		{x: 20, y: 0}
+	];
+	assert.deepStrictEqual(
+		Array.from(ctx.localRefinementRotationReflowNeighbors(placed, placements, 0, 3)),
+		[1, 2],
+		'rotation reflow should select nearest blockers while preserving one untouched anchor'
+	);
+}
+
+function testRotationReflowTransactionalCommitAndRollback() {
+	function deepClone(value) {
+		return JSON.parse(JSON.stringify(value));
+	}
+	function contextForMetric(candidateMetric) {
+		return loadBackgroundFunctions(['localRefinementTryRotationReflow'], {}, {
+			localRefinementRotationReflowAngles: function () { return [45]; },
+			localRefinementRotationReflowNeighbors: function () { return [1]; },
+			localRefinementCopyPlaced: deepClone,
+			localRefinementCopyPlacements: deepClone,
+			localRefinementRestorePlaced: function (target, source) {
+				target.splice.apply(target, [0, target.length].concat(deepClone(source)));
+			},
+			localRefinementRestorePlacements: function (target, source) {
+				target.splice.apply(target, [0, target.length].concat(deepClone(source)));
+			},
+			localRefinementEnsureSmartStats: function (stats) {
+				stats.operatorStats = stats.operatorStats || {};
+				stats.operatorStats.rotateReflow = stats.operatorStats.rotateReflow || {tried: 0, accepted: 0};
+				return stats.operatorStats;
+			},
+			localRefinementRotatedPartForRotation: function (part, rotation) {
+				const copy = deepClone(part);
+				copy.rotation = rotation;
+				return copy;
+			},
+			localRefinementBuildExclusionLists: function () { return {placed: [], placements: []}; },
+			localRefinementBuildStandaloneFeasibleRegion: function () { return [[{x: 0, y: 0}]]; },
+			localRefinementRegionCandidates: function (region, currentQ) {
+				return [{x: currentQ.x + 5, y: currentQ.y + 1}];
+			},
+			localRefinementSetPlacementXY: function (placement, x, y) {
+				placement.x = x;
+				placement.y = y;
+			},
+			localRefinementSinglePlacementLegal: function () { return true; },
+			localRefinementSubsetMetric: function () { return 1; },
+			localRefinementFinalLayoutLegalForRotations: function () { return true; },
+			localRefinementSmartMetric: function () { return candidateMetric; },
+			clonePlacementPosition: deepClone,
+			localRefinementAngularDistance: function (a, b) {
+				let delta = Math.abs((Number(a) || 0) - (Number(b) || 0)) % 360;
+				return delta > 180 ? 360 - delta : delta;
+			}
+		});
+	}
+	function fixture() {
+		const first = rect(0, 0, 2, 1);
+		first.id = 1;
+		first.source = 7;
+		first.rotation = 0;
+		const second = rect(0, 0, 1, 1);
+		second.id = 2;
+		second.source = 8;
+		second.rotation = 0;
+		const third = rect(0, 0, 1, 1);
+		third.id = 3;
+		third.source = 9;
+		third.rotation = 0;
+		return {
+			placed: [first, second, third],
+			placements: [
+				{x: 0, y: 0, id: 1, source: 7, rotation: 0},
+				{x: 3, y: 0, id: 2, source: 8, rotation: 0},
+				{x: 8, y: 0, id: 3, source: 9, rotation: 0}
+			]
+		};
+	}
+	const config = {
+		localRefinementRotationReflow: true,
+		rotationReflowMinBudgetMs: 0,
+		rotationReflowMaxNeighbors: 1
+	};
+
+	let data = fixture();
+	let stats = {movesTested: 0, movesAccepted: 0};
+	let ctx = contextForMetric(5);
+	let result = ctx.localRefinementTryRotationReflow({}, data.placed, data.placements, config, 0, 10, Date.now() + 10000, stats);
+	assert.strictEqual(result.moved, true, 'strictly improving rotation reflow should commit');
+	assert.strictEqual(result.metric, 5, 'committed reflow should return improved metric');
+	assert.strictEqual(data.placements[0].rotation, 45, 'committed target should keep its new rotation');
+	assert.strictEqual(stats.operatorStats.rotateReflow.accepted, 1, 'commit should increment operator acceptance');
+
+	data = fixture();
+	const originalPlaced = deepClone(data.placed);
+	const originalPlacements = deepClone(data.placements);
+	stats = {movesTested: 0, movesAccepted: 0};
+	ctx = contextForMetric(12);
+	result = ctx.localRefinementTryRotationReflow({}, data.placed, data.placements, config, 0, 10, Date.now() + 10000, stats);
+	assert.strictEqual(result.moved, false, 'non-improving rotation reflow should reject');
+	assert.deepStrictEqual(data.placed, originalPlaced, 'rejected reflow should restore every polygon');
+	assert.deepStrictEqual(data.placements, originalPlacements, 'rejected reflow should restore every placement');
+}
+
 function testNonCanonicalNfpGuardHelpers() {
 	const ctx = loadBackgroundFunctions([
 		'normalizedRotation',
@@ -791,6 +935,8 @@ function run() {
 	testMergedLengthChildrenCountOnce();
 	testEmptyClipperFallback();
 	testRotationRetries();
+	testRotationReflowSelectionHelpers();
+	testRotationReflowTransactionalCommitAndRollback();
 	testNonCanonicalNfpGuardHelpers();
 	testFineRotationCandidatePreservesCentroidPivot();
 	testFineRotationExactGateSelection();
