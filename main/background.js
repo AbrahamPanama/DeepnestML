@@ -5186,7 +5186,22 @@ function rotationRetryAngle(baseRotation, config, attemptIndex){
 	return normalizedRotation((Number(baseRotation) || 0) + rotationRetryStep(config)*attemptIndex);
 }
 
-function localRefinementRotationOnCanonicalGrid(rotation, config){
+function localRefinementRotationOnCanonicalGrid(rotation, config, part){
+	if(config && config.adaptiveRotations === true && config.adaptiveRotationAnglesBySource && part && typeof part.source !== 'undefined'){
+		var allowed = config.adaptiveRotationAnglesBySource[String(part.source)];
+		if(allowed && allowed.length){
+			for(var i=0; i<allowed.length; i++){
+				var adaptiveDelta = Math.abs(normalizedRotation((Number(rotation) || 0) - allowed[i]));
+				if(adaptiveDelta > 180){
+					adaptiveDelta = 360 - adaptiveDelta;
+				}
+				if(adaptiveDelta <= 1e-6){
+					return true;
+				}
+			}
+			return false;
+		}
+	}
 	var step = rotationRetryStep(config);
 	if(!isFinite(step) || step <= 0){
 		return true;
@@ -5201,8 +5216,8 @@ function localRefinementRotationOnCanonicalGrid(rotation, config){
 }
 
 function localRefinementRecordNonCanonicalNfpLookup(A, B, config, kind){
-	var badA = A && !localRefinementRotationOnCanonicalGrid(A.rotation || 0, config);
-	var badB = B && !localRefinementRotationOnCanonicalGrid(B.rotation || 0, config);
+	var badA = A && !localRefinementRotationOnCanonicalGrid(A.rotation || 0, config, A);
+	var badB = B && !localRefinementRotationOnCanonicalGrid(B.rotation || 0, config, B);
 	if(!badA && !badB){
 		return false;
 	}
@@ -5216,6 +5231,37 @@ function localRefinementRecordNonCanonicalNfpLookup(A, B, config, kind){
 		});
 	}
 	return true;
+}
+
+function rotationRetryAngles(part, config){
+	var angles = [];
+	var base = normalizedRotation(part && part.rotation || 0);
+	angles.push(base);
+
+	if(config && config.adaptiveRotations === true && config.adaptiveRotationAnglesBySource && part && typeof part.source !== 'undefined'){
+		var allowed = config.adaptiveRotationAnglesBySource[String(part.source)];
+		if(allowed && allowed.length){
+			for(var i=0; i<allowed.length; i++){
+				var candidate = normalizedRotation(allowed[i]);
+				var seen = false;
+				for(var a=0; a<angles.length; a++){
+					if(Math.abs(normalizedRotation(angles[a] - candidate)) <= 1e-6 || Math.abs(normalizedRotation(candidate - angles[a])) <= 1e-6){
+						seen = true;
+						break;
+					}
+				}
+				if(!seen){
+					angles.push(candidate);
+				}
+			}
+			return angles;
+		}
+	}
+
+	for(var j=1; j<rotationRetryCount(config); j++){
+		angles.push(rotationRetryAngle(base, config, j));
+	}
+	return angles;
 }
 
 function localRefinementNonCanonicalNfpLookupCount(){
@@ -5747,7 +5793,8 @@ function placeParts(sheets, parts, config, nestindex){
 			// inner NFP
 			var sheetNfp = null;
 			var originalPart = part;
-			var retryCount = rotationRetryCount(config);
+			var retryAngles = rotationRetryAngles(part, config);
+			var retryCount = retryAngles.length;
 			// Try every configured orientation before treating this part as unplaceable on the current sheet.
 			for(j=0; j<retryCount; j++){
 				sheetNfp = getInnerNfp(sheet, part, config);
@@ -5760,8 +5807,10 @@ function placeParts(sheets, parts, config, nestindex){
 					break;
 				}
 				
-				var r = rotatePolygon(originalPart, rotationRetryStep(config)*(j+1));
-				r.rotation = rotationRetryAngle(originalPart.rotation, config, j+1);
+				var targetRotation = retryAngles[j+1];
+				var rotationDelta = normalizedRotation(targetRotation - (originalPart.rotation || 0));
+				var r = rotatePolygon(originalPart, rotationDelta);
+				r.rotation = targetRotation;
 				r.source = part.source;
 				r.id = part.id;
 				

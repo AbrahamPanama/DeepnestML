@@ -151,6 +151,8 @@ function testNonCanonicalNfpGuardHelpers() {
 		'normalizedRotation',
 		'rotationRetryCount',
 		'rotationRetryStep',
+		'rotationRetryAngle',
+		'rotationRetryAngles',
 		'localRefinementRotationOnCanonicalGrid',
 		'localRefinementRecordNonCanonicalNfpLookup',
 		'localRefinementNonCanonicalNfpLookupCount',
@@ -175,6 +177,30 @@ function testNonCanonicalNfpGuardHelpers() {
 	);
 	assert.strictEqual(ctx.localRefinementNonCanonicalNfpLookupCount(), 1, 'off-grid lookup should increment counter');
 	assert.strictEqual(ctx.localRefinementNonCanonicalNfpLookupDelta(0), 1, 'delta should report guard trips since baseline');
+
+	const adaptiveConfig = {
+		rotations: 4,
+		adaptiveRotations: true,
+		adaptiveRotationAnglesBySource: {
+			7: [0, 90, 180, 270, 45, 225]
+		}
+	};
+	const adaptivePart = { source: 7, rotation: 45 };
+	assert.strictEqual(
+		ctx.localRefinementRotationOnCanonicalGrid(45, adaptiveConfig, adaptivePart),
+		true,
+		'explicit adaptive angle should be accepted as canonical for its source'
+	);
+	assert.strictEqual(
+		ctx.localRefinementRotationOnCanonicalGrid(47, adaptiveConfig, adaptivePart),
+		false,
+		'unlisted angle should remain blocked for an adaptive source'
+	);
+	assert.deepStrictEqual(
+		Array.from(ctx.rotationRetryAngles(adaptivePart, adaptiveConfig)),
+		[45, 0, 90, 180, 270, 225],
+		'adaptive placement retry should cover the source allowlist exactly once, starting with the assigned angle'
+	);
 }
 
 function testFineRotationCandidatePreservesCentroidPivot() {

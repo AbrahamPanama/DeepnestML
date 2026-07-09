@@ -1,0 +1,22 @@
+{
+  "name": "svg-gravity-adaptive-rotation-forced-fit",
+  "description": "An elongated part fits the square sheet only at the geometry-derived 45-degree placement angle.",
+  "input": "ml/examples/adaptive-rotation-forced-fit.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "expectedRotation": 45,
+  "expectedNonCanonicalNfpLookups": 0,
+  "timeoutMs": 60000,
+  "timeBudgetSec": 5,
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": false,
+    "populationSize": 6,
+    "threads": 2,
+    "rotations": 4,
+    "adaptiveRotations": true,
+    "adaptiveRotationMaxAngles": 6,
+    "adaptiveRotationMinAspectRatio": 1.35,
+    "localRefinement": false
+  }
+}

@@ -132,6 +132,15 @@ function mergeOptions(options) {
 	};
 }
 
+function adaptiveRotationOptions(options) {
+	return {
+		adaptiveRotations: booleanOption(optionValue(options, 'adaptiveRotations', 'adaptive-rotations', undefined), false),
+		adaptiveRotationMaxAngles: Math.floor(numberOption(optionValue(options, 'adaptiveRotationMaxAngles', 'adaptive-rotation-max-angles', undefined), 6, 1, 32)),
+		adaptiveRotationMinAspectRatio: numberOption(optionValue(options, 'adaptiveRotationMinAspectRatio', 'adaptive-rotation-min-aspect-ratio', undefined), 1.35, 1, 20),
+		adaptiveRotationAlignmentBias: numberOption(optionValue(options, 'adaptiveRotationAlignmentBias', 'adaptive-rotation-alignment-bias', undefined), 0.7, 0, 1)
+	};
+}
+
 function ensureDir(dir) {
 	if (!fs.existsSync(dir)) {
 		fs.mkdirSync(dir, { recursive: true });
@@ -273,10 +282,11 @@ function rotationsForMeta(meta) {
 	return rotations;
 }
 
-function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig) {
+function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig) {
 	fitnessVersion = parseInt(fitnessVersion || 1, 10) === 2 ? 2 : 1;
 	refinementOptions = refinementOptions || localRefinementOptions({});
 	mergeConfig = mergeConfig || mergeOptions({});
+	adaptiveConfig = adaptiveConfig || adaptiveRotationOptions({});
 	return {
 		placementType: 'gravity',
 		spacing: 0,
@@ -286,6 +296,10 @@ function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeCo
 		populationSize: 10,
 		mutationRate: 10,
 		rotations: rotations,
+		adaptiveRotations: adaptiveConfig.adaptiveRotations,
+		adaptiveRotationMaxAngles: adaptiveConfig.adaptiveRotationMaxAngles,
+		adaptiveRotationMinAspectRatio: adaptiveConfig.adaptiveRotationMinAspectRatio,
+		adaptiveRotationAlignmentBias: adaptiveConfig.adaptiveRotationAlignmentBias,
 		fitnessVersion: fitnessVersion,
 		localRefinement: refinementOptions.localRefinement,
 		localRefinementEngine: refinementOptions.localRefinementEngine,
@@ -327,6 +341,7 @@ function runBenchmark(options) {
 	const fitnessVersion = parseInt(options.fitnessVersion || options['fitness-version'] || 1, 10) === 2 ? 2 : 1;
 	const refinementOptions = localRefinementOptions(options);
 	const mergeConfig = mergeOptions(options);
+	const adaptiveConfig = adaptiveRotationOptions(options);
 	const selectedInstances = listInstances(options.instances || options.instance || 'all');
 	const stamp = timestamp();
 	const artifactRoot = path.join(ARTIFACT_ROOT, stamp + '-' + label);
@@ -343,7 +358,8 @@ function runBenchmark(options) {
 			fitnessVersion: fitnessVersion,
 			localRefinement: refinementOptions,
 			merge: mergeConfig,
-			baseConfig: buildConfigPreset('<per-instance rotations>', fitnessVersion, refinementOptions, mergeConfig)
+			adaptiveRotations: adaptiveConfig,
+			baseConfig: buildConfigPreset('<per-instance rotations>', fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig)
 		},
 		artifactRoot: artifactRoot,
 		instances: [],
@@ -366,7 +382,7 @@ function runBenchmark(options) {
 		const instance = readJson(instancePath);
 		const converted = esicup.instanceToSvg(instance);
 		const rotations = rotationsForMeta(converted.meta);
-		const configOverrides = buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig);
+		const configOverrides = buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig);
 		const instanceResult = {
 			name: converted.meta.name || name,
 			file: path.relative(ROOT, instancePath),

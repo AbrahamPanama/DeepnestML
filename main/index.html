@@ -12,6 +12,7 @@
 		<script src="util/clipper.js"></script>
 		<script src="util/parallel.js"></script>
 		<script src="util/geometryutil.js"></script>
+		<script src="util/rotationutil.js"></script>
 		<script src="util/placementworker.js"></script>
 		<script src="util/interact.js"></script>
 		<script src="util/ractive.js"></script>
@@ -402,6 +403,10 @@
 			  sheetMargin: 0, // inset from the sheet edge; parts never nest inside the margin
 			  curveTolerance: 0.72, // store distances in native units
 			  rotations: 4,
+			  adaptiveRotations: true,
+			  adaptiveRotationMaxAngles: 6,
+			  adaptiveRotationMinAspectRatio: 1.35,
+			  adaptiveRotationAlignmentBias: 0.7,
 			  threads: 4,
 			  populationSize: 10,
 			  mutationRate: 10,
@@ -483,7 +488,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							val = i.checked;
 						}
 					
@@ -588,7 +593,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -4775,6 +4780,11 @@
 						<dd class="steprepeat-disabled">
 							<input type="number" value="4" step="1" min="1" max="32" data-config="rotations" required />
 						</dd>
+
+						<dt class="steprepeat-disabled">Adaptive placement angles</dt>
+						<dd class="steprepeat-disabled">
+							<input type="checkbox" checked="checked" data-config="adaptiveRotations" /> <span class="radiolabel">Add geometry-aware diagonal choices</span>
+						</dd>
 					
 					<dt>Optimization type</dt>
 					<dd>
@@ -5330,6 +5340,11 @@
 				<div class="config_explain" id="explain_localRefinementFineRotation">
 					<h1>Fine rotation snugging</h1>
 					After Smart local refinement finishes, Deepnest can try tiny final angle changes using exact overlap checks only. It is disabled by default and skips automatically while merge-lines is enabled.
+				</div>
+
+				<div class="config_explain" id="explain_adaptiveRotations">
+					<h1>Adaptive placement angles</h1>
+					Adds a small geometry-derived diagonal angle set for elongated parts during the main nest. Identical copies are biased toward a shared orientation. It is skipped when common-line merging is enabled.
 				</div>
 
 				<div class="config_explain" id="explain_processHoles">

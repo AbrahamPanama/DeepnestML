@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-09 by Codex): code/docs expected clean after LR fine-rotation visible-acceptance follow-up commit; dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/`. Generated benchmark artifacts remain untracked by convention.
+State (verified 2026-07-09 by Codex): adaptive placement rotations ready to commit; unrelated/generated benchmark-result JSONs under `ml/benchmark/results/` remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | Adaptive per-part placement rotations | `main/util/rotationutil.js`, `main/deepnest.js`, `main/background.js`, `main/index.html`, benchmark/test/smoke coverage, `AGENT_COLLABORATION.md` | Completed: default-on bounded geometry angles + sibling alignment; exact NFP gate and A/B green | 2026-07-09 |
 | Codex | LR fine rotation visible acceptance follow-up | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, `AGENT_COLLABORATION.md`, smoke reports | Completed: legal fine rotations can be accepted visibly with exact collision gates intact | 2026-07-09 |
 | Codex | LR fine rotation Phase 0/1 | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, `ml/tests/engine_bugfixes/`, smoke/benchmark reports, `AGENT_COLLABORATION.md` | Completed: Phase 0 guard and Phase 1 default-off centroid operator landed; benchmark safety green, no accepted fine moves on bounded trio | 2026-07-08 |
 | Codex | PERF-P4 mergeLines top-k credit cap | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, smoke scenario, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: hidden default-off cap landed; flag-off equivalence green; flag-on benchmark borderline-green at cap64 | 2026-07-08 |
@@ -147,6 +148,17 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-09 - Adaptive placement rotations (Codex)
+
+- Added `main/util/rotationutil.js`: edge-weighted principal-axis analysis, bounded per-source angle sets, isotropic/merge-lines skips, and sibling-dominant angle selection. With four configured rotations an elongated horizontal part gets `[0,90,180,270,45,225]`; arbitrary continuous angles are not introduced.
+- Wired adaptive rotation allowlists through the GA and worker config. Identical-source seed copies share an orientation, mutation is biased toward the source-family dominant angle, and adaptive swap mutations keep each rotation with its part. Disabling `adaptiveRotations` preserves the legacy seed/mutation path.
+- Updated `main/background.js` so only source-allowlisted adaptive angles pass the canonical NFP guard; arbitrary fine angles still fail closed. First-placement retries enumerate the source allowlist exactly once. Existing NFP collision/containment math is unchanged.
+- Added a default-on `Adaptive placement angles` setting. It automatically skips when `mergeLines` is on and does not add angles for near-isotropic shapes. Added benchmark CLI flags for reproducible A/B runs.
+- Added pure helper tests, adaptive guard/retry engine tests, a complex branch smoke scenario, and a forced-fit fixture where a 1200x100 part can enter a 1000x1000 sheet only at 45 degrees. The forced-fit scenario is in the default smoke battery and asserts both exported `rotate(45)` and `nonCanonicalNfpLookups=0`.
+- Required pre-edit checkpoint was attempted with `npm run ml:checkpoint -- --name adaptive-rotations-pre` and failed because no completed training run with a trained model exists. No bakeoff was run because the required manifest/model/output inputs are unavailable.
+- Three-run 10-second A/B (`albano,blaz1,shapes0`, merge/refinement off): mean median utilization `0.3958307870` -> `0.3979199718` (`+0.209pp`); albano `+1.040pp`, blaz1 `-0.413pp`, shapes0 unchanged. All nine flag-on runs reported `nonCanonicalNfpLookups=0`. Artifacts remain untracked: `20260709T190330Z-adaptive-rotations-off-3x10s.json` and `20260709T190543Z-adaptive-rotations-on-3x10s.json`.
+- Verification passed: syntax checks for all changed JS; `node ml/tests/adaptive_rotations/run.js`; `node ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_equivalence/run.js`; `bash ml/scripts/run_boot_check.sh`; focused adaptive smokes; full default smoke battery including forced-fit rotation assertion; `bash -n ml/scripts/run_smoke_battery.sh`; `git diff --check`.
 
 ### 2026-07-09 - LR fine rotation visible acceptance follow-up (Codex)
 

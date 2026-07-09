@@ -23,6 +23,10 @@
 			spacing: 0,
 			sheetMargin: 0,
 			rotations: 4,
+			adaptiveRotations: true,
+			adaptiveRotationMaxAngles: 6,
+			adaptiveRotationMinAspectRatio: 1.35,
+			adaptiveRotationAlignmentBias: 0.7,
 			populationSize: 10,
 			mutationRate: 10,
 			threads: 4,
@@ -750,6 +754,25 @@
 			
 			if(c.rotations && parseInt(c.rotations) > 0){
 				config.rotations = parseInt(c.rotations);
+			}
+
+			if(c.adaptiveRotations === true || c.adaptiveRotations === false){
+				config.adaptiveRotations = !!c.adaptiveRotations;
+			}
+
+			if(c.adaptiveRotationMaxAngles && parseInt(c.adaptiveRotationMaxAngles, 10) >= 1){
+				config.adaptiveRotationMaxAngles = parseInt(c.adaptiveRotationMaxAngles, 10);
+			}
+
+			if(c.adaptiveRotationMinAspectRatio && parseFloat(c.adaptiveRotationMinAspectRatio) >= 1){
+				config.adaptiveRotationMinAspectRatio = parseFloat(c.adaptiveRotationMinAspectRatio);
+			}
+
+			if(typeof c.adaptiveRotationAlignmentBias !== 'undefined'){
+				var alignmentBias = parseFloat(c.adaptiveRotationAlignmentBias);
+				if(isFinite(alignmentBias)){
+					config.adaptiveRotationAlignmentBias = Math.max(0, Math.min(1, alignmentBias));
+				}
 			}
 			
 			if(c.populationSize && parseInt(c.populationSize) > 2){
@@ -1785,6 +1808,8 @@
 	function GeneticAlgorithm(adam, config){
 	
 		this.config = config || { populationSize: 10, mutationRate: 10, rotations: 4 };
+		this.rotationAnglesBySource = {};
+		this.prepareRotationAngles(adam);
 		var populationSize = parseInt(this.config.populationSize, 10);
 		if(!populationSize || populationSize < 1){
 			populationSize = 10;
@@ -1810,6 +1835,45 @@
 				this.population.push(mutant);
 			}
 		}
+	}
+
+	GeneticAlgorithm.prototype.prepareRotationAngles = function(parts){
+		var adaptive = this.config.adaptiveRotations === true && typeof RotationUtil !== 'undefined';
+		for(var i=0; i<parts.length; i++){
+			var source = String(parts[i].source);
+			if(Object.prototype.hasOwnProperty.call(this.rotationAnglesBySource, source)){
+				continue;
+			}
+			this.rotationAnglesBySource[source] = adaptive ?
+				RotationUtil.allowedAngles(parts[i], this.config) :
+				(typeof RotationUtil !== 'undefined' ? RotationUtil.uniformAngles(this.config.rotations) : [0]);
+		}
+		this.config.adaptiveRotationAnglesBySource = this.rotationAnglesBySource;
+	}
+
+	GeneticAlgorithm.prototype.allowedAngles = function(part){
+		var source = part && typeof part.source !== 'undefined' ? String(part.source) : null;
+		if(source !== null && this.rotationAnglesBySource[source] && this.rotationAnglesBySource[source].length){
+			return this.rotationAnglesBySource[source];
+		}
+		if(typeof RotationUtil !== 'undefined'){
+			return RotationUtil.uniformAngles(this.config.rotations);
+		}
+		return [0];
+	}
+
+	GeneticAlgorithm.prototype.nearestAllowedAngle = function(part, target){
+		var angles = this.allowedAngles(part);
+		var best = angles[0];
+		var bestDistance = Infinity;
+		for(var i=0; i<angles.length; i++){
+			var distance = typeof RotationUtil !== 'undefined' ? RotationUtil.angularDistance(angles[i], target) : Math.abs(angles[i] - target);
+			if(distance < bestDistance){
+				best = angles[i];
+				bestDistance = distance;
+			}
+		}
+		return best;
 	}
 
 	GeneticAlgorithm.prototype.addIndividual = function(individual, seen){
@@ -1917,12 +1981,65 @@
 		return 0;
 	}
 
-	GeneticAlgorithm.prototype.randomAngle = function(){
+	GeneticAlgorithm.prototype.randomAngle = function(part, placement, rotations){
+		if(this.config.adaptiveRotations === true && typeof RotationUtil !== 'undefined' && part){
+			var siblingRotations = [];
+			if(placement && rotations){
+				for(var i=0; i<placement.length; i++){
+					if(placement[i] && placement[i].source == part.source && typeof rotations[i] !== 'undefined'){
+						siblingRotations.push(rotations[i]);
+					}
+				}
+			}
+			return RotationUtil.chooseAlignedAngle(
+				this.allowedAngles(part),
+				siblingRotations,
+				Math.random,
+				this.config.adaptiveRotationAlignmentBias
+			);
+		}
 		var rotationCount = parseInt(this.config.rotations, 10) || 1;
 		return Math.floor(Math.random()*rotationCount)*(360/rotationCount);
 	}
 
+	GeneticAlgorithm.prototype.seedAdaptiveRotations = function(placement, seedIndex){
+		var rotations = [];
+		var sourceAngles = {};
+		var baseCount = Math.max(1, parseInt(this.config.rotations, 10) || 1);
+		for(var i=0; i<placement.length; i++){
+			var source = String(placement[i].source);
+			if(!Object.prototype.hasOwnProperty.call(sourceAngles, source)){
+				var angles = this.allowedAngles(placement[i]);
+				var target;
+				if(seedIndex === 1){
+					target = 0;
+				}
+				else if(seedIndex === 2){
+					target = 180;
+				}
+				else if(seedIndex === 3){
+					target = this.partMetric(placement[i], 'width') >= this.partMetric(placement[i], 'height') ? 0 : 90;
+				}
+				else if(seedIndex === 4){
+					target = this.partMetric(placement[i], 'height') > this.partMetric(placement[i], 'width') ? 0 : 90;
+				}
+				else if(seedIndex >= 5 && angles.length > baseCount){
+					target = angles[baseCount + ((seedIndex - 5) % (angles.length - baseCount))];
+				}
+				else{
+					target = angles[seedIndex % angles.length];
+				}
+				sourceAngles[source] = this.nearestAllowedAngle(placement[i], target);
+			}
+			rotations.push(sourceAngles[source]);
+		}
+		return rotations;
+	}
+
 	GeneticAlgorithm.prototype.seedRotations = function(placement, seedIndex){
+		if(this.config.adaptiveRotations === true && typeof RotationUtil !== 'undefined'){
+			return this.seedAdaptiveRotations(placement, seedIndex);
+		}
 		var rotations = [];
 		var rotationCount = parseInt(this.config.rotations, 10) || 1;
 		var allow180 = rotationCount % 2 === 0;
@@ -1960,12 +2077,17 @@
 					var temp = clone.placement[i];
 					clone.placement[i] = clone.placement[j];
 					clone.placement[j] = temp;
+					if(this.config.adaptiveRotations === true){
+						temp = clone.rotation[i];
+						clone.rotation[i] = clone.rotation[j];
+						clone.rotation[j] = temp;
+					}
 				}
 			}
 			
 			rand = Math.random();
 			if(rand < 0.01*this.config.mutationRate){
-				clone.rotation[i] = Math.floor(Math.random()*this.config.rotations)*(360/this.config.rotations);
+				clone.rotation[i] = this.randomAngle(clone.placement[i], clone.placement, clone.rotation);
 			}
 		}
 		

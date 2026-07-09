@@ -1,0 +1,21 @@
+{
+  "name": "svg-hull-adaptive-rotations",
+  "description": "Geometry-derived bounded placement angles with sibling alignment and exact NFP collision checks.",
+  "input": "ml/examples/comb-branches.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "timeBudgetSec": 10,
+  "configOverrides": {
+    "placementType": "convexhull",
+    "mergeLines": false,
+    "populationSize": 10,
+    "threads": 2,
+    "rotations": 4,
+    "adaptiveRotations": true,
+    "adaptiveRotationMaxAngles": 6,
+    "adaptiveRotationMinAspectRatio": 1.35,
+    "adaptiveRotationAlignmentBias": 0.7,
+    "localRefinement": false
+  }
+}
