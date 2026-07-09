@@ -3521,6 +3521,75 @@ function localRefinementFineRotationCandidate(basePart, basePlacement, delta){
 	};
 }
 
+function localRefinementFineRotationAccepts(candidateScore, currentScore, candidateDelta, currentDelta, config){
+	if(candidateScore === null || typeof candidateScore === 'undefined'){
+		return false;
+	}
+	if(localRefinementImproves(candidateScore, currentScore)){
+		return true;
+	}
+	if(config && config.fineRotationStrictImprovement === true){
+		return false;
+	}
+	if(currentScore === null || typeof currentScore === 'undefined'){
+		return true;
+	}
+	if(Math.abs(candidateDelta) <= Math.abs(currentDelta || 0) + 1e-9){
+		return false;
+	}
+	var neutralTolerance = Math.max(1e-9, Math.abs(currentScore) * 1e-9);
+	if(candidateScore <= currentScore + neutralTolerance){
+		return true;
+	}
+	var maxWorsenRatio = Number(config && config.fineRotationMaxWorsenRatio);
+	if(!isFinite(maxWorsenRatio) || maxWorsenRatio < 0){
+		maxWorsenRatio = 0.001;
+	}
+	var maxWorsen = Math.max(1e-9, Math.abs(currentScore) * maxWorsenRatio);
+	return candidateScore <= currentScore + maxWorsen;
+}
+
+function localRefinementAddPlacementCandidate(candidates, placement, tolerance){
+	for(var i=0; i<candidates.length; i++){
+		if(Math.abs(candidates[i].x - placement.x) <= tolerance && Math.abs(candidates[i].y - placement.y) <= tolerance){
+			return;
+		}
+	}
+	candidates.push(clonePlacementPosition(placement));
+}
+
+function localRefinementFineRotationPlacementCandidates(part, placement, delta, config){
+	var candidates = [];
+	var tolerance = Math.max(1e-9, 1e-6 * (Number(config.curveTolerance) || 1));
+	localRefinementAddPlacementCandidate(candidates, placement, tolerance);
+	var maxShift = localRefinementBboxDiagonal(part) * Math.sin(Math.abs(delta) * Math.PI / 180);
+	maxShift = Math.max(maxShift, Number(config.curveTolerance) || 0.01);
+	var distances = [0.25 * maxShift, 0.5 * maxShift, maxShift];
+	var directions = [
+		{x: -1, y: 0},
+		{x: 0, y: -1},
+		{x: -1, y: -1},
+		{x: 1, y: 0},
+		{x: 0, y: 1},
+		{x: 1, y: -1},
+		{x: -1, y: 1},
+		{x: 1, y: 1}
+	];
+	for(var d=0; d<directions.length; d++){
+		var unit = localRefinementNormalizeDirection(directions[d]);
+		if(!unit){
+			continue;
+		}
+		for(var s=0; s<distances.length; s++){
+			var candidate = clonePlacementPosition(placement);
+			candidate.x += unit.x * distances[s];
+			candidate.y += unit.y * distances[s];
+			localRefinementAddPlacementCandidate(candidates, candidate, tolerance);
+		}
+	}
+	return candidates;
+}
+
 function localRefinementFineRotationHasHoleRisk(placed, placements, config, index){
 	if(config && config.processHoles === false){
 		return false;
@@ -3617,16 +3686,50 @@ function localRefinementTryFineRotate(sheet, placed, placements, config, index, 
 				operatorStats.fineRotate.tried++;
 			}
 			var candidate = localRefinementFineRotationCandidate(basePart, basePlacement, candidateDelta);
-			if(!localRefinementFineRotationCandidateLegal(sheet, placed, placements, config, index, candidate.part, candidate.placement, stats)){
-				continue;
-			}
 			var currentPart = placed[index];
 			var currentPlacement = placements[index];
-			placed[index] = candidate.part;
-			placements[index] = candidate.placement;
-			var candidateMetric = localRefinementSmartMetric(sheet, placed, placements, config);
-			if(candidateMetric !== null && localRefinementImproves(candidateMetric, metric)){
-				metric = candidateMetric;
+			var placementsToTry = localRefinementFineRotationPlacementCandidates(candidate.part, candidate.placement, candidateDelta, config);
+			var acceptedPlacement = null;
+			var acceptedMetric = null;
+			for(var p=0; p<placementsToTry.length && Date.now() < deadline; p++){
+				if(stats && p > 0){
+					stats.fineRotateSlideCandidates = (stats.fineRotateSlideCandidates || 0) + 1;
+				}
+				if(!localRefinementFineRotationCandidateLegal(sheet, placed, placements, config, index, candidate.part, placementsToTry[p], stats)){
+					continue;
+				}
+				if(stats){
+					stats.fineRotateLegalCandidates = (stats.fineRotateLegalCandidates || 0) + 1;
+				}
+				placed[index] = candidate.part;
+				placements[index] = placementsToTry[p];
+				var candidateMetric = localRefinementSmartMetric(sheet, placed, placements, config);
+				placed[index] = currentPart;
+				placements[index] = currentPlacement;
+				if(!localRefinementFineRotationAccepts(candidateMetric, metric, candidateDelta, netDelta, config)){
+					continue;
+				}
+				if(acceptedMetric === null || candidateMetric < acceptedMetric || (GeometryUtil.almostEqual(candidateMetric, acceptedMetric, 1e-12) && p === 0)){
+					acceptedMetric = candidateMetric;
+					acceptedPlacement = placementsToTry[p];
+				}
+			}
+			if(acceptedPlacement){
+				placed[index] = candidate.part;
+				placements[index] = acceptedPlacement;
+				if(!localRefinementImproves(acceptedMetric, metric) && stats){
+					var neutralTolerance = Math.max(1e-9, Math.abs(metric) * 1e-9);
+					if(acceptedMetric <= metric + neutralTolerance){
+						stats.fineRotateNeutralAccepted = (stats.fineRotateNeutralAccepted || 0) + 1;
+					}
+					else{
+						stats.fineRotateNearNeutralAccepted = (stats.fineRotateNearNeutralAccepted || 0) + 1;
+					}
+				}
+				if((!GeometryUtil.almostEqual(acceptedPlacement.x, candidate.placement.x, 1e-9) || !GeometryUtil.almostEqual(acceptedPlacement.y, candidate.placement.y, 1e-9)) && stats){
+					stats.fineRotateSlideAccepted = (stats.fineRotateSlideAccepted || 0) + 1;
+				}
+				metric = acceptedMetric;
 				netDelta = candidateDelta;
 				moved = true;
 				acceptedAtStep = true;
@@ -3637,7 +3740,10 @@ function localRefinementTryFineRotate(sheet, placed, placements, config, index, 
 					stats.movesAccepted = (stats.movesAccepted || 0) + 1;
 					stats.fineRotateMaxDeltaDeg = Math.max(stats.fineRotateMaxDeltaDeg || 0, Math.abs(netDelta));
 				}
-				break;
+				return {
+					moved: true,
+					metric: metric
+				};
 			}
 			placed[index] = currentPart;
 			placements[index] = currentPlacement;
@@ -4799,8 +4905,13 @@ function createLocalRefinementStats(enabled){
 		movesAccepted: 0,
 		nonCanonicalNfpLookups: 0,
 		fineRotateCandidates: 0,
+		fineRotateSlideCandidates: 0,
+		fineRotateLegalCandidates: 0,
 		fineRotateExactChecks: 0,
 		fineRotateExactMs: 0,
+		fineRotateNeutralAccepted: 0,
+		fineRotateNearNeutralAccepted: 0,
+		fineRotateSlideAccepted: 0,
 		fineRotateSkippedHoles: 0,
 		fineRotateSkippedBudget: 0,
 		fineRotateSkippedMergeLines: 0,
@@ -4857,7 +4968,7 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
 	}

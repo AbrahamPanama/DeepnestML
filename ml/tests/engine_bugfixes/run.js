@@ -238,6 +238,9 @@ function testFineRotationAcceptancePath() {
 		'localRefinementRotatePoint',
 		'localRefinementPolygonCentroid',
 		'localRefinementFineRotationCandidate',
+		'localRefinementFineRotationAccepts',
+		'localRefinementAddPlacementCandidate',
+		'localRefinementFineRotationPlacementCandidates',
 		'localRefinementFineRotationHasHoleRisk',
 		'localRefinementTryFineRotate'
 	], {
@@ -287,6 +290,19 @@ function testFineRotationAcceptancePath() {
 	assert.strictEqual(placements[0].rotation, 6, 'accepted placement should keep fine rotation');
 	assert.strictEqual(placed[0].rotation, 6, 'accepted part should keep fine rotation');
 	assert.strictEqual(stats.operatorStats.fineRotate.accepted, 1, 'operator stats should count accepted fine rotation');
+}
+
+function testFineRotationNeutralAcceptance() {
+	const ctx = loadBackgroundFunctions([
+		'localRefinementImproves',
+		'localRefinementFineRotationAccepts'
+	]);
+	assert.strictEqual(ctx.localRefinementFineRotationAccepts(10, 10, 6, 0, {}), true, 'score-neutral visible fine rotation should be accepted');
+	assert.strictEqual(ctx.localRefinementFineRotationAccepts(10, 10, 3, 6, {}), false, 'score-neutral fine rotation should not undo a larger accepted fine angle');
+	assert.strictEqual(ctx.localRefinementFineRotationAccepts(10.001, 10, 6, 0, {}), true, 'near-neutral fine rotation should be accepted within the bounded default tolerance');
+	assert.strictEqual(ctx.localRefinementFineRotationAccepts(10.02, 10, 6, 0, {}), false, 'larger worse fine rotation should not be accepted');
+	assert.strictEqual(ctx.localRefinementFineRotationAccepts(10, 10, 6, 0, { fineRotationStrictImprovement: true }), false, 'strict mode should reject neutral fine rotation');
+	assert.strictEqual(ctx.localRefinementFineRotationAccepts(9.9, 10, 3, 6, { fineRotationStrictImprovement: true }), true, 'strict mode should still accept true metric improvement');
 }
 
 function testFineRotationHoleRiskHonorsProcessHoles() {
@@ -753,6 +769,7 @@ function run() {
 	testFineRotationCandidatePreservesCentroidPivot();
 	testFineRotationExactGateSelection();
 	testFineRotationAcceptancePath();
+	testFineRotationNeutralAcceptance();
 	testFineRotationHoleRiskHonorsProcessHoles();
 	testFineRotationExactOverlapOuterOnlyWhenProcessHolesOff();
 	testSheetHoleForbiddenNfp();

@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-08 by Codex): _code/docs expected clean after LR fine-rotation Phase 1 commit; dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/`. Generated benchmark artifacts remain untracked by convention._
+State (verified 2026-07-09 by Codex): code/docs expected clean after LR fine-rotation visible-acceptance follow-up commit; dirty only from untracked benchmark-result JSONs under `ml/benchmark/results/`. Generated benchmark artifacts remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | LR fine rotation visible acceptance follow-up | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, `AGENT_COLLABORATION.md`, smoke reports | Completed: legal fine rotations can be accepted visibly with exact collision gates intact | 2026-07-09 |
 | Codex | LR fine rotation Phase 0/1 | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, `ml/tests/engine_bugfixes/`, smoke/benchmark reports, `AGENT_COLLABORATION.md` | Completed: Phase 0 guard and Phase 1 default-off centroid operator landed; benchmark safety green, no accepted fine moves on bounded trio | 2026-07-08 |
 | Codex | PERF-P4 mergeLines top-k credit cap | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, smoke scenario, engine tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: hidden default-off cap landed; flag-off equivalence green; flag-on benchmark borderline-green at cap64 | 2026-07-08 |
 | Codex | PERF-P5 geometry-once dispatch | `main/deepnest.js`, `main/background.js`, IPC hosts, geometry broker tests, benchmark/equivalence reports, `AGENT_COLLABORATION.md` | Completed: token geometry dispatch landed; refinement token path verified; equivalence/smoke/benchmark green | 2026-07-08 |
@@ -146,6 +147,14 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-09 - LR fine rotation visible acceptance follow-up (Codex)
+
+- User testing still showed no visible rotations, including on parts without holes. Smoke diagnostics showed legal fine-rotation candidates existed, but strict smart-metric acceptance rejected them all.
+- Updated `main/background.js` so fine rotation tries exact-legal rotate + small slide placements, accepts score-neutral or bounded near-neutral visible rotations when `fineRotationStrictImprovement` is not set, and caps each target at one accepted fine-rotation nudge. Exact sheet/pair overlap gates remain in place before any move is accepted.
+- Added targeted acceptance tests in `ml/tests/engine_bugfixes/run.js`.
+- Verification passed: `node --check main/background.js`; `node --check ml/tests/engine_bugfixes/run.js`; `node ml/tests/engine_bugfixes/run.js`; `bash ml/scripts/run_boot_check.sh`; `DEEPNEST_SMOKE_ARTIFACT_ROOT=/tmp/deepnest-smoke-fine-rotation-capped bash ml/scripts/run_smoke_battery.sh svg-hull-fine-rotation`; `git diff --check`; `node ml/tests/engine_equivalence/run.js`.
+- Focused smoke stats: `operatorStats.fineRotate.accepted=2`, `fineRotateMaxDeltaDeg=6`, `fineRotateLegalCandidates=53`, `fineRotateNearNeutralAccepted=1`, `fineRotateSlideAccepted=1`, `nonCanonicalNfpLookups=0`.
 
 ### 2026-07-08 - LR fine rotation slotted-part follow-up (Codex)
 
