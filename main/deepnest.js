@@ -2005,11 +2005,19 @@
 	GeneticAlgorithm.prototype.seedAdaptiveRotations = function(placement, seedIndex){
 		var rotations = [];
 		var sourceAngles = {};
-		var baseCount = Math.max(1, parseInt(this.config.rotations, 10) || 1);
+		var uniformAngles = RotationUtil.uniformAngles(this.config.rotations);
 		for(var i=0; i<placement.length; i++){
 			var source = String(placement[i].source);
 			if(!Object.prototype.hasOwnProperty.call(sourceAngles, source)){
 				var angles = this.allowedAngles(placement[i]);
+				var extraAngles = angles.filter(function(angle){
+					for(var u=0; u<uniformAngles.length; u++){
+						if(RotationUtil.angularDistance(angle, uniformAngles[u]) <= 1e-6){
+							return false;
+						}
+					}
+					return true;
+				});
 				var target;
 				if(seedIndex === 1){
 					target = 0;
@@ -2023,8 +2031,8 @@
 				else if(seedIndex === 4){
 					target = this.partMetric(placement[i], 'height') > this.partMetric(placement[i], 'width') ? 0 : 90;
 				}
-				else if(seedIndex >= 5 && angles.length > baseCount){
-					target = angles[baseCount + ((seedIndex - 5) % (angles.length - baseCount))];
+				else if(seedIndex >= 5 && extraAngles.length > 0){
+					target = extraAngles[(seedIndex - 5) % extraAngles.length];
 				}
 				else{
 					target = angles[seedIndex % angles.length];

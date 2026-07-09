@@ -1,0 +1,23 @@
+{
+  "name": "svg-gravity-adaptive-slotted-oval",
+  "description": "A centered-slot oval fits the square sheet only at a diagonal adaptive angle while part holes are ignored.",
+  "input": "ml/examples/adaptive-rotation-slotted-oval.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "expectedRotations": [45, 135],
+  "expectedNonCanonicalNfpLookups": 0,
+  "timeoutMs": 60000,
+  "timeBudgetSec": 5,
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 6,
+    "threads": 2,
+    "rotations": 4,
+    "adaptiveRotations": true,
+    "adaptiveRotationMaxAngles": 6,
+    "adaptiveRotationMinAspectRatio": 1.35,
+    "localRefinement": false
+  }
+}

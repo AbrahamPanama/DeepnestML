@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | Adaptive rotation symmetry follow-up | `main/util/rotationutil.js`, `main/deepnest.js`, adaptive tests/smoke, `AGENT_COLLABORATION.md` | Completed: symmetric slotted parts use four unique axes; target and regression gates green | 2026-07-09 |
 | Codex | Adaptive per-part placement rotations | `main/util/rotationutil.js`, `main/deepnest.js`, `main/background.js`, `main/index.html`, benchmark/test/smoke coverage, `AGENT_COLLABORATION.md` | Completed: default-on bounded geometry angles + sibling alignment; exact NFP gate and A/B green | 2026-07-09 |
 | Codex | LR fine rotation visible acceptance follow-up | `main/background.js`, `ml/tests/engine_bugfixes/run.js`, `AGENT_COLLABORATION.md`, smoke reports | Completed: legal fine rotations can be accepted visibly with exact collision gates intact | 2026-07-09 |
 | Codex | LR fine rotation Phase 0/1 | `main/background.js`, `main/deepnest.js`, `main/index.html`, `ml/cli/run_benchmark.js`, `ml/tests/engine_bugfixes/`, smoke/benchmark reports, `AGENT_COLLABORATION.md` | Completed: Phase 0 guard and Phase 1 default-off centroid operator landed; benchmark safety green, no accepted fine moves on bounded trio | 2026-07-08 |
@@ -148,6 +149,16 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-09 - Adaptive rotation symmetry follow-up (Codex)
+
+- Added conservative half-turn symmetry detection. Convex contours use opposite support distances; non-convex contours use centroid + 32 center-line intersection checks. Comparisons use the existing curve tolerance, so SVG ellipse tessellation does not create false directional variants.
+- Symmetric elongated parts now use four unique axes (`[0,90,45,135]`) instead of spending NFP variants on 180-degree reversals. Child-bearing parts keep reversals when `processHoles` is on; with holes ignored, the outer contour may use the symmetric set.
+- Adaptive GA seeding now identifies non-uniform angles by value instead of assuming they follow all global-grid entries, ensuring the symmetry-reduced 45/135 candidates receive explicit seed individuals.
+- Added the slotted-oval target fixture/scenario and made it part of the default smoke battery. With `rotations:4`, `processHoles:false`, and merge-lines off, the live allowlist was `[0,90,45,135]`, the exported placement was `rotate(45)`, and `nonCanonicalNfpLookups=0`. Smoke reports now include `adaptiveRotationAnglesBySource` for diagnostics.
+- Final generic 3x10s gate artifact: `20260709T194600Z-adaptive-symmetry-final-3x10s.json`. Mean median utilization `0.3944533346` versus the frozen off baseline `0.3958307870` (`-0.138pp`, within the safety band); all nine runs had zero non-canonical NFP lookups. This corpus still selected only cardinal angles, so the slotted-oval fixture is the efficacy proof.
+- Verification passed: syntax checks; adaptive + engine bugfix tests; engine equivalence; boot check; focused forced-fit/branch/slotted smokes; full default smoke battery including exact angle assertions; `bash -n`; `git diff --check`.
+- The prior checkpoint attempt remains unavailable because there are no completed trained-model runs; no bakeoff inputs are available.
 
 ### 2026-07-09 - Adaptive placement rotations (Codex)
 

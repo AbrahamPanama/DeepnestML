@@ -7,7 +7,7 @@ ARTIFACT_ROOT="${DEEPNEST_SMOKE_ARTIFACT_ROOT:-"$ROOT_DIR/ml/artifacts/smoke-bat
 if [ "$#" -gt 0 ]; then
   SCENARIOS=("$@")
 else
-  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-hull" "svg-steprepeat" "svg-export-pdf")
+  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-steprepeat" "svg-export-pdf")
 fi
 
 mkdir -p "$ARTIFACT_ROOT"
@@ -60,6 +60,19 @@ if (typeof scenario.expectedRotation === 'number') {
   }
   if (!rotations.some((rotation) => Math.abs(rotation - scenario.expectedRotation) <= 1e-6)) {
     console.error('[smoke-battery] expected rotation missing:', scenario.expectedRotation, rotations);
+    process.exit(1);
+  }
+}
+if (Array.isArray(scenario.expectedRotations) && scenario.expectedRotations.length > 0) {
+  const output = fs.readFileSync(outputPath, 'utf8');
+  const rotations = [];
+  const rotationPattern = /rotate\(\s*([-+0-9.eE]+)\s*\)/g;
+  let match;
+  while ((match = rotationPattern.exec(output))) {
+    rotations.push(Number(match[1]));
+  }
+  if (!rotations.some((rotation) => scenario.expectedRotations.some((expected) => Math.abs(rotation - expected) <= 1e-6))) {
+    console.error('[smoke-battery] expected rotations missing:', scenario.expectedRotations, rotations);
     process.exit(1);
   }
 }

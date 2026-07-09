@@ -3360,6 +3360,7 @@
 						}
 						catch (statError) {}
 						var localRefinement = selectedNest && selectedNest.localRefinement ? selectedNest.localRefinement : null;
+						var engineConfig = DeepNest.config();
 						var details = {
 							scenarioName: scenarioName,
 							outputFormat: outputFormat,
@@ -3373,6 +3374,7 @@
 							timing: selectedNest && selectedNest.timing ? selectedNest.timing : null,
 							pairsCacheHits: selectedNest && typeof selectedNest.pairsCacheHits !== 'undefined' ? selectedNest.pairsCacheHits : null,
 							pairsMissing: selectedNest && typeof selectedNest.pairsMissing !== 'undefined' ? selectedNest.pairsMissing : null,
+							adaptiveRotationAnglesBySource: engineConfig && engineConfig.adaptiveRotationAnglesBySource ? engineConfig.adaptiveRotationAnglesBySource : null,
 							localRefinement: localRefinement,
 							localRefinementSummary: localRefinement ? {
 								enabled: !!localRefinement.enabled,
