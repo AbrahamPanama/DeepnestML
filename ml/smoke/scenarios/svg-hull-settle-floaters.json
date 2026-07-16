@@ -5,7 +5,8 @@
   "sourceFormat": "svg",
   "outputFormat": "svg",
   "expectedLocalRefinementMinimums": {
-    "rotationReflowAttempts": 1
+    "floatersDetected": 1,
+    "continuousAnglesEvaluated": 1
   },
   "timeoutMs": 90000,
   "timeBudgetSec": 10,

@@ -23,7 +23,7 @@
 			spacing: 0,
 			sheetMargin: 0,
 			rotations: 4,
-			adaptiveRotations: true,
+			adaptiveRotations: false,
 			adaptiveRotationMaxAngles: 6,
 			adaptiveRotationMinAspectRatio: 1.35,
 			adaptiveRotationAlignmentBias: 0.7,
@@ -41,7 +41,7 @@
 			improvedPlacementScoring: false,
 			fitnessVersion: 1,
 			localRefinement: false,
-			localRefinementEngine: 'slide',
+			localRefinementEngine: 'smart',
 			localRefinementBudgetMs: 1500,
 			localRefinementRotations: false,
 			localRefinementMaxColdAnglesPerPart: 3,
@@ -50,6 +50,19 @@
 			rotationReflowMaxNeighbors: 3,
 			rotationReflowMinBudgetMs: 400,
 			localRefinementFineRotation: false,
+			localRefinementContinuous: true,
+			continuousRefinementBudgetMs: 2000,
+			continuousRefinementMaxDeltaDeg: 45,
+			continuousRefinementCoarseStepDeg: 5,
+			continuousRefinementRefineStepDeg: 1,
+			continuousRefinementFineStepDeg: 0.25,
+			continuousRefinementProxyPoints: 16,
+			continuousRefinementContactCap: 96,
+			continuousRefinementPosesPerAngle: 4,
+			continuousRefinementFinalists: 12,
+			continuousRefinementMaxPairs: 4,
+			continuousRefinementMaxTargets: 8,
+			continuousRefinementMaxNeighbors: 3,
 			fineRotationMaxDeg: 6,
 			fineRotationMinDeg: 0.25,
 			fineRotationMaxTargets: 8,
@@ -872,6 +885,70 @@
 				config.localRefinementFineRotation = !!c.localRefinementFineRotation;
 			}
 
+			if(c.localRefinementContinuous === true || c.localRefinementContinuous === false){
+				config.localRefinementContinuous = !!c.localRefinementContinuous;
+			}
+
+			var continuousBudget = Number(c.continuousRefinementBudgetMs);
+			if(isFinite(continuousBudget) && continuousBudget >= 100){
+				config.continuousRefinementBudgetMs = Math.min(Math.floor(continuousBudget), 30000);
+			}
+
+			var continuousMaxDelta = Number(c.continuousRefinementMaxDeltaDeg);
+			if(isFinite(continuousMaxDelta) && continuousMaxDelta > 0){
+				config.continuousRefinementMaxDeltaDeg = Math.min(continuousMaxDelta, 45);
+			}
+
+			var continuousCoarseStep = Number(c.continuousRefinementCoarseStepDeg);
+			if(isFinite(continuousCoarseStep) && continuousCoarseStep > 0){
+				config.continuousRefinementCoarseStepDeg = Math.min(continuousCoarseStep, 15);
+			}
+
+			var continuousRefineStep = Number(c.continuousRefinementRefineStepDeg);
+			if(isFinite(continuousRefineStep) && continuousRefineStep > 0){
+				config.continuousRefinementRefineStepDeg = Math.min(continuousRefineStep, config.continuousRefinementCoarseStepDeg);
+			}
+
+			var continuousFineStep = Number(c.continuousRefinementFineStepDeg);
+			if(isFinite(continuousFineStep) && continuousFineStep > 0){
+				config.continuousRefinementFineStepDeg = Math.min(continuousFineStep, config.continuousRefinementRefineStepDeg);
+			}
+
+			var continuousProxyPoints = Number(c.continuousRefinementProxyPoints);
+			if(isFinite(continuousProxyPoints) && continuousProxyPoints >= 16){
+				config.continuousRefinementProxyPoints = Math.min(Math.floor(continuousProxyPoints), 256);
+			}
+
+			var continuousContactCap = Number(c.continuousRefinementContactCap);
+			if(isFinite(continuousContactCap) && continuousContactCap >= 16){
+				config.continuousRefinementContactCap = Math.min(Math.floor(continuousContactCap), 4096);
+			}
+
+			var continuousPoses = Number(c.continuousRefinementPosesPerAngle);
+			if(isFinite(continuousPoses) && continuousPoses >= 1){
+				config.continuousRefinementPosesPerAngle = Math.min(Math.floor(continuousPoses), 32);
+			}
+
+			var continuousFinalists = Number(c.continuousRefinementFinalists);
+			if(isFinite(continuousFinalists) && continuousFinalists >= 1){
+				config.continuousRefinementFinalists = Math.min(Math.floor(continuousFinalists), 32);
+			}
+
+			var continuousPairs = Number(c.continuousRefinementMaxPairs);
+			if(isFinite(continuousPairs) && continuousPairs >= 1){
+				config.continuousRefinementMaxPairs = Math.min(Math.floor(continuousPairs), 32);
+			}
+
+			var continuousTargets = Number(c.continuousRefinementMaxTargets);
+			if(isFinite(continuousTargets) && continuousTargets >= 1){
+				config.continuousRefinementMaxTargets = Math.min(Math.floor(continuousTargets), 32);
+			}
+
+			var continuousNeighbors = Number(c.continuousRefinementMaxNeighbors);
+			if(isFinite(continuousNeighbors) && continuousNeighbors >= 0){
+				config.continuousRefinementMaxNeighbors = Math.min(Math.floor(continuousNeighbors), 8);
+			}
+
 			var fineRotationMaxDeg = Number(c.fineRotationMaxDeg);
 			if(typeof fineRotationMaxDeg == 'number' && !isNaN(fineRotationMaxDeg) && isFinite(fineRotationMaxDeg) && fineRotationMaxDeg > 0){
 				config.fineRotationMaxDeg = Math.min(fineRotationMaxDeg, 45);
@@ -914,9 +991,13 @@
 					config.mergeCandidateCap = mergeCandidateCap > 0 ? mergeCandidateCap : 0;
 				}
 
-				if(c.simplify === true || c.simplify === false){
+			if(c.simplify === true || c.simplify === false){
 					config.simplify = !!c.simplify;
 				}
+
+			if(typeof ConfigCompatibility !== 'undefined'){
+				ConfigCompatibility.applyActiveContinuousCompaction(config);
+			}
 			
 			var n = Number(c.timeRatio);
 			if(typeof n == 'number' && !isNaN(n) && isFinite(n)){

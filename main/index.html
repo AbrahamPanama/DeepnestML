@@ -13,6 +13,7 @@
 		<script src="util/parallel.js"></script>
 		<script src="util/geometryutil.js"></script>
 		<script src="util/rotationutil.js"></script>
+		<script src="util/configcompatibility.js"></script>
 		<script src="util/placementworker.js"></script>
 		<script src="util/interact.js"></script>
 		<script src="util/ractive.js"></script>
@@ -403,7 +404,7 @@
 			  sheetMargin: 0, // inset from the sheet edge; parts never nest inside the margin
 			  curveTolerance: 0.72, // store distances in native units
 			  rotations: 4,
-			  adaptiveRotations: true,
+			  adaptiveRotations: false,
 			  adaptiveRotationMaxAngles: 6,
 			  adaptiveRotationMinAspectRatio: 1.35,
 			  adaptiveRotationAlignmentBias: 0.7,
@@ -421,7 +422,7 @@
 			  improvedPlacementScoring: false,
 			  fitnessVersion: 1,
 			  localRefinement: false,
-			  localRefinementEngine: 'slide',
+			  localRefinementEngine: 'smart',
 			  localRefinementBudgetMs: 1500,
 			  localRefinementRotations: false,
 			  localRefinementMaxColdAnglesPerPart: 3,
@@ -430,12 +431,25 @@
 			  rotationReflowMaxNeighbors: 3,
 			  rotationReflowMinBudgetMs: 400,
 			  localRefinementFineRotation: false,
+			  localRefinementContinuous: true,
+			  continuousRefinementBudgetMs: 2000,
+			  continuousRefinementMaxDeltaDeg: 45,
+			  continuousRefinementCoarseStepDeg: 5,
+			  continuousRefinementRefineStepDeg: 1,
+			  continuousRefinementFineStepDeg: 0.25,
+			  continuousRefinementProxyPoints: 16,
+			  continuousRefinementContactCap: 96,
+			  continuousRefinementPosesPerAngle: 4,
+			  continuousRefinementFinalists: 12,
+			  continuousRefinementMaxPairs: 4,
+			  continuousRefinementMaxTargets: 8,
+			  continuousRefinementMaxNeighbors: 3,
 			  fineRotationMaxDeg: 6,
 			  fineRotationMinDeg: 0.25,
 			  fineRotationMaxTargets: 8,
 			  fineRotationPivot: 'centroid',
 			  fineRotationMinBudgetMs: 300,
-			  processHoles: true, // when true, NFP generation subtracts A's holes; when false, holes on A are ignored (faster for hole-free jobs)
+			  processHoles: true, // when true, NFP generation subtracts A's holes; the compatibility gate turns it off for continuous compaction
 			  exportSheetOutline: false, // when true, exports include the sheet boundary with the nested parts
 			  exportFormat: 'svg',
 			  exportOutlineMode: 'everything',
@@ -447,7 +461,7 @@
 			  tiffBackground: 'white',
 			  tiffCompression: 'lzw',
 			  lastIccProfilePath: '',
-			  mergeLines: true, // whether to merge lines
+			  mergeLines: true, // the compatibility gate turns this off for continuous compaction
 			  mergeCandidateCap: 0, // hidden engine flag: cap common-line scoring candidates when > 0
 			  timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
 			  simplify: false,
@@ -460,6 +474,18 @@
 			};
 			
 			config.defaults(defaultconfig);
+
+			function enforceContinuousCompactionConfigGate(enabled){
+				if(enabled !== true || typeof ConfigCompatibility === 'undefined'){
+					return;
+				}
+				var rules = ConfigCompatibility.rulesForContinuousCompaction();
+				for(var i=0; i<rules.length; i++){
+					if(config.getSync(rules[i].key) !== rules[i].value){
+						config.setSync(rules[i].key, rules[i].value);
+					}
+				}
+			}
 			
 			const defaultConversionServer = 'http://convert.deepnest.io';
 			
@@ -469,6 +495,8 @@
 			  	config.setSync(key, defaultconfig[key]);
 			  }
 			}
+			config.setSync('rotations', 4);
+			enforceContinuousCompactionConfigGate(config.getSync('localRefinementContinuous') === true);
 			
 			config.get().then(val => {
 				window.DeepNest.config(val);
@@ -485,6 +513,12 @@
 					if(!key){
 						return;
 					}
+					if(key == 'localRefinementContinuous' && i.checked){
+						enforceContinuousCompactionConfigGate(true);
+					}
+					else if(key == 'localRefinementEngine' && val != 'smart'){
+						config.setSync('localRefinementContinuous', false);
+					}
 					
 					if(key == 'scale'){					
 						if(config.getSync('units') == 'mm'){
@@ -492,7 +526,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							val = i.checked;
 						}
 					
@@ -532,6 +566,7 @@
 				config.resetToDefaultsSync();
 				config.setSync('access_token', tempaccess);
 				config.setSync('id_token', tempid);
+				enforceContinuousCompactionConfigGate(config.getSync('localRefinementContinuous') === true);
 				config.get().then(val => {
 					window.DeepNest.config(val);
 					updateForm(val);
@@ -554,6 +589,45 @@
 								control.disabled = active;
 							});
 						});
+					}
+
+					function updateContinuousCompactionOptions(currentConfig){
+						if(typeof ConfigCompatibility === 'undefined'){
+							return;
+						}
+						var active = currentConfig && currentConfig.localRefinementContinuous === true;
+						var rules = ConfigCompatibility.rulesForContinuousCompaction();
+						for(var i=0; i<rules.length; i++){
+							var control = document.querySelector('#config [data-config="' + rules[i].key + '"]');
+							if(!control || !control.parentNode){
+								continue;
+							}
+							var valueCell = control.parentNode;
+							var labelCell = valueCell.previousElementSibling;
+							var cells = labelCell ? [labelCell, valueCell] : [valueCell];
+							for(var j=0; j<cells.length; j++){
+								cells[j].classList.toggle('config-incompatible', active);
+								if(active){
+									cells[j].setAttribute('data-disabled-reason', rules[i].reason);
+									cells[j].setAttribute('title', rules[i].reason);
+								}
+								else{
+									cells[j].removeAttribute('data-disabled-reason');
+									cells[j].removeAttribute('title');
+								}
+							}
+							if(active){
+								valueCell.setAttribute('tabindex', '0');
+								valueCell.setAttribute('aria-disabled', 'true');
+								control.setAttribute('title', rules[i].reason);
+								control.disabled = true;
+							}
+							else{
+								valueCell.removeAttribute('tabindex');
+								valueCell.removeAttribute('aria-disabled');
+								control.removeAttribute('title');
+							}
+						}
 					}
 
 				var unitinput 
@@ -597,7 +671,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -606,6 +680,7 @@
 				});
 
 				updateStepRepeatOptions(c);
+				updateContinuousCompactionOptions(c);
 				refreshModelArtifactChoices(c);
 				refreshMlRuntimeStatus(c);
 			}
@@ -2031,12 +2106,44 @@
 				}
 			}
 
+			// Live placed-vs-requested counts for the quantity column. Each
+			// sheetplacements[].source indexes DeepNest.parts (same contract
+			// displayNest relies on), so a per-source tally is the placed count
+			// for that row. Stored on the part object itself, so the value stays
+			// with the part across list re-sorts.
+			function updatePlacedCounts(n){
+				var counts = {};
+				n.placements.forEach(function(s){
+					s.sheetplacements.forEach(function(p){
+						counts[p.source] = (counts[p.source] || 0) + 1;
+					});
+				});
+				for(var i=0; i<DeepNest.parts.length; i++){
+					if(DeepNest.parts[i].sheet){
+						continue;
+					}
+					var placed = counts.hasOwnProperty(i) ? counts[i] : 0;
+					if(DeepNest.parts[i].placed !== placed){
+						ractive.set('parts.' + i + '.placed', placed);
+					}
+				}
+			}
+
+			function clearPlacedCounts(){
+				for(var i=0; i<DeepNest.parts.length; i++){
+					if(DeepNest.parts[i].placed != null){
+						ractive.set('parts.' + i + '.placed', null);
+					}
+				}
+			}
+
 			function resetNestComputation(clearDisplay){
 				if(DeepNest.working){
 					ipcRenderer.send('background-stop');
 				}
 				DeepNest.stop();
 				DeepNest.reset();
+				clearPlacedCounts();
 				if(window.nest && typeof window.nest.update === 'function'){
 					window.nest.update('nests');
 				}
@@ -2218,6 +2325,22 @@
 					config.get().then(function(currentConfig){
 						var runtimeOverrides = overrides || {};
 						var baseConfig = cloneConfigObject(currentConfig);
+						// Product construction remains the proven four-angle grid. Explicit
+						// automation/benchmark overrides may still exercise legacy adaptive angles.
+						baseConfig.rotations = 4;
+						baseConfig.adaptiveRotations = false;
+						// These are internal search bounds, not user preferences. Reassert them
+						// on upgrades so stale experimental localStorage values cannot regress cost.
+						baseConfig.continuousRefinementProxyPoints = 16;
+						baseConfig.continuousRefinementContactCap = 96;
+						baseConfig.continuousRefinementPosesPerAngle = 4;
+						baseConfig.continuousRefinementFinalists = 12;
+						baseConfig.continuousRefinementMaxPairs = 4;
+						baseConfig.continuousRefinementMaxTargets = 8;
+						baseConfig.continuousRefinementMaxNeighbors = 3;
+						if(baseConfig.localRefinement === true && baseConfig.localRefinementContinuous === true){
+							baseConfig.localRefinementEngine = 'smart';
+						}
 						var configOverrides = runtimeOverrides.configOverrides || {};
 						Object.keys(configOverrides).forEach(function(key){
 							baseConfig[key] = configOverrides[key];
@@ -3205,6 +3328,7 @@
 					var outputFormat = payload && payload.outputFormat ? String(payload.outputFormat).toLowerCase() : 'svg';
 					var sourceFormat = payload && payload.sourceFormat ? String(payload.sourceFormat).toLowerCase() : (inputPath ? path.extname(inputPath).replace(/^\./, '').toLowerCase() : 'svg');
 					var configOverrides = payload && payload.configOverrides ? payload.configOverrides : {};
+					var partQuantities = payload && Array.isArray(payload.partQuantities) ? payload.partQuantities : null;
 					var timeoutMs = payload && payload.timeoutMs ? Number(payload.timeoutMs) : 60000;
 					var timeBudgetSec = payload && payload.timeBudgetSec ? Number(payload.timeBudgetSec) : 0;
 					var timeBudgetMs = timeBudgetSec > 0 ? timeBudgetSec * 1000 : 0;
@@ -3365,11 +3489,26 @@
 						catch (statError) {}
 						var localRefinement = selectedNest && selectedNest.localRefinement ? selectedNest.localRefinement : null;
 						var engineConfig = DeepNest.config();
+						var requestedPartInstances = 0;
+						for(var requestedIndex=0; requestedIndex<DeepNest.parts.length; requestedIndex++){
+							if(!DeepNest.parts[requestedIndex].sheet){
+								requestedPartInstances += Math.max(0, Number(DeepNest.parts[requestedIndex].quantity) || 0);
+							}
+						}
+						var placedPartInstances = 0;
+						if(selectedNest && Array.isArray(selectedNest.placements)){
+							for(var placementSheetIndex=0; placementSheetIndex<selectedNest.placements.length; placementSheetIndex++){
+								var placementSheet = selectedNest.placements[placementSheetIndex];
+								placedPartInstances += placementSheet && Array.isArray(placementSheet.sheetplacements) ? placementSheet.sheetplacements.length : 0;
+							}
+						}
 						var details = {
 							scenarioName: scenarioName,
 							outputFormat: outputFormat,
 							outputBytes: outputBytes,
 							partCount: DeepNest.parts.length,
+							requestedPartInstances: requestedPartInstances,
+							placedPartInstances: placedPartInstances,
 							sheetIndex: selectedNest && selectedNest.placements && selectedNest.placements.length > 0 ? selectedNest.placements[0].sheet : null,
 							nestCount: DeepNest.nests.length,
 							usedSheetCount: selectedNest && selectedNest.placements ? selectedNest.placements.length : 0,
@@ -3523,6 +3662,18 @@
 							DeepNest.parts.forEach(function(part, index){
 								part.sheet = index === sheetIndex;
 							});
+							if(partQuantities){
+								var quantityIndex = 0;
+								DeepNest.parts.forEach(function(part){
+									if(part.sheet){
+										return;
+									}
+									var requested = Math.round(Number(partQuantities[quantityIndex++]));
+									if(isFinite(requested) && requested > 0){
+										part.quantity = requested;
+									}
+								});
+							}
 							ractive.update('parts');
 
 							window.__deepnestDisplayCallbackOverride = function(){
@@ -3960,6 +4111,8 @@
 			// nesting display
 			
 			var displayNest = function(n){
+				updatePlacedCounts(n);
+
 				// create svg if not exist
 				var svg = document.querySelector('#nestsvg');
 				
@@ -4136,9 +4289,28 @@
 						if(!meta.ran){
 							return 'not used';
 						}
+						if(meta.continuousSkipReason === 'mergeLines'){
+							return 'rotation skipped - merge lines on';
+						}
+						if(meta.continuousSkipReason === 'processedHoles'){
+							return 'rotation skipped - processed holes';
+						}
+						if(meta.continuousSkipReason === 'missingHelper'){
+							return 'rotation unavailable';
+						}
 						var moves = Number(meta.movesAccepted) || 0;
 						if(moves > 0){
-							return 'improved - ' + moves + ' ' + (moves === 1 ? 'move' : 'moves');
+							var details = [];
+							var angleDelta = Number(meta.continuousMaxAngleDeltaDeg) || 0;
+							var continuousGain = Number(meta.continuousRelativeImprovement) || 0;
+							if(angleDelta >= 0.05){
+								details.push(angleDelta.toFixed(angleDelta < 10 ? 1 : 0) + ' deg');
+							}
+							if(continuousGain >= 0.0005){
+								details.push((100 * continuousGain).toFixed(1) + '% compacted');
+							}
+							return 'improved - ' + moves + ' ' + (moves === 1 ? 'move' : 'moves') +
+								(details.length > 0 ? ', ' + details.join(', ') : '');
 						}
 						return 'checked - 0 moves';
 					},
@@ -4411,7 +4583,7 @@
 											<td>{{{ partrenderer(this) }}} <span style="display: none">{{bounds.width}}</span></td>
 											<td><dimensionLabel/></td>
 											<td><input type="checkbox" checked='{{sheet}}' on-change="partsettingschange" /></td>
-											<td class='quantity-cell {{ linkPartQuantities && !sheet ? "linked" : "" }}'><input type="number" min="1" step="1" value="{{quantity}}" on-change="quantitychange:{{i}}" /></td>
+											<td class='quantity-cell {{ linkPartQuantities && !sheet ? "linked" : "" }}'><input type="number" min="1" step="1" value="{{quantity}}" on-change="quantitychange:{{i}}" />{{#if !sheet && placed != null}}<span class='placed-badge {{ placed >= quantity ? "complete" : "short" }}' title='{{placed}} of {{quantity}} placed in the displayed nest'>{{placed}}</span>{{/if}}</td>
 											<td class="delete-cell"><a href="#" class="row-delete" title="Delete item" on-click="deleterow:{{i}}"></a></td>
 										</tr>
 									{{/each}}
@@ -4782,16 +4954,11 @@
 						<input type="number" value="0.3" min="0" step="any" data-config="curveTolerance" data-conversion="true" required /> <i><span class="unit-label">inch</span></i>
 					</dd>
 					
-						<dt class="steprepeat-disabled">Part rotations</dt>
+						<dt class="steprepeat-disabled">Construction rotations</dt>
 						<dd class="steprepeat-disabled">
-							<input type="number" value="4" step="1" min="1" max="32" data-config="rotations" required />
+							<input type="number" value="4" data-config="rotations" readonly />
 						</dd>
 
-						<dt class="steprepeat-disabled">Adaptive placement angles</dt>
-						<dd class="steprepeat-disabled">
-							<input type="checkbox" checked="checked" data-config="adaptiveRotations" /> <span class="radiolabel">Add geometry-aware diagonal choices</span>
-						</dd>
-					
 					<dt>Optimization type</dt>
 					<dd>
 						<select name="placementType" data-config="placementType">
@@ -4862,17 +5029,12 @@
 
 							<dt class="steprepeat-disabled">Local refinement</dt>
 							<dd class="steprepeat-disabled">
-								<input type="checkbox" data-config="localRefinement" /> <span class="radiolabel">Jiggle placed parts after nesting</span>
+								<input type="checkbox" data-config="localRefinement" /> <span class="radiolabel">Improve placed parts after nesting</span>
 							</dd>
 
-							<dt class="steprepeat-disabled">Fine rotation snugging</dt>
+							<dt class="steprepeat-disabled">Continuous compaction</dt>
 							<dd class="steprepeat-disabled">
-								<input type="checkbox" data-config="localRefinementFineRotation" /> <span class="radiolabel">Smart local refinement, merge lines off</span>
-							</dd>
-
-							<dt class="steprepeat-disabled">Rotation reflow</dt>
-							<dd class="steprepeat-disabled">
-								<input type="checkbox" checked="checked" data-config="localRefinementRotationReflow" /> <span class="radiolabel">Rotate parts and repack nearby neighbors</span>
+								<input type="checkbox" checked="checked" data-config="localRefinementContinuous" /> <span class="radiolabel">Refine angles and nearby positions after nesting</span>
 							</dd>
 
 							<dt class="steprepeat-disabled">Refinement engine</dt>
@@ -5348,19 +5510,9 @@
 					After a normal nest is generated, Deepnest can run a post-process refinement pass on each sheet. The classic slide engine tries legal translation nudges; the shrink-separate engine lightly compresses a rectangular layout, repairs overlaps with NFP-based separation, and keeps only legal score improvements. This is experimental and disabled by default.
 				</div>
 
-				<div class="config_explain" id="explain_localRefinementFineRotation">
-					<h1>Fine rotation snugging</h1>
-					After Smart local refinement finishes, Deepnest can try tiny final angle changes using exact overlap checks only. It is disabled by default and skips automatically while merge-lines is enabled.
-				</div>
-
-				<div class="config_explain" id="explain_localRefinementRotationReflow">
-					<h1>Rotation reflow</h1>
-					Smart refinement can rotate a target to one of its placement angles, temporarily release nearby blockers, and rebuild that group through exact legal regions. The whole move is reverted unless the final layout is legal and strictly better.
-				</div>
-
-				<div class="config_explain" id="explain_adaptiveRotations">
-					<h1>Adaptive placement angles</h1>
-					Adds a small geometry-derived diagonal angle set for elongated parts during the main nest. Identical copies are biased toward a shared orientation. It is skipped when common-line merging is enabled.
+				<div class="config_explain" id="explain_localRefinementContinuous">
+					<h1>Continuous compaction</h1>
+					Keeps the main nest on its four-angle grid, then searches fine local rotations and nearby positions in a bounded post-process. Only strict improvements that pass full-resolution containment and overlap checks are committed.
 				</div>
 
 				<div class="config_explain" id="explain_processHoles">

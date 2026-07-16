@@ -495,6 +495,7 @@ app.on('ready', function () {
 		sourceFormat: sourceFormat,
 		outputFormat: outputFormat,
 		configOverrides: scenario.configOverrides || {},
+		partQuantities: scenario.partQuantities || null,
 		conversionOptions: scenario.conversionOptions || null,
 		expect: scenario.expect || {},
 		timeoutMs: cliArgs.timeoutMs || cliArgs.timeout || scenario.timeoutMs || '60000',

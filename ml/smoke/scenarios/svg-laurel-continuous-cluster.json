@@ -1,0 +1,48 @@
+{
+  "name": "svg-laurel-continuous-cluster",
+  "description": "Three-part dense gate: scout all critical targets, rotate two laurels off-grid, and transactionally reflow a blocking part.",
+  "input": "ml/examples/laurel-crossed-blocker.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "timeBudgetSec": 7,
+  "expectedNonCanonicalNfpLookups": 0,
+  "expectedLocalRefinementMinimums": {
+    "continuousTargetsConsidered": 3,
+    "continuousTargetsScouted": 3,
+    "continuousTargetsExploited": 2,
+    "continuousClusterAttempts": 1,
+    "continuousClusterLegalLayouts": 1,
+    "continuousClusterAccepted": 1,
+    "continuousClusterPartsMoved": 3,
+    "continuousMovesAccepted": 1,
+    "continuousMaxAngleDeltaDeg": 5,
+    "continuousRelativeImprovement": 0.05
+  },
+  "expectedLocalRefinementMaximums": {
+    "continuousElapsedMs": 2250,
+    "continuousMaxAngleDeltaDeg": 45.000001
+  },
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "rotations": 1,
+    "adaptiveRotations": false,
+    "localRefinement": true,
+    "localRefinementEngine": "smart",
+    "localRefinementBudgetMs": 5000,
+    "localRefinementContinuous": true,
+    "continuousRefinementBudgetMs": 2000,
+    "continuousRefinementProxyPoints": 16,
+    "continuousRefinementContactCap": 96,
+    "continuousRefinementPosesPerAngle": 4,
+    "continuousRefinementFinalists": 12,
+    "continuousRefinementMaxTargets": 3,
+    "continuousRefinementMaxNeighbors": 3,
+    "curveTolerance": 2
+  }
+}

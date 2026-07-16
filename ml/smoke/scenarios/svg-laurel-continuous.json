@@ -1,0 +1,47 @@
+{
+  "name": "svg-laurel-continuous",
+  "description": "Deterministic crossed laurel pair: forced cardinal construction followed by bounded continuous local compaction. Product construction remains independently fixed at four angles.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "timeBudgetSec": 5,
+  "expectedNonCanonicalNfpLookups": 0,
+  "expectedLocalRefinementMinimums": {
+    "continuousAnglesEvaluated": 2,
+    "continuousExactChecks": 1,
+    "continuousMovesAccepted": 1,
+    "continuousMaxAngleDeltaDeg": 0.2,
+    "continuousRelativeImprovement": 0.15
+  },
+  "expectedLocalRefinementMaximums": {
+    "continuousElapsedMs": 2250,
+    "continuousMaxAngleDeltaDeg": 45.000001
+  },
+  "continuousOracle": {
+    "scoreBefore": 0.40127203628939684,
+    "scoreAfter": 0.283810489586938,
+    "minimumRecovery": 0.6
+  },
+  "configOverrides": {
+    "placementType": "gravity",
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "rotations": 1,
+    "adaptiveRotations": false,
+    "localRefinement": true,
+    "localRefinementEngine": "smart",
+    "localRefinementBudgetMs": 3500,
+    "localRefinementContinuous": true,
+    "continuousRefinementBudgetMs": 2000,
+    "continuousRefinementProxyPoints": 16,
+    "continuousRefinementContactCap": 96,
+    "continuousRefinementPosesPerAngle": 4,
+    "continuousRefinementFinalists": 12,
+    "continuousRefinementMaxPairs": 1,
+    "curveTolerance": 2
+  }
+}

@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-09 by Codex): code baseline clean; unrelated/generated benchmark-result JSONs under `ml/benchmark/results/` remain untracked by convention.
+State (verified 2026-07-16 by Claude-Code): dirty for the continuous-compaction/refinement implementation, compatibility gate, four-part efficacy follow-up below, and the quantity-column placed-vs-requested badges (`main/index.html`, `main/style.css`); unrelated/generated benchmark-result JSONs under `ml/benchmark/results/` remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,10 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
+| Codex | Four-part continuous compaction efficacy | continuous refinement engine, exact 2+2 laurel fixture/smoke gate, `AGENT_COLLABORATION.md` | Completed: bounded whole-cluster rebuild produces a visibly tighter exact-legal result; deterministic and live-product gates green | 2026-07-10 |
+| Codex | Continuous compaction compatibility gate | `main/util/configcompatibility.js`, `main/index.html`, `main/style.css`, `main/deepnest.js`, continuous-refinement tests, `AGENT_COLLABORATION.md` | Completed: prerequisites/conflicts enforced, hover/focus reasons exposed, UI + regression gates green | 2026-07-10 |
+| Codex | Continuous local compaction postprocessor | `main/background.js`, refinement config/UI/style, oracle/tests/smoke, `AGENT_COLLABORATION.md` | Completed: fair critical-target scheduling + transactional neighbor-cluster reflow; dense and regression gates green | 2026-07-09 |
 | Codex | Exact two-part pair compaction | `main/background.js`, engine/smoke tests, `AGENT_COLLABORATION.md` | Completed: exact NFP/outline contact search; same-handed laurel improves 13.3%; all regression gates green | 2026-07-09 |
 | Codex | Smart rotation + neighbor reflow | `main/background.js`, refinement config/UI/CLI, engine tests/smoke, `AGENT_COLLABORATION.md` | Completed: post-stage transactional reflow, exact rollback, UI control, benchmark/equivalence/smoke green | 2026-07-09 |
 | Codex | Adaptive rotation symmetry follow-up | `main/util/rotationutil.js`, `main/deepnest.js`, adaptive tests/smoke, `AGENT_COLLABORATION.md` | Completed: symmetric slotted parts use four unique axes; target and regression gates green | 2026-07-09 |
@@ -151,6 +155,53 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-16 - Quantity column: live placed-vs-requested badges (Claude-Code)
+
+- Added a live placed-vs-requested badge to each non-sheet row of the parts-table quantity column. `updatePlacedCounts(n)` tallies `sheetplacements[].source` per part index (the same `DeepNest.parts` contract displayNest already relies on) and writes `parts.<i>.placed` through Ractive; it runs as the first statement of `displayNest`, so counts update live on every displayed nest — both auto-display of new bests during a run and manual nest selection. Badge reads the placed count (requested is already visible in the input; full "X of Y" stays in the hover title), green `.complete` when placed >= requested, amber `.short` on shortfall; hidden (`placed == null`) until a nest is displayed. User-verified live in the dev app 2026-07-16.
+- `clearPlacedCounts()` runs inside `resetNestComputation`, so badges clear on every session invalidation: part deletes (both paths), import invalidation, fresh runs, and column sorts. The sort handler invalidates the session *before* reordering `DeepNest.parts`, so index-based tallies can never mislabel rows.
+- UI-only change: parts-table template + two renderer helpers in `main/index.html`, badge styles under `#parts table td.quantity-cell` in `main/style.css`. No engine, IPC, worker, or teacher-hook changes.
+- Verification passed: `bash ml/scripts/run_boot_check.sh` (all invariants, 665 ms) and focused real-nest smoke `bash ml/scripts/run_smoke_battery.sh svg-hull-settle-floaters` (renderer executed displayNest with the new tally; export produced). Badge visuals not yet eyeballed in the GUI — worth a glance on next `npm start`.
+- Not committed (tree intentionally dirty with Codex's continuous-compaction work); build/version bump remains held per user instruction — version stays 0.7.5.
+
+### 2026-07-10 - Four-part continuous compaction efficacy (Codex)
+
+- Reproduced the user's exact 2+2 laurel job from `ml/examples/laurel-two-crossed.svg`: four 3.3 x 5.6-inch parts on a 22.5 x 13.5-inch sheet. The prior code reported many accepted translation moves while the continuous stage accepted zero moves and left the visible U/fan arrangement unchanged. Giving the existing pair/neighbor search more time did not solve the layout.
+- Added a bounded whole-cluster operator for 4-6 parts. It beam-searches part order, contact topology, and off-grid angles with cheap proxies, exact-repairs each surviving partial cluster, and commits only a strict improvement that passes full-resolution sheet containment and pairwise material-overlap checks. Arbitrary-angle geometry is transient and never enters the persistent NFP cache.
+- Added quantity-aware smoke automation and the production scenario `svg-laurel-continuous-four`. Its substantive gate requires all four instances and four SVG paths, every part moved, at least one accepted whole-cluster layout, an off-grid angle of at least 30 degrees, at least 15% relative compaction, exact legality, zero persistent non-canonical NFP lookups, and an 8-second stage ceiling.
+- The deterministic gate passed twice with the same digest `65c7bb15657c060527c2f608826bcbc8d88a9ccd`: score `0.5103834389 -> 0.3833988559` (24.88%), four parts moved, 30/315-degree aligned diagonal families, four exact-legal layouts, and about 7.5 seconds continuous runtime.
+- Live Electron verification used the user's normal four construction rotations and retained UI settings. It placed 4/4 parts and repeatedly reported `17 moves, 30 DEG, 26.4% COMPACTED`, proving the improvement is active in the product path rather than only the frozen harness.
+- Verification passed: syntax and diff checks; continuous-refinement, engine-bugfix, adaptive-rotation, separation, TIFF, engine-equivalence, and native-vs-JS NFP-equivalence tests; boot invariants; focused repeated four-laurel gate; full default smoke battery including the new gate, SVG/adaptive/Smart scenarios, Step & Repeat, and PDF export.
+- `npm run ml:checkpoint -- --name four-part-continuous-efficacy-pre` was attempted before engine edits and failed because no completed trained-model run exists. No bakeoff was run because the required manifest/model/output inputs remain unavailable.
+
+### 2026-07-10 - Continuous compaction compatibility gate (Codex)
+
+- Added `main/util/configcompatibility.js` as the single rule source for Continuous compaction. When selected in the UI it forces Local refinement on, selects Smart, and forces Process part holes and Merge common lines off. The active engine config applies the same conflict normalization only when Local refinement is explicitly active, preserving automation/jobs that deliberately disable refinement.
+- The settings form persists compatible values immediately, disables all four controlled inputs, and marks both label/value cells with the reason. Custom hover/focus tooltips, native titles, and accessibility Help/Description text explain every disabled setting. Turning Continuous compaction off re-enables the controls without restoring a stale incompatible value.
+- Live Electron verification toggled Continuous compaction off/on: all four controls unlocked when off, then returned to Local refinement=on, engine=Smart, Process holes=off, Merge lines=off and disabled when on. Accessibility state exposed all four explanations.
+- Verification passed: config-compatibility/continuous-refinement tests, engine-bugfix tests, frozen nine-scenario engine equivalence, boot invariants, full default smoke battery (gravity, hull, adaptive rotations, both continuous fixtures, Step & Repeat, PDF), syntax/diff checks.
+- `npm run ml:checkpoint -- --name continuous-compatibility-gate-pre` was attempted before engine edits and failed because no completed trained-model run exists. No bakeoff was run because the required manifest/model/output inputs remain unavailable.
+
+### 2026-07-09 - Continuous compaction coverage + cluster reflow follow-up (Codex)
+
+- Verified the apparent override directly: with the same crossed-laurel fixture, `mergeLines:false` evaluated 74 angles and accepted two moves for an 18.17% compactness gain; `mergeLines:true` intentionally skipped continuous refinement. Added explicit skip telemetry and UI badge text for merge-lines, processed-hole, disabled, and unavailable-helper cases so this can no longer fail silently.
+- Replaced nearest-pair-only scheduling for multi-part sheets with deterministic critical-target scheduling. Up to eight targets each receive a cheap six-angle scout against their nearest anchor, then the two highest-potential targets receive the remaining exact-search budget. Two-part jobs retain both directed searches and the frozen oracle behavior.
+- Added bounded transactional cluster reflow for off-grid rotation finalists. The rotated target is locked, up to three blocking neighbors are repositioned through exact contact candidates plus bounded push fallback, and the entire cluster commits only after full-resolution sheet containment and pairwise material-overlap validation; every failure path leaves the original layout untouched.
+- Added runtime-owned target/neighbor limits, additive scheduling/cluster telemetry, a deterministic scheduler unit test, and `laurel-crossed-blocker.svg` plus `svg-laurel-continuous-cluster` to the default smoke battery. No arbitrary-angle geometry is persisted in the NFP cache.
+- Dense gate result: all three targets scouted, top two exploited, four legal cluster layouts, one cluster accepted moving three parts, continuous score `0.4012720363 -> 0.3723251672` (7.21%), maximum off-grid delta 34.5 degrees, 1301 ms continuous runtime, and zero non-canonical NFP lookups. The original two-part gate remains at 18.17% improvement and a 45-degree maximum delta.
+- Verification passed: syntax/diff checks; continuous-refinement, engine-bugfix, adaptive-rotation, separation, TIFF, engine-equivalence, native-vs-JS NFP equivalence tests; boot invariants; focused dense and two-part smoke gates; full default smoke battery including SVG, adaptive rotation, Smart refinement, Step & Repeat, and PDF export.
+- `npm run ml:checkpoint -- --name continuous-cluster-reflow-pre` was attempted before edits and failed because no completed trained-model run exists. No ML bakeoff was run because the required manifest/model/output inputs are unavailable.
+
+### 2026-07-09 - Continuous local compaction postprocessor (Codex)
+
+- Kept interactive construction on the proven four-angle grid (`rotations:4`, placement-side adaptive angles disabled) and replaced Smart's stacked pair/reflow/fine-rotation calls with one bounded continuous post-stage. Legacy engine functions and config keys remain for compatibility but Smart no longer invokes them.
+- The compactor performs deterministic coarse-to-fine angle sweeps (5, 1, 0.25 degrees within +/-45 degrees), generates bounded boundary/bbox contact poses from 16-point proxies, rejects proxy intersections, then exact-polishes a small finalist set. Every accepted move strictly improves a box/hull/span post-score; full-resolution sheet containment and material-overlap gates are transactional and the whole sheet reverts on final illegality.
+- The search never writes arbitrary-angle geometry to the persistent NFP cache. Internal proxy/contact/finalist bounds are runtime-owned so stale localStorage values cannot regress latency; automation/benchmark overrides remain available. Two-part jobs split the budget between both movement directions.
+- UI now distinguishes construction from post-compaction: `Construction rotations` is a read-only four-angle invariant, the old adaptive/fine/reflow controls are removed, `Continuous compaction` is visible, enabling it selects Smart, selecting a legacy engine disables it, and the nest badge reports accepted moves, maximum angle, and percent compacted.
+- Added `main/util/continuousrefinement.js`, deterministic unit/invariant tests, a crossed-laurel production fixture, a reproducible slow-oracle scenario, generic smoke maximum/oracle checks, and the production scenario to the default battery.
+- Frozen crossed-laurel result: score `0.4012720363 -> 0.3283463892` (18.17%), 62.08% of the slow-oracle gain, two accepted moves, exported rotations 40/315 degrees, 74 angles and 7100 proxy poses evaluated, 1083 full-resolution checks (286 ms), continuous stage 1267 ms, and zero persistent non-cardinal NFP lookups. Gate ceilings are 2250 ms and +/-45 degrees.
+- Verification passed: syntax and diff checks; continuous-refinement, engine-bugfix, adaptive-rotation, separation, TIFF, native-vs-JS NFP equivalence, and nine-scenario engine-equivalence tests; boot invariants; full default smoke battery including SVG, adaptive opt-in fixtures, Smart floater/continuous refinement, Step & Repeat, and PDF export.
+- `npm run ml:checkpoint -- --name continuous-local-compaction-pre` was attempted before engine edits and failed because no completed trained-model run exists. No ML bakeoff was run because the required manifest/model/output inputs are unavailable.
 
 ### 2026-07-09 - Exact two-part pair compaction (Codex)
 

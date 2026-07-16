@@ -1,0 +1,42 @@
+{
+  "name": "svg-laurel-continuous-four",
+  "description": "Two instances of each crossed-laurel source must rebuild into a visibly tighter arbitrary-angle cluster.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "partQuantities": [2, 2],
+  "expectedPartsPlaced": 4,
+  "expectedSvgPathCount": 4,
+  "expectedRotations": [30, 315],
+  "expectedNonCanonicalNfpLookups": 0,
+  "expectedLocalRefinementMinimums": {
+    "wholeClusterAccepted": 1,
+    "wholeClusterPartsMoved": 4,
+    "wholeClusterLegalLayouts": 1,
+    "continuousMovesAccepted": 1,
+    "continuousMaxAngleDeltaDeg": 30,
+    "continuousRelativeImprovement": 0.15
+  },
+  "expectedLocalRefinementMaximums": {
+    "continuousElapsedMs": 8000
+  },
+  "configOverrides": {
+    "placementType": "gravity",
+    "rotations": 1,
+    "adaptiveRotations": false,
+    "improvedPlacementScoring": true,
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "localRefinement": true,
+    "localRefinementEngine": "smart",
+    "localRefinementBudgetMs": 15000,
+    "localRefinementContinuous": true,
+    "continuousRefinementBudgetMs": 2000,
+    "continuousRefinementMaxTargets": 8,
+    "continuousRefinementMaxNeighbors": 3
+  }
+}

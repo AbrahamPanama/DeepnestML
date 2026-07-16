@@ -766,6 +766,56 @@ opacity: 0.45;
 cursor: not-allowed;
 }
 
+#config .config-incompatible{
+opacity: 0.48;
+cursor: not-allowed;
+position: relative;
+}
+
+#config .config-incompatible input,
+#config .config-incompatible select,
+#config .config-incompatible textarea{
+cursor: not-allowed;
+}
+
+#config .config-incompatible[data-disabled-reason]:after{
+content: attr(data-disabled-reason);
+position: absolute;
+z-index: 60;
+top: calc(100% + 0.25em);
+left: 0;
+width: 18em;
+box-sizing: border-box;
+padding: 0.55em 0.7em;
+border: 1px solid #344352;
+border-radius: 4px;
+background: #263746;
+box-shadow: 0 0.35em 0.9em rgba(25, 39, 52, 0.2);
+color: #fff;
+font-size: 0.82em;
+font-weight: normal;
+line-height: 1.35;
+white-space: normal;
+opacity: 0;
+visibility: hidden;
+transform: translateY(-0.2em);
+transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+pointer-events: none;
+}
+
+#config dd.config-incompatible[data-disabled-reason]:after{
+right: 0;
+left: auto;
+}
+
+#config .config-incompatible[data-disabled-reason]:hover:after,
+#config .config-incompatible[data-disabled-reason]:focus:after,
+#config .config-incompatible[data-disabled-reason]:focus-within:after{
+opacity: 1;
+visibility: visible;
+transform: translateY(0);
+}
+
 #config i{
 font-style: normal;
 margin-left: 0.5em;
@@ -957,11 +1007,32 @@ width: 4.25em;
 
 #parts table td.quantity-cell{
 min-width: 4.75em;
+white-space: nowrap;
 }
 
 #parts table td.quantity-cell.linked input[type=number]{
 color: #2A6F7B;
 font-weight: bold;
+}
+
+#parts table td.quantity-cell .placed-badge{
+display: inline-block;
+margin-left: 0.35em;
+padding: 0.1em 0.5em;
+border-radius: 10px;
+font-size: 11px;
+font-weight: 600;
+vertical-align: middle;
+}
+
+#parts table td.quantity-cell .placed-badge.complete{
+background: #e3f1e6;
+color: #2c6e3a;
+}
+
+#parts table td.quantity-cell .placed-badge.short{
+background: #fbecd9;
+color: #a8611f;
 }
 
 #parts table td.delete-cell{
@@ -2517,14 +2588,16 @@ background: rgba(255, 255, 255, 0.9);
 box-shadow: 0 0.35em 1.1em rgba(42, 59, 76, 0.08);
 color: #647086;
 font-size: 0.88em;
-white-space: nowrap;
+line-height: 1.25;
+text-align: center;
+white-space: normal;
 }
 
 #localrefinementstatus strong{
 font-weight: 700;
 color: #39424D;
 text-transform: uppercase;
-letter-spacing: 0.06em;
+letter-spacing: 0;
 font-size: 0.78em;
 }
 

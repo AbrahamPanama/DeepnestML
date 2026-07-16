@@ -7,7 +7,7 @@ ARTIFACT_ROOT="${DEEPNEST_SMOKE_ARTIFACT_ROOT:-"$ROOT_DIR/ml/artifacts/smoke-bat
 if [ "$#" -gt 0 ]; then
   SCENARIOS=("$@")
 else
-  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-steprepeat" "svg-export-pdf")
+  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-steprepeat" "svg-export-pdf")
 fi
 
 mkdir -p "$ARTIFACT_ROOT"
@@ -49,6 +49,21 @@ const stat = fs.statSync(outputPath);
 if (!stat.size) {
   console.error('[smoke-battery] empty output:', outputPath);
   process.exit(1);
+}
+if (typeof scenario.expectedPartsPlaced === 'number') {
+  const actual = report.details && typeof report.details.placedPartInstances === 'number' ? report.details.placedPartInstances : null;
+  if (actual !== scenario.expectedPartsPlaced) {
+    console.error('[smoke-battery] expected placed part count mismatch:', scenario.expectedPartsPlaced, actual);
+    process.exit(1);
+  }
+}
+if (typeof scenario.expectedSvgPathCount === 'number' && report.outputFormat === 'svg') {
+  const output = fs.readFileSync(outputPath, 'utf8');
+  const actual = (output.match(/<path\b/g) || []).length;
+  if (actual !== scenario.expectedSvgPathCount) {
+    console.error('[smoke-battery] expected SVG path count mismatch:', scenario.expectedSvgPathCount, actual);
+    process.exit(1);
+  }
 }
 if (typeof scenario.expectedRotation === 'number') {
   const output = fs.readFileSync(outputPath, 'utf8');
@@ -93,6 +108,38 @@ if (scenario.expectedLocalRefinementMinimums && typeof scenario.expectedLocalRef
       console.error('[smoke-battery] local refinement minimum not met:', field, expected, actual);
       process.exit(1);
     }
+  }
+}
+if (scenario.expectedLocalRefinementMaximums && typeof scenario.expectedLocalRefinementMaximums === 'object') {
+  const local = report.details && report.details.localRefinement;
+  for (const field of Object.keys(scenario.expectedLocalRefinementMaximums)) {
+    const expected = Number(scenario.expectedLocalRefinementMaximums[field]);
+    const actual = local && typeof local[field] === 'number' ? local[field] : null;
+    if (actual === null || actual > expected) {
+      console.error('[smoke-battery] local refinement maximum exceeded:', field, expected, actual);
+      process.exit(1);
+    }
+  }
+}
+if (scenario.continuousOracle && typeof scenario.continuousOracle === 'object') {
+  const local = report.details && report.details.localRefinement;
+  const oracleBefore = Number(scenario.continuousOracle.scoreBefore);
+  const oracleAfter = Number(scenario.continuousOracle.scoreAfter);
+  const minimumRecovery = Number(scenario.continuousOracle.minimumRecovery);
+  if (!local || typeof local.continuousScoreBefore !== 'number' || typeof local.continuousScoreAfter !== 'number') {
+    console.error('[smoke-battery] missing continuous oracle scores');
+    process.exit(1);
+  }
+  if (Math.abs(local.continuousScoreBefore - oracleBefore) > 1e-9) {
+    console.error('[smoke-battery] continuous oracle start drifted:', oracleBefore, local.continuousScoreBefore);
+    process.exit(1);
+  }
+  const oracleGain = oracleBefore - oracleAfter;
+  const productionGain = local.continuousScoreBefore - local.continuousScoreAfter;
+  const recovery = oracleGain > 0 ? productionGain / oracleGain : 0;
+  if (recovery < minimumRecovery) {
+    console.error('[smoke-battery] continuous oracle recovery too low:', minimumRecovery, recovery);
+    process.exit(1);
   }
 }
 console.log('[smoke-battery] passed:', report.scenarioName, report.outputFormat, stat.size + ' bytes');
