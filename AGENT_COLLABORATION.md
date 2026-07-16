@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.7.5`
+- Current version: `0.8.0`
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.7.5-mac-arm64.dmg`
+- Local DMG artifact: `dist/Deepnest ML-0.8.0-mac-arm64.dmg`
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-16 by Claude-Code): dirty for the continuous-compaction/refinement implementation, compatibility gate, four-part efficacy follow-up below, and the quantity-column placed-vs-requested badges (`main/index.html`, `main/style.css`); unrelated/generated benchmark-result JSONs under `ml/benchmark/results/` remain untracked by convention.
+State (verified 2026-07-16 by Claude-Code): clean — the continuous-compaction wave (Codex) and quantity placed badges landed in `e37246f`, release 0.8.0 committed on top and pushed; generated benchmark-result JSONs under `ml/benchmark/results/` remain untracked by convention, as do pre-existing local artifacts (`testpart.svg`, zips, `.claude/`).
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -155,6 +155,14 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-16 - Release 0.8.0: commit, build, push (Claude-Code)
+
+- User-directed full release: committed the pending completed work as `e37246f` ("land continuous compaction wave (Codex) + quantity placed badges" — Codex's and Claude-Code's edits interleave in `main/index.html`/`main/style.css`, so they land together with authorship credited in the message), then bumped `package.json` to 0.8.0 and rebuilt.
+- Version rationale: 0.7.5 was explicitly frozen as the PERF-P0 pre-feature baseline; everything since (PERF-P1..P6, fine rotation, adaptive rotations, rotation reflow, pair/continuous compaction, quantity badges) is a backward-compatible feature wave — semver minor bump.
+- Built `dist/Deepnest ML-0.8.0-mac-arm64.dmg` (101 MB, ad-hoc signed, notarization not configured — unchanged from prior releases) via `npm run dist`. Known non-fatal BOM `SyntaxError` warning from app-builder-lib during packaging, same as prior builds.
+- Protocol ML checkpoint attempted (`npm run ml:checkpoint -- --name release-0.8.0-pre`) and failed with the standing error: no completed training runs with a trained model exist. Same caveat Codex recorded on every prior engine landing; no bakeoff inputs available.
+- Benchmark-result JSONs and pre-existing local artifacts intentionally remain untracked.
 
 ### 2026-07-16 - Quantity column: live placed-vs-requested badges (Claude-Code)
 
