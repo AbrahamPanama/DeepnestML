@@ -51,6 +51,9 @@
 			rotationReflowMinBudgetMs: 400,
 			localRefinementFineRotation: false,
 			localRefinementOverlapRepair: false,
+			rasterCollisionShadow: false,
+			rasterDivisor: 64,
+			rasterTargetAmbiguity: 0.30,
 			overlapRepairMaxTargets: 4,
 			overlapRepairWindowSize: 5,
 			overlapRepairPoses: 6,
@@ -906,6 +909,17 @@
 
 			if(c.localRefinementOverlapRepair === true || c.localRefinementOverlapRepair === false){
 				config.localRefinementOverlapRepair = !!c.localRefinementOverlapRepair;
+			}
+			if(c.rasterCollisionShadow === true || c.rasterCollisionShadow === false){
+				config.rasterCollisionShadow = !!c.rasterCollisionShadow;
+			}
+			var rasterDivisor = Number(c.rasterDivisor);
+			if(isFinite(rasterDivisor) && rasterDivisor >= 1){
+				config.rasterDivisor = Math.min(Math.floor(rasterDivisor), 1024);
+			}
+			var rasterTargetAmbiguity = Number(c.rasterTargetAmbiguity);
+			if(isFinite(rasterTargetAmbiguity) && rasterTargetAmbiguity > 0){
+				config.rasterTargetAmbiguity = Math.min(rasterTargetAmbiguity, 5);
 			}
 			var overlapRepairMaxTargets = Number(c.overlapRepairMaxTargets);
 			if(isFinite(overlapRepairMaxTargets) && overlapRepairMaxTargets >= 1){

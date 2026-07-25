@@ -4442,6 +4442,71 @@ function localRefinementRunRotationReflowStage(sheet, placed, placements, config
 	};
 }
 
+// ---------------------------------------------------------------------------
+// RC-2 raster shadow measurement (docs/raster-collision-plan.md §4).
+//
+// Computes the raster verdict alongside the existing exact verdict WITHOUT
+// changing any decision, and records agreement, direction of disagreement, and
+// the time attributable to each tier. Direction is what matters: "raster said
+// legal, exact said illegal" is a design failure; the reverse is merely lost
+// speed. (v4's undirected counter blocked a gate for a week because nobody could
+// tell those apart.)
+//
+// Per plan §3.2, the gate is NET time — mask construction plus queries versus
+// exact-only — not the ambiguity rate alone.
+// ---------------------------------------------------------------------------
+
+function localRefinementRasterPixelSize(placed, config){
+	if(typeof config._rasterPixelSize === 'number'){
+		return config._rasterPixelSize;
+	}
+	var polygons = [];
+	for(var i=0; i<placed.length; i++){
+		polygons.push(placed[i]);
+	}
+	var alpha = Number(config.rasterTargetAmbiguity);
+	if(!(alpha > 0)){
+		alpha = RasterCollision.DEFAULT_TARGET_AMBIGUITY;
+	}
+	var divisor = Math.max(1, parseInt(config.rasterDivisor, 10) ||
+		RasterCollision.DEFAULT_RASTER_DIVISOR);
+	config._rasterPixelSize = RasterCollision.chooseAdaptivePixelSize(
+		polygons, Number(config.curveTolerance) || 0, divisor, alpha
+	);
+	return config._rasterPixelSize;
+}
+
+// Masks are built from `placed[i]`, which is already the origin-rotated polygon,
+// so a mask is reusable for every instance of the same (source, rotation) and the
+// placement translation is applied at query time as an offset.
+function localRefinementRasterMasks(placed, index, config, runtimeStats){
+	if(!config._rasterMasks){
+		config._rasterMasks = {};
+	}
+	var part = placed[index];
+	var key = [
+		typeof part.source !== 'undefined' ? part.source : 'p' + index,
+		typeof part.rotation !== 'undefined' ? Math.round(normalizedRotation(part.rotation) * 1000) / 1000 : 0
+	].join(':');
+	if(config._rasterMasks[key]){
+		return config._rasterMasks[key];
+	}
+	var startedAt = Date.now();
+	var masks = null;
+	try{
+		masks = RasterCollision.rasterisePair(part, localRefinementRasterPixelSize(placed, config));
+	}
+	catch(err){
+		masks = null;
+	}
+	if(runtimeStats){
+		runtimeStats.rasterBuildMs = (runtimeStats.rasterBuildMs || 0) + (Date.now() - startedAt);
+		runtimeStats.rasterMasksBuilt = (runtimeStats.rasterMasksBuilt || 0) + 1;
+	}
+	config._rasterMasks[key] = masks || false;
+	return config._rasterMasks[key];
+}
+
 function localRefinementSinglePlacementLegal(sheet, placed, placements, config, index, skip){
 	var eps = Math.max(1e-9, 1e-4 * (Number(config.curveTolerance) || 0));
 	var q = {
@@ -4471,10 +4536,63 @@ function localRefinementSinglePlacementLegal(sheet, placed, placements, config, 
 			neighborIndices.push(all);
 		}
 	}
+	var rasterShadow = !!(config && config.rasterCollisionShadow === true &&
+		typeof RasterCollision !== 'undefined' && runtimeStats);
+	var targetMasks = null;
+	if(rasterShadow){
+		targetMasks = localRefinementRasterMasks(placed, index, config, runtimeStats);
+		if(!targetMasks){
+			rasterShadow = false;
+		}
+	}
+
 	for(var neighbor=0; neighbor<neighborIndices.length; neighbor++){
 		var j = neighborIndices[neighbor];
 		if(j === index || (skip && skip[j])){
 			continue;
+		}
+		if(rasterShadow){
+			// Measurement only: never alters control flow. Exact material
+			// overlap is the authority here, so it is computed unconditionally
+			// in shadow mode (the operative path below may short-circuit before
+			// reaching it). The duplicate cost is acceptable for a shadow run
+			// and keeps the measured path byte-identical to production.
+			var rasterStartedAt = Date.now();
+			var neighbourMasks = localRefinementRasterMasks(placed, j, config, runtimeStats);
+			var verdict = null;
+			if(neighbourMasks){
+				verdict = RasterCollision.classify(
+					targetMasks.outer, targetMasks.inner, placements[index],
+					neighbourMasks.outer, neighbourMasks.inner, placements[j]
+				);
+			}
+			runtimeStats.rasterQueryMs = (runtimeStats.rasterQueryMs || 0) + (Date.now() - rasterStartedAt);
+			if(verdict){
+				var exactStartedAt = Date.now();
+				var exactOverlap = localRefinementMaterialOverlap(
+					targetWorld,
+					shiftPolygon(placed[j], placements[j]),
+					config
+				);
+				runtimeStats.rasterExactMs = (runtimeStats.rasterExactMs || 0) + (Date.now() - exactStartedAt);
+				runtimeStats.rasterSamples = (runtimeStats.rasterSamples || 0) + 1;
+				if(verdict === 'ambiguous'){
+					runtimeStats.rasterAmbiguous = (runtimeStats.rasterAmbiguous || 0) + 1;
+				}
+				else if((verdict === 'overlap') === exactOverlap){
+					runtimeStats.rasterAgree = (runtimeStats.rasterAgree || 0) + 1;
+				}
+				else if(verdict === 'disjoint' && exactOverlap){
+					// UNSAFE: raster proved disjoint but the parts actually
+					// overlap. A single occurrence invalidates the design.
+					runtimeStats.rasterDisagreeUnsafe = (runtimeStats.rasterDisagreeUnsafe || 0) + 1;
+				}
+				else{
+					// Raster claimed overlap where exact says clear. Also a
+					// soundness break, but in the conservative direction.
+					runtimeStats.rasterDisagreeConservative = (runtimeStats.rasterDisagreeConservative || 0) + 1;
+				}
+			}
 		}
 		var nfp = getOuterNfp(placed[j], placed[index], false, config);
 		if(!nfp){
@@ -8588,6 +8706,15 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.legalityPredicateDisagreements = 0;
 	stats.legalityDisagreementNfpStricter = 0;
 	stats.legalityDisagreementMaterialStricter = 0;
+	stats.rasterSamples = 0;
+	stats.rasterAgree = 0;
+	stats.rasterAmbiguous = 0;
+	stats.rasterDisagreeUnsafe = 0;
+	stats.rasterDisagreeConservative = 0;
+	stats.rasterQueryMs = 0;
+	stats.rasterExactMs = 0;
+	stats.rasterBuildMs = 0;
+	stats.rasterMasksBuilt = 0;
 	stats.mergeCreditRejects = 0;
 	localRefinementEnsureSmartStats(stats);
 
@@ -8872,7 +8999,7 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'legalityPredicateDisagreements', 'legalityDisagreementNfpStricter', 'legalityDisagreementMaterialStricter', 'mergeCreditRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'continuousAnglesEvaluated', 'continuousPosesScored', 'continuousProxyRejects', 'continuousExactChecks', 'continuousExactMs', 'continuousMovesAccepted', 'continuousElapsedMs', 'continuousSkippedHoles', 'continuousTargetsConsidered', 'continuousTargetsAttempted', 'continuousTargetsScouted', 'continuousTargetsExploited', 'continuousTaskBudgetMs', 'continuousClusterAttempts', 'continuousClusterExactChecks', 'continuousClusterFailures', 'continuousClusterLegalLayouts', 'continuousClusterAccepted', 'continuousClusterPartsMoved', 'wholeClusterAttempts', 'wholeClusterCandidates', 'wholeClusterProxyChecks', 'wholeClusterExactChecks', 'wholeClusterLegalLayouts', 'wholeClusterAccepted', 'wholeClusterPartsMoved', 'windowedRebuildAttempts', 'windowedRebuildRegionComputations', 'windowedRebuildEmptyRegions', 'windowedRebuildCandidates', 'windowedRebuildExactChecks', 'windowedRebuildAccepted', 'windowedRebuildSignaturesSkipped', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines', 'contactBefore', 'contactAfter', 'contactRelativeImprovement', 'plateauAccepted', 'plateauRejectedRevisit', 'overlapRepairAttempts', 'overlapRepairPosesScored', 'overlapRepairSeparationFeasible', 'overlapRepairInfeasible', 'overlapRepairRejected', 'overlapRepairAccepted', 'overlapRepairNoIntrusion'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'legalityPredicateDisagreements', 'legalityDisagreementNfpStricter', 'legalityDisagreementMaterialStricter', 'mergeCreditRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'continuousAnglesEvaluated', 'continuousPosesScored', 'continuousProxyRejects', 'continuousExactChecks', 'continuousExactMs', 'continuousMovesAccepted', 'continuousElapsedMs', 'continuousSkippedHoles', 'continuousTargetsConsidered', 'continuousTargetsAttempted', 'continuousTargetsScouted', 'continuousTargetsExploited', 'continuousTaskBudgetMs', 'continuousClusterAttempts', 'continuousClusterExactChecks', 'continuousClusterFailures', 'continuousClusterLegalLayouts', 'continuousClusterAccepted', 'continuousClusterPartsMoved', 'wholeClusterAttempts', 'wholeClusterCandidates', 'wholeClusterProxyChecks', 'wholeClusterExactChecks', 'wholeClusterLegalLayouts', 'wholeClusterAccepted', 'wholeClusterPartsMoved', 'windowedRebuildAttempts', 'windowedRebuildRegionComputations', 'windowedRebuildEmptyRegions', 'windowedRebuildCandidates', 'windowedRebuildExactChecks', 'windowedRebuildAccepted', 'windowedRebuildSignaturesSkipped', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines', 'contactBefore', 'contactAfter', 'contactRelativeImprovement', 'plateauAccepted', 'plateauRejectedRevisit', 'overlapRepairAttempts', 'overlapRepairPosesScored', 'overlapRepairSeparationFeasible', 'overlapRepairInfeasible', 'overlapRepairRejected', 'overlapRepairAccepted', 'overlapRepairNoIntrusion', 'rasterSamples', 'rasterAgree', 'rasterAmbiguous', 'rasterDisagreeUnsafe', 'rasterDisagreeConservative', 'rasterQueryMs', 'rasterExactMs', 'rasterBuildMs', 'rasterMasksBuilt'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
 	}

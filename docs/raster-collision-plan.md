@@ -1,8 +1,9 @@
 # Raster Collision Tier — "make fine rotation affordable" — Implementation Plan
 
-Status: RC-1 implemented and measured 2026-07-25. Soundness passed; the
-divisor-64 laurel ambiguity gate failed, so RC-2 is blocked pending an explicit
-resolution-policy amendment. See §3.1.
+Status: **STOPPED at RC-2.** RC-1 soundness passed twice; RC-2's net-time gate
+failed — the raster tier is measurably SLOWER than exact geometry on this
+workload, so RC-3..RC-5 are cancelled. See §3.4 for the outcome and for the
+successor that follows from it (direct-Clipper fine rotation, no raster tier).
 
 Author: Claude-Code, 2026-07-25 (against commit `7360de2`, product 0.8.0).
 
@@ -279,6 +280,69 @@ Treat the reported rates as **upper bounds**.
 plus queries versus exact-only — not ambiguity alone. At 9x rasterisation cost, a
 tier that resolves 67 % of queries can still lose overall if masks are rebuilt too
 often. Report build time, query time, and the net, per instance.
+
+---
+
+## 3.4 RC-2 OUTCOME — the raster tier does not pay. STOP. (Claude-Code, 2026-07-25)
+
+**Verdict: RC-2 fails its net-time gate. Do not proceed to RC-3, RC-4 or RC-5.**
+The off-ramp worked as designed.
+
+Soundness is confirmed a second time, in production geometry rather than
+synthetic fixtures: across 1,867 shadow-measured pairs on albano there were
+**0 unsafe and 0 conservative disagreements**, with 23.0 % ambiguous. Combined
+with RC-1's 6,000 randomised checks, the conservative two-sided design is sound.
+
+But the economics are inverted from the plan's assumption:
+
+| | per pair |
+|---|---|
+| exact Clipper `materialOverlap` | **19.3 µs** |
+| raster query (bit-AND) | **37.5 µs — 1.9x SLOWER** |
+
+Net over the run: raster 129 ms (64 query + 65 build) versus exact 42 ms for the
+same pairs — a **loss of 87 ms**. Query-only, excluding amortisable mask build, is
+still a 34 ms loss. A coarser-resolution control run reproduced it (37.5 µs vs
+19.3 µs).
+
+**Why the premise was wrong.** §1 assumed exact geometry is expensive, so a
+bit-parallel filter would dominate it. It is not: after `curveTolerance`
+simplification Deepnest's parts are modest polygons, and Clipper resolves a pair
+in ~20 µs. Meanwhile a raster AND over the overlap window of two masks large
+enough to keep ambiguity low costs more than that. Raster filtering is the right
+trick when exact geometry is genuinely expensive — thousands of vertices per part
+— which is not this workload. §3.2's "speedup ceiling 1/ambiguity" was also
+incomplete: it treated raster query cost as negligible, when in fact finer pixels
+buy lower ambiguity **and** slower queries, so there may be no winning resolution.
+
+**The valuable consequence — fine rotation never needed raster.** If an exact
+overlap test is only ~19 µs, then off-grid poses can be validated by **direct
+Clipper collision against spatially-prefiltered neighbours**, with no NFP at the
+candidate angle and no raster tier at all. That sidesteps the (sources x
+rotations)² wall of §1 just as effectively, with none of the machinery:
+
+| search | cost |
+|---|---|
+| 1° over ±45° (90 poses x 5 neighbours) | 8.7 ms/part -> **0.9 s for 100 parts** |
+| 1° full circle (360 poses x 5 neighbours) | 34.7 ms/part -> 3.5 s for 100 parts |
+
+**1°-granularity rotation is affordable today**, using a mechanism the codebase
+already has — it is exactly how fine rotation, rotation reflow, and
+overlap-then-repair already validate off-grid poses. The blocker was never
+collision-testing cost; it was that NFP-based *candidate generation* forces
+canonical angles. The correct successor work is a pose generator that proposes
+off-grid angles and validates them directly, not a new collision tier.
+
+**What to keep.** `main/util/raster-collision.js` and its gate harness are sound,
+tested, and cost nothing while unused (no engine path calls them with the flag
+off). Keep them for a future workload with genuinely complex geometry; do not
+wire them into the hot path. `rasterCollisionShadow` stays default-off.
+
+**Caveats.** Measured on albano only (blaz1/shapes0 produced no shadow samples in
+the corpus run); mask build amortises with query volume, though query-only is
+still a loss; and the rasteriser is a first implementation that could likely be
+made ~2x faster — but it needs 2x merely to break even, which does not justify
+the complexity.
 
 ---
 
