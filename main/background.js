@@ -6345,6 +6345,52 @@ function localRefinementWindowCandidateLegal(sheet, partialPlaced, partialPlacem
 	return true;
 }
 
+/*
+ * DP-2: the one exact validator every off-grid pose consumer shares.
+ *
+ * Deliberately uses a FRESH bbox prefilter rather than the cached spatial index.
+ * The index is only patched on accepted moves (`localRefinementRecordAcceptance`),
+ * but placements are mutated in far more places than that — pose trials, the
+ * separator moving window neighbours, group settle — so a cached index can be
+ * stale mid-operation. A stale index returns a SUBSET of true neighbours, which
+ * would make this predicate answer "legal" for an overlapping pose. That is the
+ * one failure mode a validator may never have.
+ *
+ * The cost of being safe is small: a bbox test is ~50 ns against ~19 us for an
+ * exact Clipper test (measured in RC-2), so an O(n) scan over 100 parts costs
+ * less than a third of a single exact test while still removing ~95 % of them.
+ *
+ * Never consults NFP, so it is valid at any rotation, canonical or not.
+ */
+function localRefinementPoseLegal(sheet, placed, placements, config, index, part, placement, skip){
+	if(!localRefinementExactSheetContains(part, placement, sheet, config)){
+		return false;
+	}
+	var eps = Math.max(1e-9, 1e-4 * (Number(config && config.curveTolerance) || 0));
+	var world = shiftPolygon(part, placement);
+	var bounds = GeometryUtil.getPolygonBounds(world);
+	if(!bounds){
+		return false;
+	}
+	for(var j=0; j<placed.length; j++){
+		if(j === index || (skip && skip[j])){
+			continue;
+		}
+		var otherBounds = localRefinementWorldBounds(placed[j], placements[j]);
+		if(!localRefinementBoundsOverlap(bounds, otherBounds, eps)){
+			continue;
+		}
+		if(localRefinementExactMaterialOverlap(
+			world,
+			shiftPolygon(placed[j], placements[j]),
+			config
+		)){
+			return false;
+		}
+	}
+	return true;
+}
+
 function localRefinementTryWindowRebuild(sheet, placed, placements, config, indices, currentMetric, deadline, stats, preserveNeighbours){
 	var operatorStats = stats ? localRefinementEnsureSmartStats(stats) : null;
 	if(operatorStats){

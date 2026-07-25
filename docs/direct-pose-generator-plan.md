@@ -120,14 +120,33 @@ poseLegal(sheet, placed, placements, config, index, part, placement) -> boolean
 - `localRefinementExactSheetContains` for containment;
 - `localRefinementMaterialOverlap` per surviving neighbour.
 
-**Fix while here:** `localRefinementSpatialQuery` is currently consulted only when
-`skip` is absent, so three of the five `localRefinementSinglePlacementLegal` call
-sites fall back to a full O(n) neighbour scan. Make the query compose with `skip`
-(query, then filter). Free throughput on the highest-volume operators, and this
-generator will lean on it hard.
+**Correction to this section (Claude-Code, 2026-07-25).** The draft called the
+`!skip` guard on `localRefinementSpatialQuery` a free throughput fix. It is not —
+it is a **staleness guard**, and removing it would have been a correctness bug.
 
-**Gate:** flag-off equivalence byte-identical; a targeted test proving the
-prefiltered path and the full-scan path agree on a randomised layout.
+The cached index is patched only via `localRefinementRecordAcceptance` (10 call
+sites), while placements are mutated in 16 — pose trials, the separator moving
+window neighbours, group settle. Mid-operation the index can therefore be stale,
+and a stale index returns a **subset** of true neighbours. For a validator, a
+subset means answering "legal" for an overlapping pose: the one failure mode it
+may never have. The guard was protecting exactly the paths that mutate without
+patching.
+
+`localRefinementPoseLegal` therefore does its own **fresh** O(n) bbox prefilter
+and never consults the cached index. The cost of that safety is negligible against
+the RC-2 measurement: a bbox test is ~50 ns versus ~19 µs for one exact Clipper
+test, so scanning 100 parts costs under a third of a single exact test while still
+removing ~95 % of them. The spatial index would save the remaining ~5 µs — not
+worth a soundness risk.
+
+If someone later wants the index on these paths, the prerequisite is a generation
+counter or dirty flag that forces a refresh after any unpatched mutation. Do not
+simply delete the `!skip` condition.
+
+**Gate:** flag-off equivalence byte-identical; a randomised test proving the
+prefiltered path and an exhaustive full-scan path never disagree
+(`ml/tests/pose_validation`, 1,500 layouts biased toward near-contact, requiring
+both many legal and many illegal samples so the test cannot pass vacuously).
 
 ---
 
