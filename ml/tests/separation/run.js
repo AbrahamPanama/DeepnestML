@@ -235,6 +235,224 @@ function testTranslatedQueryMatchesShiftedNfp(){
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Local overlap-then-repair toy (LRv4 §overlap-repair investigation).
+//
+// Layout: a 4x3 grid of unit squares on a 1.0 pitch, which is exactly touching
+// under the 2x2 NFP convention used above (parts overlap when |dx|<1 and
+// |dy|<1). Column 3 is left empty so the window has somewhere to breathe.
+// One part is then deliberately shoved on top of its neighbour — the move class
+// the engine currently rejects outright — and only a small window around it is
+// allowed to move. Everything else is a fixed obstacle: visible to collision,
+// never repositioned.
+//
+// This is the feasibility question for local repair: can the separator resolve
+// ONE deliberate overlap using a handful of degrees of freedom, without being
+// allowed to disturb the rest of the sheet?
+// ---------------------------------------------------------------------------
+function createGridContext(options) {
+	options = options || {};
+	const cols = options.cols || 3;
+	const rows = options.rows || 3;
+	const pitch = options.pitch || 1.0;
+	const placements = [];
+	for (let r = 0; r < rows; r++) {
+		for (let c = 0; c < cols; c++) {
+			placements.push({ x: c * pitch, y: r * pitch });
+		}
+	}
+	if (options.mutate) {
+		options.mutate(placements);
+	}
+	const parts = placements.map(() => [{ x: 0, y: 0 }]);
+	const movableSet = options.movable || null;
+	const moveLog = [];
+	return {
+		placements,
+		moveLog,
+		ctx: {
+			n: placements.length,
+			q: function (i) {
+				return { x: placements[i].x + parts[i][0].x, y: placements[i].y + parts[i][0].y };
+			},
+			setPlacement: function (i, t) {
+				moveLog.push(i);
+				placements[i].x = t.x;
+				placements[i].y = t.y;
+			},
+			refPoint: function (i) {
+				return parts[i][0];
+			},
+			movable: movableSet ? function (i) { return movableSet.indexOf(i) >= 0; } : undefined,
+			nfp: function (i, j) {
+				void i;
+				const qj = placements[j];
+				return rect(qj.x - 1, qj.y - 1, 2, 2);
+			},
+			ifp: function () {
+				return options.tight
+					? [rect(0, 0, (cols - 1) * pitch, (rows - 1) * pitch)]
+					: [rect(-2, -2, 12, 12)];
+			},
+			bboxDiag: function () {
+				return Math.sqrt(2);
+			},
+			sheetBounds: options.tight
+				? { x: 0, y: 0, width: (cols - 1) * pitch, height: (rows - 1) * pitch }
+				: { x: -2, y: -2, width: 12, height: 12 },
+			eps: 1e-6,
+			deadline: Date.now() + 2000,
+			rng: SeparationUtil.mulberry32(20260725),
+			maxAttempts: 4,
+			maxItersPerAttempt: 400
+		}
+	};
+}
+
+function countOverlaps(ctx) {
+	let count = 0;
+	for (let i = 0; i < ctx.n; i++) {
+		for (let j = i + 1; j < ctx.n; j++) {
+			if (SeparationUtil.penetration(ctx.q(i), ctx.nfp(i, j)).depth > ctx.eps) {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
+function testLocalRepairResolvesDeliberateOverlap() {
+	// Part 4 (centre of the 3x3 block) is shoved 0.55 onto part 5's cell.
+	const fixture = createGridContext({
+		cols: 3,
+		rows: 3,
+		movable: [4, 5, 7],
+		mutate: function (placements) {
+			placements[4].x += 0.55;
+		}
+	});
+	const before = countOverlaps(fixture.ctx);
+	assert.ok(before > 0, 'toy must start with a real overlap');
+
+	const fixedBefore = fixture.placements.map((p) => ({ x: p.x, y: p.y }));
+	const result = SeparationUtil.separate(fixture.ctx);
+
+	assert.strictEqual(result.feasible, true, 'local repair should resolve one deliberate overlap');
+	assert.strictEqual(countOverlaps(fixture.ctx), 0, 'no overlap may remain after repair');
+
+	// The whole point of the movable/fixed split: untouched parts stay untouched.
+	for (let i = 0; i < fixture.placements.length; i++) {
+		if ([4, 5, 7].indexOf(i) >= 0) {
+			continue;
+		}
+		assertClose(fixture.placements[i].x, fixedBefore[i].x, 1e-12, 'fixed part ' + i + ' x must not move');
+		assertClose(fixture.placements[i].y, fixedBefore[i].y, 1e-12, 'fixed part ' + i + ' y must not move');
+	}
+	assert.ok(fixture.moveLog.every((i) => [4, 5, 7].indexOf(i) >= 0), 'separator must never write to a fixed part');
+}
+
+function testFixedPartsStillBlockMovableOnes() {
+	// Same overlap, but the only movable part is the offender and it is boxed in
+	// by fixed neighbours on a tight pitch. Repair must fail rather than resolve
+	// by walking through an obstacle — this is what proves fixed parts are real
+	// collision sources and not merely skipped.
+	const fixture = createGridContext({
+		cols: 3,
+		rows: 3,
+		pitch: 1.0,
+		movable: [4],
+		mutate: function (placements) {
+			placements[4].x += 0.55;
+		}
+	});
+	const result = SeparationUtil.separate(fixture.ctx);
+	if (result.feasible) {
+		assert.strictEqual(countOverlaps(fixture.ctx), 0, 'a feasible result must genuinely have no overlap');
+	}
+	assert.ok(fixture.moveLog.every((i) => i === 4), 'only the single movable part may be written');
+}
+
+// The scenario that actually matters for overlap-then-repair: the mover is
+// PINNED at the pose we want it in (fixed), and its neighbours must yield to
+// accommodate it. If the mover is left movable the separator simply reverts it
+// to where it came from — that trivially "succeeds" and proves nothing, which
+// is why the two tests above are mechanism checks rather than efficacy ones.
+//
+// Measured behaviour on a 4x3 tight-container grid (10 seeds per cell):
+//   slack/gap 0.10 -> 0% at every window size (jammed; no k rescues it)
+//   slack/gap 0.20 -> 100% for intrusion 0.20, 0% beyond
+//   slack/gap 0.35 -> k<=2 fails at intrusion 0.40+, k>=3 succeeds 100%
+// So local repair is bounded by available neighbourhood slack, and cooperative
+// shuffling needs at least three movable neighbours before it does any work.
+function testPinnedMoverNeedsCooperativeWindow() {
+	const PITCH = 1.35;
+	const SHOVE = 0.5;
+	const OFFENDER = 5;
+	// Nearest-first, ties broken by index — the same ordering a real window
+	// builder would produce from centroid distance. WHICH neighbours are freed
+	// matters as much as how many: [1,4] (above + left) cannot absorb an x-axis
+	// intrusion that [4,6] (left + right) can, so the useful threshold is a
+	// property of the window builder, not a universal constant.
+	const neighboursByDistance = [1, 4, 6, 9, 0, 2, 8, 10];
+
+	function attempt(windowSize) {
+		const movable = neighboursByDistance.slice(0, windowSize);
+		const fixture = createGridContext({
+			cols: 4,
+			rows: 3,
+			pitch: PITCH,
+			tight: true,
+			movable: movable,
+			mutate: function (placements) {
+				placements[OFFENDER].x += SHOVE;
+			}
+		});
+		const result = SeparationUtil.separate(fixture.ctx);
+		assert.ok(
+			fixture.moveLog.every((i) => movable.indexOf(i) >= 0),
+			'pinned mover and fixed ring must never be written (window ' + windowSize + ')'
+		);
+		return result.feasible && countOverlaps(fixture.ctx) === 0;
+	}
+
+	assert.strictEqual(attempt(2), false, 'two movable neighbours cannot absorb the intrusion');
+	assert.strictEqual(attempt(4), true, 'four movable neighbours should absorb the intrusion cooperatively');
+}
+
+function testPinnedMoverFailsWhenNeighbourhoodIsJammed() {
+	// Same intrusion, but only 0.10 slack per gap. No window size can help, and
+	// the separator must report infeasible rather than fabricate a bad layout.
+	const fixture = createGridContext({
+		cols: 4,
+		rows: 3,
+		pitch: 1.1,
+		tight: true,
+		movable: [4, 6, 1, 9, 0, 2, 8, 10],
+		mutate: function (placements) {
+			placements[5].x += 0.5;
+		}
+	});
+	const result = SeparationUtil.separate(fixture.ctx);
+	assert.strictEqual(result.feasible, false, 'a jammed neighbourhood must report infeasible');
+	assert.ok(countOverlaps(fixture.ctx) > 0, 'infeasible result should still show the unresolved overlap');
+}
+
+function testMovableOmittedKeepsLegacyBehaviour() {
+	// Backward compatibility: no ctx.movable means every part is movable, which
+	// must reproduce the pre-change result exactly.
+	const build = () => createGridContext({
+		cols: 3,
+		rows: 3,
+		mutate: function (placements) {
+			placements[4].x += 0.55;
+		}
+	});
+	const legacy = build();
+	const result = SeparationUtil.separate(legacy.ctx);
+	assert.strictEqual(result.feasible, true, 'unconstrained separation should still resolve the toy');
+	assert.strictEqual(countOverlaps(legacy.ctx), 0, 'unconstrained separation should leave no overlap');
+}
+
 function run() {
 	testSeparatedSquaresHaveNoOverlap();
 	testOverlappedSquaresResolve();
@@ -245,6 +463,11 @@ function run() {
 	testTightThreeSquaresDeterministic();
 	testDeadlineRespected();
 	testTranslatedQueryMatchesShiftedNfp();
+	testLocalRepairResolvesDeliberateOverlap();
+	testFixedPartsStillBlockMovableOnes();
+	testPinnedMoverNeedsCooperativeWindow();
+	testPinnedMoverFailsWhenNeighbourhoodIsJammed();
+	testMovableOmittedKeepsLegacyBehaviour();
 	console.log('separation tests passed');
 }
 

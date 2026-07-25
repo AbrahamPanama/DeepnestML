@@ -331,6 +331,15 @@
 		return weights;
 	}
 
+	// A context may mark parts as fixed obstacles via `ctx.movable(i) === false`.
+	// Fixed parts are fully visible to collision tests (a movable part still sees
+	// their NFPs) but are never selected as a move target and never accrue cost.
+	// Omitting `ctx.movable` keeps every part movable, which is the original
+	// behaviour.
+	function isMovable(ctx, i){
+		return typeof ctx.movable !== 'function' ? true : ctx.movable(i) !== false;
+	}
+
 	function evaluateViolations(ctx, weights, wSheet, eps){
 		var n = ctx.n || 0;
 		var partCosts = [];
@@ -345,6 +354,13 @@
 		}
 
 		for(i=0; i<n; i++){
+			// Skipping fixed parts here is safe as well as faster: every pair is
+			// visited from both ends, so an overlap between fixed i and movable j
+			// is still recorded (and still blocks feasibility) via the (j, i)
+			// entry, attributed to the part that can actually resolve it.
+			if(!isMovable(ctx, i)){
+				continue;
+			}
 			var q = ctx.q(i);
 			var ifp = ctx.ifp(i);
 			if(!ifp){
@@ -444,6 +460,16 @@
 		var movesApplied = 0;
 		var itersUsed = 0;
 		var maxResidualDepth = 0;
+		// Stall detection counts consecutive no-progress iterations against the
+		// number of parts that can actually move, not the context size, so a
+		// small movable window inside a large fixed ring terminates promptly.
+		var movableCount = 0;
+		for(var m=0; m<n; m++){
+			if(isMovable(ctx, m)){
+				movableCount++;
+			}
+		}
+		var strikeLimit = Math.max(1, movableCount);
 
 		for(var attempt=0; attempt<maxAttempts; attempt++){
 			var strikes = 0;
@@ -485,17 +511,20 @@
 					}
 				}
 
-				var target = 0;
+				var target = -1;
 				var targetCost = -Infinity;
 				for(var i=0; i<n; i++){
+					if(!isMovable(ctx, i)){
+						continue;
+					}
 					if(violations.partCosts[i] > targetCost){
 						target = i;
 						targetCost = violations.partCosts[i];
 					}
 				}
-				if(targetCost <= eps){
+				if(target < 0 || targetCost <= eps){
 					strikes++;
-					if(strikes > n){
+					if(strikes > strikeLimit){
 						break;
 					}
 					continue;
@@ -558,7 +587,7 @@
 				}
 				else{
 					strikes++;
-					if(strikes > n){
+					if(strikes > strikeLimit){
 						break;
 					}
 				}
