@@ -478,9 +478,192 @@ function utilizationFromPlacements(meta, placements, partsBySource) {
 	};
 }
 
+function placementGroups(placements) {
+	if (!Array.isArray(placements)) {
+		return [];
+	}
+	var groups = [];
+	var flat = [];
+	for (var i = 0; i < placements.length; i++) {
+		if (placements[i] && Array.isArray(placements[i].sheetplacements)) {
+			groups.push(placements[i].sheetplacements.slice());
+		}
+		else if (placements[i] && typeof placements[i].source !== 'undefined') {
+			flat.push(placements[i]);
+		}
+	}
+	if (flat.length > 0) {
+		groups.push(flat);
+	}
+	return groups;
+}
+
+function transformedRecord(record, placement) {
+	var outer = [];
+	var holes = [];
+	var i;
+	for (i = 0; i < record.polygon.length; i++) {
+		var point = rotatePoint(record.polygon[i], placement.rotation || 0);
+		outer.push({
+			x: point.x + Number(placement.x || 0),
+			y: point.y + Number(placement.y || 0)
+		});
+	}
+	var sourceHoles = Array.isArray(record.holes) ? record.holes : [];
+	for (var h = 0; h < sourceHoles.length; h++) {
+		var hole = [];
+		for (i = 0; i < sourceHoles[h].length; i++) {
+			point = rotatePoint(sourceHoles[h][i], placement.rotation || 0);
+			hole.push({
+				x: point.x + Number(placement.x || 0),
+				y: point.y + Number(placement.y || 0)
+			});
+		}
+		holes.push(hole);
+	}
+	return {
+		outer: outer,
+		holes: holes,
+		bounds: boundsForRing(outer)
+	};
+}
+
+function clipperPathsForMaterial(transformed, scale, clipperLib) {
+	var rings = [transformed.outer].concat(transformed.holes || []);
+	var paths = [];
+	for (var r = 0; r < rings.length; r++) {
+		var path = [];
+		for (var i = 0; i < rings[r].length; i++) {
+			path.push({X: rings[r][i].x, Y: rings[r][i].y});
+		}
+		clipperLib.JS.ScaleUpPath(path, scale);
+		paths.push(path);
+	}
+	return paths;
+}
+
+function boundsOverlap(a, b, tolerance) {
+	return a.x <= b.x + b.width + tolerance &&
+		a.x + a.width >= b.x - tolerance &&
+		a.y <= b.y + b.height + tolerance &&
+		a.y + a.height >= b.y - tolerance;
+}
+
+function materialIntersectionArea(left, right, scale, clipperLib) {
+	var clipper = new clipperLib.Clipper();
+	var solution = new clipperLib.Paths();
+	clipper.AddPaths(left, clipperLib.PolyType.ptSubject, true);
+	clipper.AddPaths(right, clipperLib.PolyType.ptClip, true);
+	if (!clipper.Execute(
+		clipperLib.ClipType.ctIntersection,
+		solution,
+		clipperLib.PolyFillType.pftEvenOdd,
+		clipperLib.PolyFillType.pftEvenOdd
+	)) {
+		return Number.POSITIVE_INFINITY;
+	}
+	var signedArea = 0;
+	for (var i = 0; i < solution.length; i++) {
+		signedArea += clipperLib.Clipper.Area(solution[i]);
+	}
+	return Math.abs(signedArea) / (scale * scale);
+}
+
+function legalityFromPlacements(meta, placements, clipperLib) {
+	if (!meta || !meta.sheetBounds || !meta.sourceMap) {
+		throw new Error('missing ESICUP conversion metadata');
+	}
+	if (!clipperLib || !clipperLib.Clipper) {
+		throw new Error('missing Clipper library');
+	}
+	var scale = 100000;
+	var coordinateTolerance = Math.max(1e-7, Number(meta.stripHeight || 0) * 1e-10);
+	var areaTolerance = 1e-6;
+	var groups = placementGroups(placements);
+	var placedCount = 0;
+	var overlapCount = 0;
+	var outsideCount = 0;
+	var missingSourceCount = 0;
+	var maxIntersectionArea = 0;
+	var collisions = [];
+	var sheetBounds = meta.sheetBounds;
+
+	for (var g = 0; g < groups.length; g++) {
+		var transformed = [];
+		for (var p = 0; p < groups[g].length; p++) {
+			var placement = groups[g][p];
+			var record = meta.sourceMap[String(placement.source)];
+			placedCount++;
+			if (!record || !Array.isArray(record.polygon) || record.polygon.length < 3) {
+				missingSourceCount++;
+				continue;
+			}
+			var world = transformedRecord(record, placement);
+			var maxX = sheetBounds.x + sheetBounds.width;
+			var maxY = sheetBounds.y + sheetBounds.height;
+			for (var v = 0; v < world.outer.length; v++) {
+				var vertex = world.outer[v];
+				if (vertex.x < sheetBounds.x - coordinateTolerance ||
+					vertex.x > maxX + coordinateTolerance ||
+					vertex.y < sheetBounds.y - coordinateTolerance ||
+					vertex.y > maxY + coordinateTolerance) {
+					outsideCount++;
+					break;
+				}
+			}
+			transformed.push({
+				source: placement.source,
+				bounds: world.bounds,
+				paths: clipperPathsForMaterial(world, scale, clipperLib)
+			});
+		}
+		for (var leftIndex = 0; leftIndex < transformed.length; leftIndex++) {
+			for (var rightIndex = leftIndex + 1; rightIndex < transformed.length; rightIndex++) {
+				var left = transformed[leftIndex];
+				var right = transformed[rightIndex];
+				if (!boundsOverlap(left.bounds, right.bounds, coordinateTolerance)) {
+					continue;
+				}
+				var area = materialIntersectionArea(left.paths, right.paths, scale, clipperLib);
+				maxIntersectionArea = Math.max(maxIntersectionArea, area);
+				if (area > areaTolerance) {
+					overlapCount++;
+					if (collisions.length < 20) {
+						collisions.push({
+							sheetIndex: g,
+							leftSource: left.source,
+							rightSource: right.source,
+							intersectionArea: area
+						});
+					}
+				}
+			}
+		}
+	}
+
+	var allPartsPlaced = placedCount === Number(meta.totalDemand);
+	var overlapFree = overlapCount === 0;
+	var withinSheetBounds = outsideCount === 0 && missingSourceCount === 0;
+	return {
+		legal: allPartsPlaced && overlapFree && withinSheetBounds,
+		allPartsPlaced: allPartsPlaced,
+		overlapFree: overlapFree,
+		withinSheetBounds: withinSheetBounds,
+		placedCount: placedCount,
+		expectedPartCount: Number(meta.totalDemand),
+		sheetCount: groups.length,
+		overlapCount: overlapCount,
+		outsideCount: outsideCount,
+		missingSourceCount: missingSourceCount,
+		maxIntersectionArea: maxIntersectionArea,
+		collisions: collisions
+	};
+}
+
 module.exports = {
 	instanceToSvg: instanceToSvg,
 	utilizationFromPlacements: utilizationFromPlacements,
+	legalityFromPlacements: legalityFromPlacements,
 	_normalizeShape: normalizeShape,
 	_polygonArea: polygonArea,
 	_shapeArea: shapeArea,

@@ -123,6 +123,20 @@ function localRefinementOptions(options) {
 		rotationReflowMinBudgetMs: Math.floor(numberOption(optionValue(options, 'rotationReflowMinBudgetMs', 'rotation-reflow-min-budget-ms', undefined), 400, 0, 30000)),
 		localRefinementFineRotation: booleanOption(optionValue(options, 'localRefinementFineRotation', 'local-refinement-fine-rotation', undefined), false),
 		localRefinementContinuous: booleanOption(optionValue(options, 'localRefinementContinuous', 'local-refinement-continuous', undefined), true),
+		localRefinementContactAcceptance: booleanOption(optionValue(options, 'localRefinementContactAcceptance', 'local-refinement-contact-acceptance', undefined), false),
+		v4AcceptEpsPrimary: numberOption(optionValue(options, 'v4AcceptEpsPrimary', 'v4-accept-eps-primary', undefined), 0.000001, 0, 0.1),
+		v4AcceptEpsContact: numberOption(optionValue(options, 'v4AcceptEpsContact', 'v4-accept-eps-contact', undefined), 0.001, 0, 1),
+		v4MaxPlateauAccepts: Math.floor(numberOption(optionValue(options, 'v4MaxPlateauAccepts', 'v4-max-plateau-accepts', undefined), 0, 0, 10000)),
+		v4FastLegality: booleanOption(optionValue(options, 'v4FastLegality', 'v4-fast-legality', undefined), false),
+		v4LegalityShadow: booleanOption(optionValue(options, 'v4LegalityShadow', 'v4-legality-shadow', undefined), false),
+		v4IncrementalScoring: booleanOption(optionValue(options, 'v4IncrementalScoring', 'v4-incremental-scoring', undefined), false),
+		v4ScaledCoverage: booleanOption(optionValue(options, 'v4ScaledCoverage', 'v4-scaled-coverage', undefined), false),
+		v4TargetFraction: numberOption(optionValue(options, 'v4TargetFraction', 'v4-target-fraction', undefined), 0.25, 0.01, 1),
+		v4MinTargets: Math.floor(numberOption(optionValue(options, 'v4MinTargets', 'v4-min-targets', undefined), 6, 1, 256)),
+		v4MaxTargets: Math.floor(numberOption(optionValue(options, 'v4MaxTargets', 'v4-max-targets', undefined), 64, 1, 1024)),
+		v4EnableSwap: booleanOption(optionValue(options, 'v4EnableSwap', 'v4-enable-swap', undefined), false),
+		v4WindowedRebuild: booleanOption(optionValue(options, 'v4WindowedRebuild', 'v4-windowed-rebuild', undefined), false),
+		v4WindowSize: Math.floor(numberOption(optionValue(options, 'v4WindowSize', 'v4-window-size', undefined), 5, 4, 8)),
 		continuousRefinementBudgetMs: Math.floor(numberOption(optionValue(options, 'continuousRefinementBudgetMs', 'continuous-refinement-budget-ms', undefined), 2000, 100, 30000)),
 		continuousRefinementMaxDeltaDeg: numberOption(optionValue(options, 'continuousRefinementMaxDeltaDeg', 'continuous-refinement-max-delta-deg', undefined), 45, 0.01, 45),
 		continuousRefinementCoarseStepDeg: numberOption(optionValue(options, 'continuousRefinementCoarseStepDeg', 'continuous-refinement-coarse-step-deg', undefined), 5, 0.05, 15),
@@ -329,6 +343,20 @@ function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeCo
 		rotationReflowMinBudgetMs: refinementOptions.rotationReflowMinBudgetMs,
 		localRefinementFineRotation: refinementOptions.localRefinementFineRotation,
 		localRefinementContinuous: refinementOptions.localRefinementContinuous,
+		localRefinementContactAcceptance: refinementOptions.localRefinementContactAcceptance,
+		v4AcceptEpsPrimary: refinementOptions.v4AcceptEpsPrimary,
+		v4AcceptEpsContact: refinementOptions.v4AcceptEpsContact,
+		v4MaxPlateauAccepts: refinementOptions.v4MaxPlateauAccepts,
+		v4FastLegality: refinementOptions.v4FastLegality,
+		v4LegalityShadow: refinementOptions.v4LegalityShadow,
+		v4IncrementalScoring: refinementOptions.v4IncrementalScoring,
+		v4ScaledCoverage: refinementOptions.v4ScaledCoverage,
+		v4TargetFraction: refinementOptions.v4TargetFraction,
+		v4MinTargets: refinementOptions.v4MinTargets,
+		v4MaxTargets: refinementOptions.v4MaxTargets,
+		v4EnableSwap: refinementOptions.v4EnableSwap,
+		v4WindowedRebuild: refinementOptions.v4WindowedRebuild,
+		v4WindowSize: refinementOptions.v4WindowSize,
 		continuousRefinementBudgetMs: refinementOptions.continuousRefinementBudgetMs,
 		continuousRefinementMaxDeltaDeg: refinementOptions.continuousRefinementMaxDeltaDeg,
 		continuousRefinementCoarseStepDeg: refinementOptions.continuousRefinementCoarseStepDeg,
@@ -445,6 +473,7 @@ function runBenchmark(options) {
 				timeBudgetSec: timeBudgetSec,
 				captureUtilization: true,
 				benchmarkMetaPath: metaPath,
+				randomSeed: runIndex,
 				timeoutMs: Math.ceil((timeBudgetSec + 60) * 1000),
 				configOverrides: configOverrides
 			});
@@ -459,9 +488,18 @@ function runBenchmark(options) {
 			if (typeof report.details.utilization !== 'number') {
 				throw new Error('benchmark run missing utilization: ' + reportPath + (report.details.utilizationError ? ' ' + report.details.utilizationError : ''));
 			}
+			if (!report.details.legality ||
+				report.details.legality.overlapFree !== true ||
+				report.details.legality.withinSheetBounds !== true) {
+				throw new Error(
+					'benchmark run failed external legality audit: ' + reportPath + ' ' +
+					JSON.stringify(report.details.legality || null)
+				);
+			}
 
 			instanceResult.runs.push({
 				runIndex: runIndex + 1,
+				randomSeed: report.details.randomSeed,
 				utilization: report.details.utilization,
 				usedLength: report.details.usedLength,
 				timeToBestSec: report.details.timeToBestSec,
@@ -470,6 +508,8 @@ function runBenchmark(options) {
 				timing: report.details.timing || null,
 				localRefinement: report.details.localRefinement || null,
 				localRefinementSummary: report.details.localRefinementSummary || null,
+				legality: report.details.legality || null,
+				allPartsPlaced: report.details.legality ? report.details.legality.allPartsPlaced : null,
 				placementsDigest: report.details.placementsDigest,
 				reportPath: path.relative(ROOT, reportPath),
 				outputPath: path.relative(ROOT, outputPath)

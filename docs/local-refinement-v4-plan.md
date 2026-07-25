@@ -1,7 +1,8 @@
 # Local Refinement v4 — "make refinement real" — Implementation Plan
 
-Status: PLAN — not started. Diagnosis below is evidence-backed and reproducible
-(§1). Supersedes nothing; it **repairs the acceptance and throughput layers**
+Status: IMPLEMENTED BEHIND DEFAULT-OFF FLAGS — verification green, efficacy and
+safety gates incomplete (Codex, 2026-07-25). Diagnosis below is evidence-backed
+and reproducible (§1). Supersedes nothing; it **repairs the acceptance and throughput layers**
 that every prior refinement WP (v3 smart engine, fine rotation, rotation reflow,
 continuous compaction) was built on top of. Those operators are not the problem —
 they are being starved and then overruled.
@@ -19,6 +20,30 @@ plan makes effective.
 Goal: turn Local Refinement from a cosmetic post-pass into a search that measurably
 densifies real sheets — specifically, make it able to **accept rotations that improve
 local fit**, which it currently cannot do at all.
+
+## Implementation outcome (2026-07-25)
+
+- WP-V4.1 through WP-V4.5 are implemented and remain default-off.
+- The four-laurel visual gate is substantive: 45-degree refinement, 24.88% continuous
+  score improvement, exact legality, and zero non-canonical NFP cache lookups.
+- Frozen flag-off engine equivalence, focused tests, boot check, and the 13-scenario
+  Electron smoke battery pass.
+- V4.2's fast-legality gate failed safely: NFP-only and exact-material predicates
+  disagree on existing fixtures. The app checkbox is disabled and the flag remains
+  available only to controlled CLI diagnostics. Best albano throughput was 981
+  candidate evaluations versus 594 baseline (1.65x, below the required 10x).
+- The production window operator fires at a 15-second refinement budget, but its
+  accepted albano moves improve contact while leaving the primary metric and
+  utilization unchanged.
+- Benchmark runs now use explicit deterministic seeds and independently sweep the
+  original exported geometry with Clipper. On matched albano seeds, v4 accepted one
+  contact move per run but median utilization remained 79.8528%, equal to shipped
+  smart. The broader seeded comparison stopped when shipped-smart itself exported a
+  `shapes0` sliver with intersection area `0.00005026835`; this is an existing
+  parser/engine-to-export tolerance defect and blocks the zero-illegal-layout gate.
+- No defaults were flipped, no full-corpus efficacy claim is made, and no bakeoff was
+  run. See the 2026-07-25 handoff in `AGENT_COLLABORATION.md` for commands and
+  benchmark artifact names.
 
 ---
 

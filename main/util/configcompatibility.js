@@ -15,16 +15,6 @@
 			key: 'localRefinementEngine',
 			value: 'smart',
 			reason: 'Continuous compaction uses the Smart refinement engine.'
-		},
-		{
-			key: 'processHoles',
-			value: false,
-			reason: 'Continuous compaction cannot process interior holes yet.'
-		},
-		{
-			key: 'mergeLines',
-			value: false,
-			reason: 'Continuous compaction requires independent part edges, so common-line merging is unavailable.'
 		}
 	];
 

@@ -1,0 +1,44 @@
+{
+  "name": "svg-laurel-v4-contact",
+  "description": "Four-laurel contact-aware acceptance must preserve exact legality while admitting a real rotated refinement move.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 120000,
+  "timeBudgetSec": 18,
+  "partQuantities": [2, 2],
+  "expectedPartsPlaced": 4,
+  "expectedSvgPathCount": 4,
+  "expectedNonCanonicalNfpLookups": 0,
+  "expectedLocalRefinementMinimums": {
+    "wholeClusterAccepted": 1,
+    "continuousMovesAccepted": 1,
+    "continuousMaxAngleDeltaDeg": 30,
+    "continuousRelativeImprovement": 0.15
+  },
+  "expectedLocalRefinementMaximums": {
+    "continuousElapsedMs": 8000
+  },
+  "configOverrides": {
+    "placementType": "gravity",
+    "rotations": 1,
+    "adaptiveRotations": false,
+    "improvedPlacementScoring": true,
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "localRefinement": true,
+    "localRefinementEngine": "smart",
+    "localRefinementBudgetMs": 15000,
+    "localRefinementContinuous": true,
+    "localRefinementContactAcceptance": true,
+    "v4IncrementalScoring": true,
+    "v4ScaledCoverage": true,
+    "v4WindowedRebuild": true,
+    "continuousRefinementBudgetMs": 2000,
+    "continuousRefinementMaxTargets": 8,
+    "continuousRefinementMaxNeighbors": 3
+  }
+}

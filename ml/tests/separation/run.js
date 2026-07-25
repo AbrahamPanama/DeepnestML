@@ -204,6 +204,37 @@ function testDeadlineRespected() {
 	assert.ok(Date.now() - start < 50, 'deadline exit should be prompt');
 }
 
+function testTranslatedQueryMatchesShiftedNfp(){
+	const rng = SeparationUtil.mulberry32(424242);
+	function shiftedRing(ring, shift){
+		const result = ring.map((point) => ({x: point.x + shift.x, y: point.y + shift.y}));
+		if(ring.children){
+			result.children = ring.children.map((child) => shiftedRing(child, shift));
+		}
+		return result;
+	}
+	for(let sample=0; sample<500; sample++){
+		const width = 1 + 20 * rng();
+		const height = 1 + 20 * rng();
+		const nfp = rect(-width / 2, -height / 2, width, height);
+		if(sample % 3 === 0){
+			nfp.children = [rect(-width / 8, -height / 8, width / 4, height / 4)];
+		}
+		const shift = {x: -50 + 100 * rng(), y: -50 + 100 * rng()};
+		const localQ = {x: -width + 2 * width * rng(), y: -height + 2 * height * rng()};
+		const worldQ = {x: localQ.x + shift.x, y: localQ.y + shift.y};
+		const shifted = SeparationUtil.penetration(worldQ, shiftedRing(nfp, shift));
+		const translated = SeparationUtil.penetration(localQ, nfp);
+		assert.strictEqual(translated.inside, shifted.inside, 'translated query should preserve NFP inside state');
+		assertClose(translated.depth, shifted.depth, 1e-12, 'translated query should preserve penetration depth');
+		if(translated.exit || shifted.exit){
+			assert.ok(translated.exit && shifted.exit, 'translated and shifted predicates should both return an exit');
+			assertClose(translated.exit.x + shift.x, shifted.exit.x, 1e-12, 'translated exit x should map back to world coordinates');
+			assertClose(translated.exit.y + shift.y, shifted.exit.y, 1e-12, 'translated exit y should map back to world coordinates');
+		}
+	}
+}
+
 function run() {
 	testSeparatedSquaresHaveNoOverlap();
 	testOverlappedSquaresResolve();
@@ -213,6 +244,7 @@ function run() {
 	testMaterialOverlapErosionPredicate();
 	testTightThreeSquaresDeterministic();
 	testDeadlineRespected();
+	testTranslatedQueryMatchesShiftedNfp();
 	console.log('separation tests passed');
 }
 

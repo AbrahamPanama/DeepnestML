@@ -51,6 +51,20 @@
 			rotationReflowMinBudgetMs: 400,
 			localRefinementFineRotation: false,
 			localRefinementContinuous: true,
+			localRefinementContactAcceptance: false,
+			v4AcceptEpsPrimary: 0.000001,
+			v4AcceptEpsContact: 0.001,
+			v4MaxPlateauAccepts: 0,
+			v4FastLegality: false,
+			v4LegalityShadow: false,
+			v4IncrementalScoring: false,
+			v4ScaledCoverage: false,
+			v4TargetFraction: 0.25,
+			v4MinTargets: 6,
+			v4MaxTargets: 64,
+			v4EnableSwap: false,
+			v4WindowedRebuild: false,
+			v4WindowSize: 5,
 			continuousRefinementBudgetMs: 2000,
 			continuousRefinementMaxDeltaDeg: 45,
 			continuousRefinementCoarseStepDeg: 5,
@@ -887,6 +901,68 @@
 
 			if(c.localRefinementContinuous === true || c.localRefinementContinuous === false){
 				config.localRefinementContinuous = !!c.localRefinementContinuous;
+			}
+
+			if(c.localRefinementContactAcceptance === true || c.localRefinementContactAcceptance === false){
+				config.localRefinementContactAcceptance = !!c.localRefinementContactAcceptance;
+			}
+
+			if(c.v4FastLegality === true || c.v4FastLegality === false){
+				config.v4FastLegality = !!c.v4FastLegality;
+			}
+			if(c.v4LegalityShadow === true || c.v4LegalityShadow === false){
+				config.v4LegalityShadow = !!c.v4LegalityShadow;
+			}
+
+			if(c.v4IncrementalScoring === true || c.v4IncrementalScoring === false){
+				config.v4IncrementalScoring = !!c.v4IncrementalScoring;
+			}
+
+			if(c.v4ScaledCoverage === true || c.v4ScaledCoverage === false){
+				config.v4ScaledCoverage = !!c.v4ScaledCoverage;
+			}
+
+			if(c.v4EnableSwap === true || c.v4EnableSwap === false){
+				config.v4EnableSwap = !!c.v4EnableSwap;
+			}
+
+			if(c.v4WindowedRebuild === true || c.v4WindowedRebuild === false){
+				config.v4WindowedRebuild = !!c.v4WindowedRebuild;
+			}
+
+			var v4AcceptEpsPrimary = Number(c.v4AcceptEpsPrimary);
+			if(isFinite(v4AcceptEpsPrimary) && v4AcceptEpsPrimary >= 0){
+				config.v4AcceptEpsPrimary = Math.min(v4AcceptEpsPrimary, 0.1);
+			}
+
+			var v4AcceptEpsContact = Number(c.v4AcceptEpsContact);
+			if(isFinite(v4AcceptEpsContact) && v4AcceptEpsContact >= 0){
+				config.v4AcceptEpsContact = Math.min(v4AcceptEpsContact, 1);
+			}
+
+			var v4MaxPlateauAccepts = Number(c.v4MaxPlateauAccepts);
+			if(isFinite(v4MaxPlateauAccepts) && v4MaxPlateauAccepts >= 0){
+				config.v4MaxPlateauAccepts = Math.min(Math.floor(v4MaxPlateauAccepts), 10000);
+			}
+
+			var v4TargetFraction = Number(c.v4TargetFraction);
+			if(isFinite(v4TargetFraction) && v4TargetFraction > 0){
+				config.v4TargetFraction = Math.min(v4TargetFraction, 1);
+			}
+
+			var v4MinTargets = Number(c.v4MinTargets);
+			if(isFinite(v4MinTargets) && v4MinTargets >= 1){
+				config.v4MinTargets = Math.min(Math.floor(v4MinTargets), 256);
+			}
+
+			var v4MaxTargets = Number(c.v4MaxTargets);
+			if(isFinite(v4MaxTargets) && v4MaxTargets >= 1){
+				config.v4MaxTargets = Math.min(Math.floor(v4MaxTargets), 1024);
+			}
+
+			var v4WindowSize = Number(c.v4WindowSize);
+			if(isFinite(v4WindowSize) && v4WindowSize >= 4){
+				config.v4WindowSize = Math.min(Math.floor(v4WindowSize), 8);
 			}
 
 			var continuousBudget = Number(c.continuousRefinementBudgetMs);

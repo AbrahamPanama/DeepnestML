@@ -14,6 +14,7 @@
 		<script src="util/geometryutil.js"></script>
 		<script src="util/rotationutil.js"></script>
 		<script src="util/configcompatibility.js"></script>
+		<script src="util/refinement-contact.js"></script>
 		<script src="util/placementworker.js"></script>
 		<script src="util/interact.js"></script>
 		<script src="util/ractive.js"></script>
@@ -432,6 +433,20 @@
 			  rotationReflowMinBudgetMs: 400,
 			  localRefinementFineRotation: false,
 			  localRefinementContinuous: true,
+			  localRefinementContactAcceptance: false,
+			  v4AcceptEpsPrimary: 0.000001,
+			  v4AcceptEpsContact: 0.001,
+			  v4MaxPlateauAccepts: 0,
+			  v4FastLegality: false,
+			  v4LegalityShadow: false,
+			  v4IncrementalScoring: false,
+			  v4ScaledCoverage: false,
+			  v4TargetFraction: 0.25,
+			  v4MinTargets: 6,
+			  v4MaxTargets: 64,
+			  v4EnableSwap: false,
+			  v4WindowedRebuild: false,
+			  v4WindowSize: 5,
 			  continuousRefinementBudgetMs: 2000,
 			  continuousRefinementMaxDeltaDeg: 45,
 			  continuousRefinementCoarseStepDeg: 5,
@@ -449,7 +464,7 @@
 			  fineRotationMaxTargets: 8,
 			  fineRotationPivot: 'centroid',
 			  fineRotationMinBudgetMs: 300,
-			  processHoles: true, // when true, NFP generation subtracts A's holes; the compatibility gate turns it off for continuous compaction
+			  processHoles: true, // hole-bearing parts remain fixed during continuous refinement
 			  exportSheetOutline: false, // when true, exports include the sheet boundary with the nested parts
 			  exportFormat: 'svg',
 			  exportOutlineMode: 'everything',
@@ -461,7 +476,7 @@
 			  tiffBackground: 'white',
 			  tiffCompression: 'lzw',
 			  lastIccProfilePath: '',
-			  mergeLines: true, // the compatibility gate turns this off for continuous compaction
+			  mergeLines: true, // refinement preserves existing common-line credit before committing
 			  mergeCandidateCap: 0, // hidden engine flag: cap common-line scoring candidates when > 0
 			  timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
 			  simplify: false,
@@ -526,7 +541,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'localRefinementContactAcceptance' || key == 'v4FastLegality' || key == 'v4IncrementalScoring' || key == 'v4ScaledCoverage' || key == 'v4EnableSwap' || key == 'v4WindowedRebuild' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							val = i.checked;
 						}
 					
@@ -671,7 +686,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'localRefinementContactAcceptance' || key == 'v4FastLegality' || key == 'v4IncrementalScoring' || key == 'v4ScaledCoverage' || key == 'v4EnableSwap' || key == 'v4WindowedRebuild' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -3335,6 +3350,11 @@
 					var captureUtilization = payload && (payload.captureUtilization === true || payload.captureUtilization === 'true' || payload.captureUtilization === 1 || payload.captureUtilization === '1');
 					var benchmarkMetaPath = payload && payload.benchmarkMetaPath ? String(payload.benchmarkMetaPath) : '';
 					var benchmarkMeta = null;
+					var smokeRandomRestore = null;
+					var randomSeed = Number(payload && payload.randomSeed);
+					if(isFinite(randomSeed) && randomSeed >= 0 && Math.floor(randomSeed) === randomSeed){
+						smokeRandomRestore = seededRandom.installSeededRandom(randomSeed);
+					}
 					var smokeMlMode = payload && payload.mlMode ? String(payload.mlMode) : '';
 					var smokeMlModelPath = payload && payload.mlModelPath ? String(payload.mlModelPath) : '';
 					var startedAt = Date.now();
@@ -3353,6 +3373,10 @@
 					if(budgetHandle){
 						clearTimeout(budgetHandle);
 						budgetHandle = null;
+					}
+					if(smokeRandomRestore){
+						smokeRandomRestore();
+						smokeRandomRestore = null;
 					}
 					window.__deepnestDisplayCallbackOverride = null;
 					try {
@@ -3531,6 +3555,9 @@
 							mlRecommendation: window.DeepNestLastMLRecommendation || null,
 							mlDiagnostic: window.DeepNestLastMLDiagnostic || null
 						};
+						if(isFinite(randomSeed) && randomSeed >= 0){
+							details.randomSeed = randomSeed;
+						}
 						if(timeToBestSec !== null){
 							details.timeToBestSec = timeToBestSec;
 						}
@@ -3542,9 +3569,16 @@
 								if(!benchmarkMeta){
 									throw new Error('missing benchmark metadata');
 								}
-								var utilization = esicupConvert.utilizationFromPlacements(benchmarkMeta, selectedNest ? selectedNest.placements : []);
+								var benchmarkPlacements = selectedNest ? selectedNest.placements : [];
+								var utilization = esicupConvert.utilizationFromPlacements(benchmarkMeta, benchmarkPlacements);
 								details.utilization = utilization.utilization;
 								details.usedLength = utilization.usedLength;
+								details.legality = esicupConvert.legalityFromPlacements(
+									benchmarkMeta,
+									benchmarkPlacements,
+									ClipperLib
+								);
+								details.placements = benchmarkPlacements;
 							}
 							catch(utilizationError){
 								details.utilizationError = utilizationError && utilizationError.message ? utilizationError.message : String(utilizationError);
@@ -5035,6 +5069,31 @@
 							<dt class="steprepeat-disabled">Continuous compaction</dt>
 							<dd class="steprepeat-disabled">
 								<input type="checkbox" checked="checked" data-config="localRefinementContinuous" /> <span class="radiolabel">Refine angles and nearby positions after nesting</span>
+							</dd>
+
+							<dt class="steprepeat-disabled">Contact-aware acceptance</dt>
+							<dd class="steprepeat-disabled">
+								<input type="checkbox" data-config="localRefinementContactAcceptance" /> <span class="radiolabel">Accept denser local fits on score plateaus</span>
+							</dd>
+
+							<dt class="steprepeat-disabled" title="Unavailable because NFP-only checks disagreed with exact material checks in safety testing.">Fast refinement legality</dt>
+							<dd class="steprepeat-disabled" title="Unavailable because NFP-only checks disagreed with exact material checks in safety testing.">
+								<input type="checkbox" data-config="v4FastLegality" disabled="disabled" /> <span class="radiolabel">Use indexed NFP checks during candidate search</span>
+							</dd>
+
+							<dt class="steprepeat-disabled">Incremental refinement scoring</dt>
+							<dd class="steprepeat-disabled">
+								<input type="checkbox" data-config="v4IncrementalScoring" /> <span class="radiolabel">Reuse part bounds and hulls while searching</span>
+							</dd>
+
+							<dt class="steprepeat-disabled">Scaled refinement coverage</dt>
+							<dd class="steprepeat-disabled">
+								<input type="checkbox" data-config="v4ScaledCoverage" /> <span class="radiolabel">Refine a proportional set of parts</span>
+							</dd>
+
+							<dt class="steprepeat-disabled">Windowed cluster rebuild</dt>
+							<dd class="steprepeat-disabled">
+								<input type="checkbox" data-config="v4WindowedRebuild" /> <span class="radiolabel">Rebuild dense local groups on larger sheets</span>
 							</dd>
 
 							<dt class="steprepeat-disabled">Refinement engine</dt>

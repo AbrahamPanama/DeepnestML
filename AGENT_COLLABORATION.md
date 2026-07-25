@@ -86,7 +86,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-16 by Claude-Code): clean — the continuous-compaction wave (Codex) and quantity placed badges landed in `e37246f`, release 0.8.0 committed on top and pushed; generated benchmark-result JSONs under `ml/benchmark/results/` remain untracked by convention, as do pre-existing local artifacts (`testpart.svg`, zips, `.claude/`).
+State (verified 2026-07-25 by Codex): dirty — Local Refinement v4 implementation and verification are complete but uncommitted; generated benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +96,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
 | Codex | Four-part continuous compaction efficacy | continuous refinement engine, exact 2+2 laurel fixture/smoke gate, `AGENT_COLLABORATION.md` | Completed: bounded whole-cluster rebuild produces a visibly tighter exact-legal result; deterministic and live-product gates green | 2026-07-10 |
 | Codex | Continuous compaction compatibility gate | `main/util/configcompatibility.js`, `main/index.html`, `main/style.css`, `main/deepnest.js`, continuous-refinement tests, `AGENT_COLLABORATION.md` | Completed: prerequisites/conflicts enforced, hover/focus reasons exposed, UI + regression gates green | 2026-07-10 |
@@ -142,7 +143,7 @@ Park future tasks both agents should be aware of. Keep entries short. Move items
 | Windows port (WIN-W1…W5) | `docs/windows-port-plan.md` | Ship a Windows x64 build preserving all features; mac stays unchanged. Three real risks: native addon (MSVC + header-only Boost.Polygon + `NOMINMAX`), the Python sidecar (bundle embeddable CPython + wheels for PDF/PNG/TIFF conversion), packaging (NSIS/portable, unsigned v1). JS layer is already platform-neutral. W1 compile / W2 bundling / W4 packaging need a Windows build host; W3 + config edits are Mac-authorable but must not regress the mac build. Claim WIN-W1…W5 from §10 |
 | TIFF bitmap export + unified export modal (TIFF-T1…T4) | `docs/tiff-export-plan.md` | Export nested layouts as per-sheet raster TIFFs for print/RIP: outline-removal enum, top-indicator fiducial, ICC (RGB embed / CMYK convert+embed), via the existing PyMuPDF+Pillow converter (no new deps). Refactors the export menu into a CollageMaker-style modal (light theme). Export-only; not ML-sensitive as long as `placeParts`/vector-export defaults are untouched. Claim TIFF-T1…T4 from the plan's §10 |
 | SOTA nesting engine (WP-0 … WP-4) | `docs/sota-nesting-implementation-plan.md` | Phased plan: benchmark harness → fitness v2 → separate-and-compact refinement (replaces slide Local Refinement) → `deepsearch` placement type → ML routing. Every WP lands behind a default-off flag with equivalence + benchmark gates. Claim individual WPs from the plan's §10 table |
-| Local Refinement v4 "make refinement real" (WP-V4.1 … WP-V4.5) | `docs/local-refinement-v4-plan.md` | Written 2026-07-24 by Claude-Code, evidence-backed against 0.8.0. Diagnosis: the acceptance objective is the bounding box of all parts (gravity mode), so every interior/rotational improvement scores exactly 0 and is rejected — albano generated 944 legal rotation candidates and accepted 0; swap is 0-for-67 corpus-wide. Plus ~5 ms/candidate throughput and the strongest operator hard-gated to 4–6-part sheets. Order 1→2→4 is a dependency chain: contact-aware acceptance, then hot-path throughput, then windowed ruin & recreate. Claim WP-V4.x from the plan's §8 table |
+| Local Refinement v4 gate follow-up | `main/background.js`, benchmark corpus | WP-V4.1-V4.5 are implemented default-off. Remaining blockers: fast-legality predicate disagreements, only 1.65x vs 10x throughput, production windows that improve contact but not utilization, and strict merge-line export slivers. Do not flip defaults until those gates are green. |
 | Local Refinement v3 "smart" engine (WP-R1 … WP-R6) | `docs/local-refinement-v3-plan.md` | Approved 2026-06-11; supersedes SOTA WP-2.3. Prereqs: SOTA WP-2.1, WP-2.2, and the §8.3 equivalence harness. Contact-graph chain targeting, geometry-derived rotations with pivot rocking, void relocation, swaps, ruin-&-recreate under a budgeted orchestrator (`localRefinementEngine: 'smart'`, default stays 'slide') |
 
 ## Open Questions For User
@@ -156,6 +157,22 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-25 - Local Refinement v4 implementation and gate results (Codex)
+
+- Implemented WP-V4.1 through WP-V4.5 behind default-off controls. Added sampled contact-aware plateau acceptance with shared before/after neighbours and sample steps, quantized revisit rejection, plateau caps, additive contact statistics, and exact commit-time legality.
+- Added a uniform refinement spatial index, translated-query NFP checks, cached local bounds/hulls, and flag-controlled incremental scoring. Randomized equivalence coverage is green for 1,000 layouts and 500 shifted/unshifted NFP cases.
+- Instrumented NFP-vs-exact-material legality. Full smoke diagnostics found nonzero conservative disagreements (NFP overlap while exact material did not), so `v4FastLegality` remains default-off and is disabled in the app UI with an explanatory hover label. The best fixed-budget albano count was 981 candidate evaluations versus the 594 baseline (1.65x, below the required 10x/5,940 gate).
+- Added scaled target coverage and explicit swap gating. Flag-off frozen engine equivalence remains green.
+- Added production-size 4-8 part windowed ruin/recreate with contact/frontier seeds, indexed neighbours, allowlisted angles, exact candidate and transaction gates, merge-credit preservation, signature suppression, and bounded deadlines. It fires on albano at a 15-second refinement budget, but accepted production windows were contact-improving and primary/utilization-neutral.
+- Preserved the proven exact arbitrary-angle whole-cluster path for 4-6 part jobs. The v4 laurel smoke moved all four parts, accepted a 45-degree refinement, improved the continuous score by 24.88%, and passed the exact legality gate.
+- Added an independent Clipper pairwise export audit to benchmark reports. The benchmark runner records completeness and hard-fails out-of-sheet geometry, missing source geometry, or positive-area overlaps; fixed-budget partial nests remain valid benchmark samples. A final no-merge albano run passed 24/24 parts with zero collisions and a maximum numerical intersection of `1e-10`.
+- Relaxed the old whole-stage `mergeLines`/`processHoles` blocks. Merge mode now runs refinement while preserving pre-move merge credit; hole-bearing parts remain fixed targets while eligible neighbours continue refining. A merge-enabled albano run confirmed `continuousRan: true` with no skip reason. Its independent original-geometry export audit found two common-line slivers (maximum area `0.010511834`), so strict external legality intentionally remains red for that mode instead of weakening the audit.
+- Fixed the benchmark's false "seed" convention by plumbing explicit deterministic seeds through the existing renderer seeded-random utility. The seeded off-control completed all nine bounded samples with mean median utilization `39.826%`. The seeded shipped-smart comparison stopped on `shapes0` seed 2 when the external audit found a pre-existing exported sliver (`0.00005026835` area), so a full paired target mean is intentionally not claimed.
+- On the complete, overlap-free matched albano slice, off, shipped-smart, and v4 all had median utilization `79.8528%`. V4 accepted one contact move on every seed and changed the digest, but primary utilization did not improve. The required full-corpus efficacy gate was not run and no default was flipped.
+- Verification green: syntax checks; engine bugfix, continuous refinement, separation, adaptive rotation, geometry broker, contact, coverage, scoring, spatial, window, and benchmark-legality tests; frozen engine equivalence; boot check; 13-scenario Electron smoke battery; `git diff --check`.
+- The pre-edit ML checkpoint command (`npm run ml:checkpoint -- --name lr-v4-1-pre`) failed because no completed training run with a trained model exists. Bakeoff was not run because required manifest/model/output inputs are unavailable and the efficacy prerequisites did not pass.
+- New durable coverage: `main/util/refinement-contact.js`, `ml/tests/refinement_contact/`, `ml/tests/refinement_coverage/`, `ml/tests/refinement_scoring/`, `ml/tests/refinement_spatial/`, `ml/tests/refinement_window/`, `ml/tests/benchmark_legality/`, and `ml/smoke/scenarios/svg-laurel-v4-contact.json`.
 
 ### 2026-07-16 - Release 0.8.0: commit, build, push (Claude-Code)
 

@@ -80,6 +80,7 @@ function testCriticalTargetsReceiveNearestAnchors(){
 	const context = {
 		localRefinementWorldBounds: (part) => part.bounds,
 		localRefinementSmartTargetOrder: (placed, placements, config) => config.order.slice(),
+		localRefinementHasChildren: (part) => !!(part && part.children && part.children.length),
 		sqr: (value) => value * value
 	};
 	vm.createContext(context);
@@ -111,6 +112,42 @@ function testCriticalTargetsReceiveNearestAnchors(){
 		[{anchor: 1, target: 0}, {anchor: 0, target: 1}],
 		'two-part jobs should retain both directed refinement tasks'
 	);
+	placed[3].children = [[{x: 0, y: 0}]];
+	const holeSafeTasks = context.localRefinementContinuousTargetTasks(
+		placed,
+		[{}, {}, {}, {}],
+		{order: [3, 0, 2, 1], processHoles: true},
+		4
+	);
+	assert.ok(
+		holeSafeTasks.every((task) => task.target !== 3),
+		'hole-bearing parts should remain fixed while ordinary targets continue'
+	);
+}
+
+function testMergeCreditGuard(){
+	const background = fs.readFileSync(path.join(ROOT, 'main', 'background.js'), 'utf8');
+	const context = {Math};
+	vm.createContext(context);
+	vm.runInContext(functionSource(background, 'localRefinementMergeCreditAccepts'), context);
+	const stats = {};
+	assert.strictEqual(
+		context.localRefinementMergeCreditAccepts(10, 10.01, {mergeLines: true, curveTolerance: 0.01}, stats),
+		true,
+		'refinement may preserve or gain common-line credit'
+	);
+	assert.strictEqual(
+		context.localRefinementMergeCreditAccepts(10, 9, {mergeLines: true, curveTolerance: 0.01}, stats),
+		false,
+		'refinement must reject layouts that trade away common-line credit'
+	);
+	assert.strictEqual(stats.mergeCreditRejects, 1);
+	const stage = functionSource(background, 'localRefinementRunContinuousStage');
+	assert.ok(!stage.includes("localRefinementContinuousSkip(stats, 'mergeLines')"), 'mergeLines should no longer block continuous refinement');
+	assert.ok(!stage.includes("localRefinementContinuousSkip(stats, 'processedHoles')"), 'processed holes should no longer block the whole sheet');
+	const singleLegal = functionSource(background, 'localRefinementSinglePlacementLegal');
+	assert.ok(singleLegal.includes('v4LegalityShadow === true'), 'predicate disagreement telemetry must be explicitly auditable');
+	assert.ok(singleLegal.includes('nfpOverlap && !shadowAudit'), 'normal candidate rejection must keep the fast NFP short-circuit');
 }
 
 function testContinuousCompactionCompatibilityGate(){
@@ -144,8 +181,8 @@ function testContinuousCompactionCompatibilityGate(){
 	ConfigCompatibility.applyContinuousCompaction(active);
 	assert.strictEqual(active.localRefinement, true, 'Continuous compaction should enable its parent refinement pass');
 	assert.strictEqual(active.localRefinementEngine, 'smart', 'Continuous compaction should select the Smart engine');
-	assert.strictEqual(active.processHoles, false, 'Continuous compaction should disable processed-hole nesting');
-	assert.strictEqual(active.mergeLines, false, 'Continuous compaction should disable common-line merging');
+	assert.strictEqual(active.processHoles, true, 'Continuous compaction should preserve processed-hole nesting');
+	assert.strictEqual(active.mergeLines, true, 'Continuous compaction should preserve common-line merging');
 	const inactiveParent = {
 		localRefinementContinuous: true,
 		localRefinement: false,
@@ -159,7 +196,7 @@ function testContinuousCompactionCompatibilityGate(){
 	const rules = ConfigCompatibility.rulesForContinuousCompaction();
 	assert.deepStrictEqual(
 		rules.map((rule) => rule.key),
-		['localRefinement', 'localRefinementEngine', 'processHoles', 'mergeLines'],
+		['localRefinement', 'localRefinementEngine'],
 		'the UI should disable every runtime-incompatible setting'
 	);
 	assert.ok(rules.every((rule) => rule.reason && rule.reason.length > 20), 'every disabled setting should explain why it is unavailable');
@@ -189,6 +226,7 @@ testPostScoreRewardsCompactness();
 testConstructionAndRefinementStaySeparate();
 testConfiguredAngleWindowIsEnforced();
 testCriticalTargetsReceiveNearestAnchors();
+testMergeCreditGuard();
 testContinuousCompactionCompatibilityGate();
 testWholeClusterRebuildStaysBoundedAndExact();
 console.log('continuous refinement tests passed');

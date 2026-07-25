@@ -17,6 +17,7 @@ const nestGeometryBroker = nestGeometryBrokerModule.createNestGeometryBroker(2);
 let backgroundWindow = null;
 let mainWindow = null;
 let smokePayload = null;
+let smokeStartScheduled = false;
 let windowsReady = {
 	background: false,
 	main: false
@@ -123,6 +124,10 @@ function maybeStartSmoke() {
 	if (!windowsReady.background || !windowsReady.main || !mainWindow || !smokePayload) {
 		return;
 	}
+	if (smokeStartScheduled) {
+		return;
+	}
+	smokeStartScheduled = true;
 	mainWindow.webContents.send('app-smoke-test-start', smokePayload);
 }
 
@@ -142,11 +147,23 @@ function createWindowPreferences() {
 	};
 }
 
+function forwardRendererErrors(label, webContents) {
+	webContents.on('console-message', function (event, level, message, line, sourceId) {
+		if (Number(level) >= 2 || process.env.DEEPNEST_SMOKE_TRACE_CONSOLE === '1') {
+			console.error('[app-smoke][' + label + '] ' + message + ' (' + sourceId + ':' + line + ')');
+		}
+	});
+	webContents.on('crashed', function () {
+		console.error('[app-smoke][' + label + '] renderer crashed');
+	});
+}
+
 function createBackgroundWindow() {
 	backgroundWindow = new BrowserWindow({
 		show: false,
 		webPreferences: createWindowPreferences()
 	});
+	forwardRendererErrors('background', backgroundWindow.webContents);
 	backgroundWindow.loadURL(url.format({
 		pathname: path.join(__dirname, '../main/background.html'),
 		protocol: 'file:',
@@ -164,6 +181,7 @@ function createMainWindow() {
 		show: false,
 		webPreferences: createWindowPreferences()
 	});
+	forwardRendererErrors('main', mainWindow.webContents);
 	mainWindow.loadURL(url.format({
 		pathname: path.join(__dirname, '../main/index.html'),
 		protocol: 'file:',
@@ -502,6 +520,8 @@ app.on('ready', function () {
 		timeBudgetSec: cliArgs.timeBudgetSec || scenario.timeBudgetSec || '',
 		captureUtilization: cliArgs.captureUtilization || scenario.captureUtilization || false,
 		benchmarkMetaPath: benchmarkMetaPath,
+		randomSeed: typeof cliArgs.randomSeed !== 'undefined' ? Number(cliArgs.randomSeed) :
+			(typeof scenario.randomSeed !== 'undefined' ? Number(scenario.randomSeed) : undefined),
 		mlMode: cliArgs.mlMode || scenario.mlMode || '',
 		mlModelPath: cliArgs.mlModelPath || scenario.mlModelPath || ''
 	};

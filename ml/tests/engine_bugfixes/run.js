@@ -153,6 +153,7 @@ function testRotationReflowSelectionHelpers() {
 		'localRefinementAngularDistance',
 		'localRefinementSourceRotationAngles',
 		'localRefinementRotationReflowAngles',
+		'localRefinementPartLocalBounds',
 		'localRefinementWorldBounds',
 		'localRefinementRotationReflowNeighbors'
 	], {
@@ -234,7 +235,9 @@ function testRotationReflowTransactionalCommitAndRollback() {
 			localRefinementSinglePlacementLegal: function () { return true; },
 			localRefinementSubsetMetric: function () { return 1; },
 			localRefinementFinalLayoutLegalForRotations: function () { return true; },
-			localRefinementSmartMetric: function () { return candidateMetric; },
+			localRefinementUsesContactAcceptance: function () { return false; },
+			localRefinementAcceptanceMetric: function () { return candidateMetric; },
+			localRefinementRecordAcceptance: function () {},
 			clonePlacementPosition: deepClone,
 			localRefinementAngularDistance: function (a, b) {
 				let delta = Math.abs((Number(a) || 0) - (Number(b) || 0)) % 360;
@@ -337,9 +340,11 @@ function testPairCompactionRejectsUnsafeBestAndCommitsLegalFallback() {
 			},
 			clonePlacementPosition: deepClone,
 			localRefinementTranslatePairIntoSheet: function () { return true; },
-			localRefinementSmartMetric: function (sheet, placed, placements) {
+			localRefinementAcceptanceMetric: function (sheet, placed, placements) {
 				return placements[1].x === 1 ? 4 : 6;
 			},
+			localRefinementUsesContactAcceptance: function () { return false; },
+			localRefinementRecordAcceptance: function () {},
 			localRefinementImproves: function (candidate, current) { return candidate < current; },
 			localRefinementFinalLayoutLegalForRotations: function (sheet, placed, placements) {
 				return !allIllegal && placements[1].x === 3;
@@ -499,6 +504,7 @@ function testFineRotationAcceptancePath() {
 		'rotatePolygon',
 		'localRefinementClonePart',
 		'localRefinementBboxDiagonal',
+		'localRefinementPartLocalBounds',
 		'localRefinementWorldBounds',
 		'localRefinementHasChildren',
 		'localRefinementBoundsOverlap',
@@ -534,9 +540,13 @@ function testFineRotationAcceptancePath() {
 		localRefinementFineRotationCandidateLegal: function () {
 			return true;
 		},
-		localRefinementSmartMetric: function (sheet, placed, placements) {
+		localRefinementUsesContactAcceptance: function () {
+			return false;
+		},
+		localRefinementAcceptanceMetric: function (sheet, placed, placements) {
 			return Math.abs((placements[0].rotation || 0) - 6);
-		}
+		},
+		localRefinementRecordAcceptance: function () {}
 	});
 	const part = rect(0, 0, 2, 1);
 	part.source = 'part-a';
@@ -580,6 +590,7 @@ function testFineRotationHoleRiskHonorsProcessHoles() {
 		'localRefinementBboxDiagonal',
 		'localRefinementHasChildren',
 		'localRefinementBoundsOverlap',
+		'localRefinementPartLocalBounds',
 		'localRefinementWorldBounds',
 		'localRefinementFineRotationHasHoleRisk'
 	], {
