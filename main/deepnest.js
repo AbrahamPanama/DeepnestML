@@ -52,6 +52,12 @@
 			localRefinementFineRotation: false,
 			localRefinementOverlapRepair: false,
 			rasterCollisionShadow: false,
+			localRefinementDirectPoses: false,
+			directPoseMaxTargets: 6,
+			directPoseMaxNeighbours: 4,
+			directPoseMaxEdges: 6,
+			directPoseMaxCandidates: 24,
+			directPoseSlideSamples: 12,
 			rasterDivisor: 64,
 			rasterTargetAmbiguity: 0.30,
 			overlapRepairMaxTargets: 4,
@@ -910,8 +916,27 @@
 			if(c.localRefinementOverlapRepair === true || c.localRefinementOverlapRepair === false){
 				config.localRefinementOverlapRepair = !!c.localRefinementOverlapRepair;
 			}
+			if(c.localRefinementDirectPoses === true || c.localRefinementDirectPoses === false){
+				config.localRefinementDirectPoses = !!c.localRefinementDirectPoses;
+			}
 			if(c.rasterCollisionShadow === true || c.rasterCollisionShadow === false){
 				config.rasterCollisionShadow = !!c.rasterCollisionShadow;
+			}
+			var directPoseMaxTargets = Number(c.directPoseMaxTargets);
+			if(isFinite(directPoseMaxTargets) && directPoseMaxTargets >= 1){
+				config.directPoseMaxTargets = Math.min(Math.floor(directPoseMaxTargets), 64);
+			}
+			var directPoseMaxNeighbours = Number(c.directPoseMaxNeighbours);
+			if(isFinite(directPoseMaxNeighbours) && directPoseMaxNeighbours >= 1){
+				config.directPoseMaxNeighbours = Math.min(Math.floor(directPoseMaxNeighbours), 16);
+			}
+			var directPoseMaxEdges = Number(c.directPoseMaxEdges);
+			if(isFinite(directPoseMaxEdges) && directPoseMaxEdges >= 1){
+				config.directPoseMaxEdges = Math.min(Math.floor(directPoseMaxEdges), 32);
+			}
+			var directPoseMaxCandidates = Number(c.directPoseMaxCandidates);
+			if(isFinite(directPoseMaxCandidates) && directPoseMaxCandidates >= 1){
+				config.directPoseMaxCandidates = Math.min(Math.floor(directPoseMaxCandidates), 256);
 			}
 			var rasterDivisor = Number(c.rasterDivisor);
 			if(isFinite(rasterDivisor) && rasterDivisor >= 1){

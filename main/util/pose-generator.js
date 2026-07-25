@@ -240,7 +240,21 @@
 				var rb = rotated[(te.index + 1) % rotated.length];
 				var mid = {x: (ra.x + rb.x) / 2, y: (ra.y + rb.y) / 2};
 				var half = te.length / 2;
-				var slides = [half, ne.length / 2, ne.length - half];
+				// Phase sweep along the mated edge. Three positions (both ends
+				// plus centre) is enough for convex parts, but for concave ones
+				// — interlocking leaves, teeth, combs — the phase decides whether
+				// the protrusions mesh or collide, and the meshing phase is
+				// almost always missed by a 3-sample sweep.
+				var samples = Math.max(2, parseInt(options.slideSamples, 10) || 3);
+				var from = half;
+				var to = Math.max(half, ne.length - half);
+				var slides = [];
+				for(var q=0; q<samples; q++){
+					slides.push(samples === 1 ? from : from + (to - from) * (q / (samples - 1)));
+				}
+				if(to > from){
+					slides.push(ne.length / 2);
+				}
 				for(var s=0; s<slides.length; s++){
 					var along = slides[s];
 					var desired = {

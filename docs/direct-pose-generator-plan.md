@@ -171,6 +171,53 @@ poses are validated by exact geometry only.
 non-multiples of the canonical grid on the laurel fixture; exact legality holds;
 no wall-clock regression beyond budget.
 
+### 4.1 DP-3 measured outcome (Claude-Code, 2026-07-25)
+
+Wiring is complete and safe, but **the edge-mating pose family produces zero legal
+poses on the target geometry.** The gate is not met.
+
+`localRefinementTryDirectPose` is wired behind default-off
+`localRefinementDirectPoses`, runs last in the pass (same reason as fine
+rotation), validates through `localRefinementPoseLegal` only, and never touches
+NFP. Flag-off equivalence is byte-identical and `nonCanonicalNfpLookups` is 0 in
+every flag-on run.
+
+Laurel four-part fixture, flag on:
+
+| variant | poses generated | validated | legal | accepted |
+|---|---|---|---|---|
+| 3 slide phases, cap 24 | 2,384 | 192 | **0** | 0 |
+| 12 slide phases, cap 24 | 5,392 | 192 | **0** | 0 |
+| 12 slide phases, cap 400 | 5,392 | 2,048 | **0** | 0 |
+
+Two hypotheses were tested and both eliminated. Widening the phase sweep from 3 to
+12 samples (concave protrusions mesh or collide depending on phase) changed
+nothing. Raising the validation cap from 24 to 400 — on the theory that ranking by
+contact score selects the *most deeply mated*, hence most-overlapping, poses —
+also changed nothing at 2,048 validated poses.
+
+**Root cause: these parts have no edges to mate.** Edge mating assumes a part has
+meaningful long straight edges whose direction is geometrically significant. A
+laurel branch outline is thousands of short arc segments. Measured on a synthetic
+leafy contour of the same character, the longest edge is **~1 % of the part
+diameter** — so "rotate to align the longest edges" derives an essentially
+arbitrary angle, and mating two such edges flush drives the leaves straight into
+each other.
+
+**Consequence for the plan.** §2.1 is sound for parts with real edges (sheet-metal
+brackets, polygonal blanks) and should be kept for them, but it is the wrong pose
+family for smooth/arc-heavy outlines — which is precisely the geometry that
+motivated this whole line of work. The §2.2 pivot-rotation and §2.3 sibling
+families are unaffected and remain viable.
+
+The successor family for arc-heavy parts is **contact walking**: sample the
+target's boundary, sample the neighbour's boundary, and for each sampled point
+pair derive the rotation that aligns the local boundary *tangents* antiparallel,
+then translate to touch at that point. That degrades gracefully as segment length
+goes to zero, where edge mating degenerates. Prototype it against the laurel
+fixture before wiring anything, and use the same measured cost model: ~19 µs per
+exact validation means a few thousand candidate poses per part is affordable.
+
 ---
 
 ## 5. WP-DP-4 — efficacy

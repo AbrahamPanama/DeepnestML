@@ -4249,6 +4249,164 @@ function localRefinementFineRotationCandidateLegal(sheet, placed, placements, co
 	}
 }
 
+/*
+ * DP-3: direct off-grid poses.
+ *
+ * Fine rotation already sweeps small deltas about a pivot. What a canonical grid
+ * — and a delta sweep — cannot express is a LARGE off-grid angle derived from a
+ * neighbour's geometry: rotate so a long edge lies antiparallel to a neighbour's
+ * long edge, then slide flush. That is the pose family that makes slender parts
+ * lie along one another instead of fanning.
+ *
+ * Every pose here is validated by `localRefinementPoseLegal` (exact geometry, no
+ * NFP), so arbitrary angles are safe. Like fine rotation, this must run AFTER the
+ * NFP-consuming operators: once a part carries an off-grid rotation, any later
+ * NFP lookup for it fails closed on the Phase 0 guard.
+ */
+function localRefinementDirectPoseCandidates(sheet, placed, placements, config, index){
+	var poses = [];
+	if(typeof PoseGenerator === 'undefined'){
+		return poses;
+	}
+	var maxNeighbours = Math.max(1, parseInt(config.directPoseMaxNeighbours, 10) || 4);
+	var maxEdges = Math.max(1, parseInt(config.directPoseMaxEdges, 10) || 6);
+	var window = localRefinementOverlapRepairWindow(placed, placements, index, maxNeighbours);
+	var options = {
+		maxEdges: maxEdges,
+		// Spacing is already baked into the polygons before they reach the
+		// worker, so mated edges touch at zero additional separation.
+		separation: 0,
+		slideSamples: Math.max(2, parseInt(config.directPoseSlideSamples, 10) || 12)
+	};
+	for(var w=0; w<window.length; w++){
+		var j = window[w];
+		var mated = PoseGenerator.edgeMatingPoses(
+			placed[index], placements[index], placed[j], placements[j], options
+		);
+		for(var m=0; m<mated.length; m++){
+			poses.push(mated[m]);
+		}
+	}
+	// Alignment pressure: for repeated slender parts the dense answer is agreement,
+	// not thirty independent diagonals. Without this the generator can rebuild the
+	// very fan artefact it exists to remove.
+	var dominant = localRefinementDominantSourceRotation(placed, placements, index);
+	if(dominant !== null){
+		var siblings = PoseGenerator.siblingPoses(placements[index], dominant);
+		for(var s=0; s<siblings.length; s++){
+			poses.push(siblings[s]);
+		}
+	}
+	return poses;
+}
+
+function localRefinementDominantSourceRotation(placed, placements, index){
+	var source = placed[index] && placed[index].source;
+	if(typeof source === 'undefined'){
+		return null;
+	}
+	var counts = {};
+	var best = null;
+	var bestCount = 0;
+	for(var i=0; i<placed.length; i++){
+		if(i === index || !placed[i] || placed[i].source !== source){
+			continue;
+		}
+		var rotation = normalizedRotation(placements[i].rotation || 0);
+		var key = String(Math.round(rotation * 1000) / 1000);
+		counts[key] = (counts[key] || 0) + 1;
+		if(counts[key] > bestCount){
+			bestCount = counts[key];
+			best = Number(key);
+		}
+	}
+	return best;
+}
+
+function localRefinementTryDirectPose(sheet, placed, placements, config, index, currentMetric, deadline, stats){
+	var result = {moved: false, metric: currentMetric};
+	if(!config || config.localRefinementDirectPoses !== true || typeof PoseGenerator === 'undefined'){
+		return result;
+	}
+	if(localRefinementFineRotationHasHoleRisk(placed, placements, config, index)){
+		return result;
+	}
+	var operatorStats = stats ? localRefinementEnsureSmartStats(stats) : null;
+	var poses = localRefinementDirectPoseCandidates(sheet, placed, placements, config, index);
+	if(poses.length === 0){
+		return result;
+	}
+	if(stats){
+		stats.directPoseGenerated = (stats.directPoseGenerated || 0) + poses.length;
+	}
+
+	var snapshotPlaced = localRefinementCopyPlaced(placed);
+	var snapshotPlacements = localRefinementCopyPlacements(placements);
+	var originalPart = placed[index];
+	var originalPlacement = clonePlacementPosition(placements[index]);
+
+	// Rank cheaply before spending exact tests: contact scoring is sampled
+	// distance, an exact Clipper test is ~19 us (measured RC-2).
+	var ranked = PoseGenerator.rankPoses(poses, function(pose){
+		var part = localRefinementRotatedPartForRotation(originalPart, pose.rotation);
+		placed[index] = part;
+		localRefinementSetPlacementPosition(placements[index], pose);
+		placements[index].rotation = part.rotation;
+		var score = localRefinementWindowPartContact(sheet, placed, placements, config, index);
+		placed[index] = originalPart;
+		localRefinementSetPlacementPosition(placements[index], originalPlacement);
+		placements[index].rotation = originalPlacement.rotation;
+		return score;
+	}, Math.max(1, parseInt(config.directPoseMaxCandidates, 10) || 24));
+
+	for(var p=0; p<ranked.length && Date.now() < deadline; p++){
+		if(operatorStats){
+			operatorStats.directPose.tried++;
+		}
+		if(stats){
+			stats.directPoseTried = (stats.directPoseTried || 0) + 1;
+		}
+		var candidatePart = localRefinementRotatedPartForRotation(originalPart, ranked[p].rotation);
+		if(!localRefinementPoseLegal(sheet, placed, placements, config, index, candidatePart, ranked[p], null)){
+			continue;
+		}
+		if(stats){
+			stats.directPoseLegal = (stats.directPoseLegal || 0) + 1;
+		}
+		placed[index] = candidatePart;
+		localRefinementSetPlacementPosition(placements[index], ranked[p]);
+		placements[index].rotation = candidatePart.rotation;
+
+		var primaryAfter = localRefinementAcceptanceMetric(sheet, placed, placements, config);
+		var acceptance = primaryAfter === null ? {accepted: false} : localRefinementAcceptanceCandidate(
+			sheet, snapshotPlaced, snapshotPlacements, placed, placements, config, [index], currentMetric, primaryAfter, stats
+		);
+		if(!acceptance.accepted || !localRefinementFinalLayoutLegalForRotations(sheet, placed, placements, config)){
+			localRefinementRestorePlaced(placed, snapshotPlaced);
+			localRefinementRestorePlacements(placements, snapshotPlacements);
+			continue;
+		}
+		if(operatorStats){
+			operatorStats.directPose.accepted++;
+		}
+		if(stats){
+			stats.directPoseAccepted = (stats.directPoseAccepted || 0) + 1;
+			stats.movesAccepted = (stats.movesAccepted || 0) + 1;
+			var delta = localRefinementAngularDistance(originalPlacement.rotation || 0, ranked[p].rotation);
+			if(typeof stats.directPoseMaxDeltaDeg !== 'number' || delta > stats.directPoseMaxDeltaDeg){
+				stats.directPoseMaxDeltaDeg = delta;
+			}
+		}
+		result.moved = true;
+		result.metric = acceptance.primary;
+		return result;
+	}
+
+	localRefinementRestorePlaced(placed, snapshotPlaced);
+	localRefinementRestorePlacements(placements, snapshotPlacements);
+	return result;
+}
+
 function localRefinementTryFineRotate(sheet, placed, placements, config, index, currentMetric, deadline, stats){
 	var operatorStats = stats ? localRefinementEnsureSmartStats(stats) : null;
 	if(localRefinementFineRotationHasHoleRisk(placed, placements, config, index)){
@@ -4696,7 +4854,8 @@ function localRefinementEnsureSmartStats(stats){
 			relocate: {tried: 0, accepted: 0},
 			swap: {tried: 0, accepted: 0},
 			fineRotate: {tried: 0, accepted: 0},
-			overlapRepair: {tried: 0, accepted: 0}
+			overlapRepair: {tried: 0, accepted: 0},
+			directPose: {tried: 0, accepted: 0}
 		};
 	}
 	else{
@@ -4726,6 +4885,9 @@ function localRefinementEnsureSmartStats(stats){
 		}
 		if(!stats.operatorStats.overlapRepair){
 			stats.operatorStats.overlapRepair = {tried: 0, accepted: 0};
+		}
+		if(!stats.operatorStats.directPose){
+			stats.operatorStats.directPose = {tried: 0, accepted: 0};
 		}
 	}
 	return stats.operatorStats;
@@ -8761,6 +8923,11 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.rasterExactMs = 0;
 	stats.rasterBuildMs = 0;
 	stats.rasterMasksBuilt = 0;
+	stats.directPoseGenerated = 0;
+	stats.directPoseTried = 0;
+	stats.directPoseLegal = 0;
+	stats.directPoseAccepted = 0;
+	stats.directPoseMaxDeltaDeg = 0;
 	stats.mergeCreditRejects = 0;
 	localRefinementEnsureSmartStats(stats);
 
@@ -8892,6 +9059,22 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 				var repaired = localRefinementTryOverlapRepair(sheet, placed, placements, config, order[t], currentMetric, deadline, stats);
 				if(repaired.moved){
 					currentMetric = repaired.metric;
+					madeProgress = true;
+				}
+			}
+		}
+
+		// Direct off-grid poses run last in the pass, for the same reason fine
+		// rotation does: once a part carries a non-canonical rotation, any later
+		// NFP lookup for it fails closed on the Phase 0 guard. Validation here is
+		// exact geometry only, so the angle may be arbitrary.
+		if(config.localRefinementDirectPoses === true && Date.now() < deadline){
+			order = localRefinementSmartTargetOrder(placed, placements, config);
+			targetLimit = Math.min(order.length, Math.max(1, parseInt(config.directPoseMaxTargets, 10) || 6));
+			for(t=0; t<targetLimit && Date.now() < deadline; t++){
+				var posed = localRefinementTryDirectPose(sheet, placed, placements, config, order[t], currentMetric, deadline, stats);
+				if(posed.moved){
+					currentMetric = posed.metric;
 					madeProgress = true;
 				}
 			}
@@ -9045,7 +9228,7 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'legalityPredicateDisagreements', 'legalityDisagreementNfpStricter', 'legalityDisagreementMaterialStricter', 'mergeCreditRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'continuousAnglesEvaluated', 'continuousPosesScored', 'continuousProxyRejects', 'continuousExactChecks', 'continuousExactMs', 'continuousMovesAccepted', 'continuousElapsedMs', 'continuousSkippedHoles', 'continuousTargetsConsidered', 'continuousTargetsAttempted', 'continuousTargetsScouted', 'continuousTargetsExploited', 'continuousTaskBudgetMs', 'continuousClusterAttempts', 'continuousClusterExactChecks', 'continuousClusterFailures', 'continuousClusterLegalLayouts', 'continuousClusterAccepted', 'continuousClusterPartsMoved', 'wholeClusterAttempts', 'wholeClusterCandidates', 'wholeClusterProxyChecks', 'wholeClusterExactChecks', 'wholeClusterLegalLayouts', 'wholeClusterAccepted', 'wholeClusterPartsMoved', 'windowedRebuildAttempts', 'windowedRebuildRegionComputations', 'windowedRebuildEmptyRegions', 'windowedRebuildCandidates', 'windowedRebuildExactChecks', 'windowedRebuildAccepted', 'windowedRebuildSignaturesSkipped', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines', 'contactBefore', 'contactAfter', 'contactRelativeImprovement', 'plateauAccepted', 'plateauRejectedRevisit', 'overlapRepairAttempts', 'overlapRepairPosesScored', 'overlapRepairSeparationFeasible', 'overlapRepairInfeasible', 'overlapRepairRejected', 'overlapRepairAccepted', 'overlapRepairNoIntrusion', 'rasterSamples', 'rasterAgree', 'rasterAmbiguous', 'rasterDisagreeUnsafe', 'rasterDisagreeConservative', 'rasterQueryMs', 'rasterExactMs', 'rasterBuildMs', 'rasterMasksBuilt'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'legalityPredicateDisagreements', 'legalityDisagreementNfpStricter', 'legalityDisagreementMaterialStricter', 'mergeCreditRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'continuousAnglesEvaluated', 'continuousPosesScored', 'continuousProxyRejects', 'continuousExactChecks', 'continuousExactMs', 'continuousMovesAccepted', 'continuousElapsedMs', 'continuousSkippedHoles', 'continuousTargetsConsidered', 'continuousTargetsAttempted', 'continuousTargetsScouted', 'continuousTargetsExploited', 'continuousTaskBudgetMs', 'continuousClusterAttempts', 'continuousClusterExactChecks', 'continuousClusterFailures', 'continuousClusterLegalLayouts', 'continuousClusterAccepted', 'continuousClusterPartsMoved', 'wholeClusterAttempts', 'wholeClusterCandidates', 'wholeClusterProxyChecks', 'wholeClusterExactChecks', 'wholeClusterLegalLayouts', 'wholeClusterAccepted', 'wholeClusterPartsMoved', 'windowedRebuildAttempts', 'windowedRebuildRegionComputations', 'windowedRebuildEmptyRegions', 'windowedRebuildCandidates', 'windowedRebuildExactChecks', 'windowedRebuildAccepted', 'windowedRebuildSignaturesSkipped', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines', 'contactBefore', 'contactAfter', 'contactRelativeImprovement', 'plateauAccepted', 'plateauRejectedRevisit', 'overlapRepairAttempts', 'overlapRepairPosesScored', 'overlapRepairSeparationFeasible', 'overlapRepairInfeasible', 'overlapRepairRejected', 'overlapRepairAccepted', 'overlapRepairNoIntrusion', 'rasterSamples', 'rasterAgree', 'rasterAmbiguous', 'rasterDisagreeUnsafe', 'rasterDisagreeConservative', 'rasterQueryMs', 'rasterExactMs', 'rasterBuildMs', 'rasterMasksBuilt', 'directPoseGenerated', 'directPoseTried', 'directPoseLegal', 'directPoseAccepted'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
 	}
@@ -9072,6 +9255,9 @@ function mergeLocalRefinementStats(total, stats){
 	}
 	if(typeof stats.overlapRepairMaxInitialDepth === 'number'){
 		total.overlapRepairMaxInitialDepth = Math.max(total.overlapRepairMaxInitialDepth || 0, stats.overlapRepairMaxInitialDepth);
+	}
+	if(typeof stats.directPoseMaxDeltaDeg === 'number'){
+		total.directPoseMaxDeltaDeg = Math.max(total.directPoseMaxDeltaDeg || 0, stats.directPoseMaxDeltaDeg);
 	}
 	if(typeof stats.continuousMaxAngleDeltaDeg === 'number'){
 		total.continuousMaxAngleDeltaDeg = Math.max(total.continuousMaxAngleDeltaDeg || 0, stats.continuousMaxAngleDeltaDeg);
