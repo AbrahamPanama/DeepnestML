@@ -243,7 +243,56 @@ which converts a locally-touching-but-globally-overlapping pose into the nearest
 genuinely legal one. At ~19 µs per exact test, a 34-step bisection costs ~0.65 ms,
 so it is affordable on the top-ranked few dozen poses per target.
 
-That is the next thing to try, and it is a small increment on what exists: the
+### 4.3 Slide-to-contact repair — first legal poses, still none accepted (2026-07-25)
+
+Implemented as `localRefinementSlideToLegal`: push the pose away from the nearest
+overlapping neighbour in 16 samples up to one bbox diagonal, then bisect 18 times
+back to the SMALLEST legal push — the nearest legal placement to the one the
+generator wanted. Exact predicate throughout, valid at any rotation.
+
+Laurel four-part fixture, repair budget 40 per target:
+
+| stage | count |
+|---|---|
+| poses generated | 8,652 |
+| validated | 304 |
+| repair attempted | 44 |
+| **repaired to legal** | **2** |
+| passed acceptance | **0** |
+
+**This is the first time any off-grid pose in this arc reached legality** — edge
+mating and contact walking produced 0 from ~15,000 combined. So repair is the
+right mechanism and §4.2's diagnosis was correct.
+
+Two things it also shows:
+
+1. **Repair succeeds rarely: 2/44 (4.5 %).** Pushing along a single direction —
+   away from the nearest overlapping neighbour — usually fails to find legality
+   within one bbox diagonal, because a concave part interpenetrating several arms
+   at once has no single separating direction. A multi-direction push, or a push
+   along the exact penetration-depth exit vector (`SeparationUtil.penetration`
+   already computes one, though it needs an NFP), would likely raise this.
+2. **Legal is not better.** Both repaired poses were rejected by acceptance.
+   That is coherent rather than surprising: sliding out to legality moves the part
+   *away* from the pack, which lowers contact and the primary metric, so the
+   repaired pose ends up worse than where the part already sat. Repair finds the
+   nearest legal pose to an over-ambitious one — it does not make that pose good.
+
+**Assessment.** The generate → rank → validate → repair → accept chain is now
+complete and every link is verified, but the poses it yields on this geometry are
+legal-and-worse. Before spending more here, weigh it against the **pre-mated
+superpart** route: compute a two-part interlock offline once, at continuous
+precision and without budget pressure, then let the existing NFP placer treat the
+pair as one rigid part. That obtains the interlocking angle by construction rather
+than by search, and it uses NFP's global guarantee instead of trying to replace it
+— which §4.2 showed is the wall for concave parts.
+
+The remaining increment here, if continued: multi-direction repair (§4.3 item 1).
+Do that before any further pose family.
+
+---
+
+The original successor note: this is a small increment on what exists: the
 generator, the validator, the ranking, the acceptance rule, and the wiring are all
 in place and verified. **Do not add a third pose family before adding repair** —
 the evidence says families are not the bottleneck.

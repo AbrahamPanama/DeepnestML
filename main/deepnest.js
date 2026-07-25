@@ -59,6 +59,7 @@
 			directPoseMaxCandidates: 24,
 			directPoseSlideSamples: 12,
 			directPoseContactSamples: 16,
+			directPoseRepairBudget: 8,
 			directPoseTangentWindow: 0.05,
 			rasterDivisor: 64,
 			rasterTargetAmbiguity: 0.30,
