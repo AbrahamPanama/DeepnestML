@@ -625,6 +625,32 @@ function loadLaurelPolygon() {
 	return laurelPathPolygon(match[1], 0.3);
 }
 
+function testResolutionPolicies() {
+	function rect(w, h) {
+		return [{x: 0, y: 0}, {x: w, y: 0}, {x: w, y: h}, {x: 0, y: h}];
+	}
+	// Shape rule adapts to perimeter-to-area: slender parts get finer pixels
+	// relative to their own size than compact ones.
+	const compact = RasterCollision.chooseShapePixelSize([rect(100, 100)], 0.3, 0.3);
+	const slender = RasterCollision.chooseShapePixelSize([rect(1000, 20)], 0.3, 0.3);
+	assert.ok(compact > slender, 'slender parts must receive a finer pixel than compact ones');
+	assert.ok(Math.abs(compact - 0.3 * (100 * 100) / 400) < 1e-9, 'square closed form p = alpha*A/P');
+
+	// Combined rule is the finer of the two and never coarser than either.
+	const polys = [rect(1000, 20)];
+	const bySize = RasterCollision.choosePixelSize(polys, 0.3, 64);
+	const byShape = RasterCollision.chooseShapePixelSize(polys, 0.3, 0.3);
+	const combined = RasterCollision.chooseAdaptivePixelSize(polys, 0.3, 64, 0.3);
+	assert.strictEqual(combined, Math.min(bySize, byShape), 'combined policy must take the finer rule');
+	assert.ok(combined <= bySize && combined <= byShape, 'combined policy is never coarser than either input');
+
+	// Holes count toward both area (removed) and perimeter (added).
+	const withHole = rect(100, 100);
+	withHole.children = [rect(20, 20)];
+	const holed = RasterCollision.chooseShapePixelSize([withHole], 0.3, 0.3);
+	assert.ok(holed < compact, 'a hole removes area and adds boundary, so resolution must get finer');
+}
+
 function measureLaurel() {
 	const polygon = loadLaurelPolygon();
 	const angles = [0, 17, 37, 90];
@@ -633,6 +659,28 @@ function measureLaurel() {
 	let variants;
 	let pixelSize;
 	let counts;
+	const shapeAlphas = [0.20, 0.30, 0.40];
+	const shapePolicy = [];
+	for (const alpha of shapeAlphas) {
+		const shapePixelSize = RasterCollision.chooseShapePixelSize([polygon], 0.3, alpha);
+		const shapeVariants = prepareVariants([polygon], angles, shapePixelSize);
+		const shapeCounts = measurePreparedVariants(shapeVariants, shapePixelSize, 2500, 0x1a0e1);
+		const shapeBytes = shapeVariants.map(maskPairBytes);
+		const meanBytes = shapeBytes.reduce((sum, v) => sum + v, 0) / shapeBytes.length;
+		const laurelBounds = RasterCollision.polygonBounds(polygon);
+		shapePolicy.push({
+			targetAmbiguity: alpha,
+			pixelSize: shapePixelSize,
+			equivalentDivisor: Math.hypot(laurelBounds.width, laurelBounds.height) / shapePixelSize,
+			ambiguityRate: shapeCounts.ambiguityRate,
+			actualFixtureVerdict: RasterCollision.classify(
+				shapeVariants[0].masks.outer, shapeVariants[0].masks.inner, {x: 26000, y: 500},
+				shapeVariants[3].masks.outer, shapeVariants[3].masks.inner, {x: 35000, y: 500}
+			),
+			meanBytesPerPartAngle: meanBytes,
+			projectedBytes24Sources16Angles: meanBytes * 24 * 16
+		});
+	}
 	for (const divisor of divisors) {
 		const resolutionPixelSize = RasterCollision.choosePixelSize(
 			[polygon],
@@ -697,6 +745,7 @@ function measureLaurel() {
 		pixelSize: pixelSize,
 		sampled: counts,
 		resolutionSweep: resolutionSweep,
+		shapePolicy: shapePolicy,
 		actualFixturePair: {
 			verdict: actualVerdict,
 			exactIntersectionArea: actualArea
@@ -725,7 +774,11 @@ function measureEsicup() {
 		const file = files[fileIndex];
 		const json = JSON.parse(fs.readFileSync(path.join(instanceDir, file), 'utf8'));
 		const polygons = json.items.map((item) => normalizeEsicupShape(item.shape));
-		const pixelSize = RasterCollision.choosePixelSize(polygons, 0.3, 64);
+		const pixelSize = process.env.RASTER_ADAPTIVE ?
+			RasterCollision.chooseAdaptivePixelSize(polygons, 0.3, 64, Number(process.env.RASTER_ADAPTIVE)) :
+			(process.env.RASTER_SHAPE_ALPHA ?
+				RasterCollision.chooseShapePixelSize(polygons, 0.3, Number(process.env.RASTER_SHAPE_ALPHA)) :
+				RasterCollision.choosePixelSize(polygons, 0.3, 64));
 		const variants = prepareVariants(polygons, [0], pixelSize);
 		const sampleCount = Math.max(200, Math.min(1000, variants.length * 12));
 		const counts = measurePreparedVariants(
@@ -763,6 +816,8 @@ function measureEsicup() {
 }
 
 runUnitTests();
+testResolutionPolicies();
+
 const report = {
 	soundness: runRandomizedSoundness(),
 	containment: runRandomizedContainment(),

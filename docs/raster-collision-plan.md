@@ -214,6 +214,60 @@ those numbers, prefer the measured divisor and record why.
 Interim fallback if (c) underperforms: adopt divisor 192 globally, accepting ~9x
 the pixels of divisor 64 (3x linear) in both memory and rasterisation time.
 
+### 3.3 Resolution policy — measured outcome (Claude-Code, 2026-07-25)
+
+`chooseShapePixelSize` and `chooseAdaptivePixelSize` are implemented in
+`main/util/raster-collision.js`. The shape rule alone did **not** dominate, so the
+shipped policy is the combination.
+
+Laurel (2,500 deterministic poses, same harness sampling as §3.1):
+
+| policy | pixel | ambiguity | speedup ceiling | proj. 24x16 |
+|---|---|---|---|---|
+| divisor 64 | 199.6 | 55.80 % | ~1.8x | 0.11 MB |
+| divisor 192 | 66.5 | 32.52 % | ~3.0x | 1.44 MB |
+| divisor 256 | 49.9 | 11.44 % | ~7.5x | 2.57 MB |
+| shape alpha=0.40 | 45.1 | 9.64 % | ~9x | 3.05 MB |
+| **shape alpha=0.30** | 33.8 | **6.12 %** | **~14x** | 5.61 MB |
+| shape alpha=0.20 | 22.5 | 3.04 % | ~23x | 12.30 MB |
+
+The crossed-laurel fixture is correctly classified `overlap` at every shape-rule
+setting, and stays `ambiguous` up to divisor 128.
+
+ESICUP corpus (7,968 sampled placements):
+
+| policy | corpus ambiguity | proj. 24x16 |
+|---|---|---|
+| divisor 64 | 18.84 % | 3.92 MB |
+| shape alpha=0.30 alone | **25.89 %** (worse) | — |
+| **min(divisor 64, alpha=0.30)** | **18.64 %** | 3.74 MB |
+
+**The shape rule alone is not a win.** It is decisively better on slender parts
+and *worse* on several compact ESICUP instances, because its calibration model
+(band fraction of a part's own area) does not match the measured quantity
+(fraction of sampled pair placements that are ambiguous). The two rules have
+complementary blind spots, so the shipped policy takes the **finer of the two**:
+
+```
+p = min( minPartBboxDiag / rasterDivisor , alpha * area / perimeter )   clamped
+```
+
+That is never coarser than either input, costs one extra evaluation, and measured
+best-or-equal on both corpora: laurel 6.12 %, ESICUP 18.64 %.
+
+**Note that `alpha` is not a predicted ambiguity.** alpha=0.30 yields ~6 % measured
+on laurel, not 30 %. It is a shape-relative resolution knob whose absolute scale
+was calibrated empirically; do not read it as a target rate.
+
+**Known limitation — the curveTolerance floor.** Pixel size is clamped below at
+`curveTolerance / 2`, so instances whose parts are small relative to
+`curveTolerance` cannot be resolved further and keep a high ambiguity rate:
+shirts 55.5 %, blaz1 43.5 %, jakobs1 40.0 % (each clamp-limited, blaz1 pinned at
+p = 0.15 = 0.3/2). The floor is defensible — the polygon itself is only accurate
+to `curveTolerance` — but it caps what the filter can do on fine-featured jobs.
+If RC-2 shows those instances dominating the fallthrough cost, revisit the floor
+before adding resolution elsewhere.
+
 **Caveat on the measurement itself:** `candidateOffsets` in the harness forces
 25 % of samples into a shallow band 0.25–4 px deep, and every sample is
 bbox-overlapping by construction. That is deliberately adversarial and matches the

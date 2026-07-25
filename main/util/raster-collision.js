@@ -11,6 +11,8 @@
 	'use strict';
 
 	var DEFAULT_RASTER_DIVISOR = 64;
+	// Target ambiguous fraction for the derived resolution policy (plan §3.2).
+	var DEFAULT_TARGET_AMBIGUITY = 0.30;
 	var MORPHOLOGY_RADIUS = 1;
 
 	function finite(value, fallback){
@@ -560,6 +562,107 @@
 		return 'ambiguous';
 	}
 
+	// Signed area (shoelace) and perimeter of a single ring.
+	function ringAreaAbs(ring){
+		if(!ring || ring.length < 3){
+			return 0;
+		}
+		var total = 0;
+		for(var i=0, j=ring.length-1; i<ring.length; j=i++){
+			total += (ring[j].x + ring[i].x) * (ring[j].y - ring[i].y);
+		}
+		return Math.abs(total / 2);
+	}
+
+	function ringPerimeter(ring){
+		if(!ring || ring.length < 2){
+			return 0;
+		}
+		var total = 0;
+		for(var i=0, j=ring.length-1; i<ring.length; j=i++){
+			var dx = ring[i].x - ring[j].x;
+			var dy = ring[i].y - ring[j].y;
+			total += Math.sqrt(dx * dx + dy * dy);
+		}
+		return total;
+	}
+
+	// Derived resolution policy (see docs/raster-collision-plan.md §3.2).
+	//
+	// The ambiguous band is one pixel wide around the boundary, so for material
+	// area A and total boundary length P the ambiguous fraction is ~ P*p/A.
+	// Solving for a target ambiguity alpha gives p = alpha * A / P, which
+	// self-adapts to shape: high perimeter-to-area parts (slender branches) get
+	// fine pixels, compact parts stay coarse, and memory is spent only where it
+	// buys resolution. Holes count toward BOTH terms — they remove material and
+	// add boundary — which is what makes slotted parts behave sensibly.
+	//
+	// Masks in a pair must share a pixel size (see compatiblePixelSize), so the
+	// job-wide size is the most demanding part's.
+	function chooseShapePixelSize(polygons, curveTolerance, targetAmbiguity){
+		polygons = polygons || [];
+		var alpha = finite(targetAmbiguity, DEFAULT_TARGET_AMBIGUITY);
+		if(!(alpha > 0)){
+			alpha = DEFAULT_TARGET_AMBIGUITY;
+		}
+		var smallest = Infinity;
+		var minDiagonal = Infinity;
+		for(var i=0; i<polygons.length; i++){
+			var polygon = polygons[i];
+			var bounds = polygonBounds(polygon);
+			if(!bounds){
+				continue;
+			}
+			var diagonal = Math.sqrt(
+				bounds.width * bounds.width + bounds.height * bounds.height
+			);
+			if(diagonal > 0){
+				minDiagonal = Math.min(minDiagonal, diagonal);
+			}
+			var area = ringAreaAbs(polygon);
+			var perimeter = ringPerimeter(polygon);
+			if(polygon && polygon.children){
+				for(var c=0; c<polygon.children.length; c++){
+					area -= ringAreaAbs(polygon.children[c]);
+					perimeter += ringPerimeter(polygon.children[c]);
+				}
+			}
+			if(!(area > 0) || !(perimeter > 0)){
+				continue;
+			}
+			smallest = Math.min(smallest, alpha * (area / perimeter));
+		}
+		var finest = Math.max(1e-9, finite(curveTolerance, 0) / 2);
+		if(!isFinite(smallest)){
+			return isFinite(minDiagonal) ? Math.max(finest, minDiagonal / 16) : finest;
+		}
+		var coarsest = isFinite(minDiagonal) ? minDiagonal / 16 : smallest;
+		if(finest > coarsest){
+			return coarsest;
+		}
+		return clamp(smallest, finest, coarsest);
+	}
+
+	// Combined policy: take the FINER of the size-based and shape-based rules.
+	//
+	// Measured 2026-07-25, they have complementary blind spots. The size rule
+	// (minDiag/divisor) is calibrated for compact parts and goes far too coarse on
+	// slender ones (laurel 55.8% ambiguous at divisor 64). The shape rule
+	// (alpha*area/perimeter) fixes slender parts (6.12%) but is too coarse for
+	// several compact ESICUP instances (corpus 25.9% vs 18.8%). Neither dominates,
+	// and a min() costs nothing but a second evaluation.
+	function chooseAdaptivePixelSize(polygons, curveTolerance, rasterDivisor, targetAmbiguity){
+		var bySize = choosePixelSize(polygons, curveTolerance, rasterDivisor);
+		var byShape = chooseShapePixelSize(polygons, curveTolerance, targetAmbiguity);
+		if(!isFinite(bySize)){
+			return byShape;
+		}
+		if(!isFinite(byShape)){
+			return bySize;
+		}
+		return Math.min(bySize, byShape);
+	}
+
 	function choosePixelSize(polygons, curveTolerance, rasterDivisor){
 		polygons = polygons || [];
 		rasterDivisor = Math.max(1, finite(
@@ -600,9 +703,12 @@
 		contains: contains,
 		classify: classify,
 		choosePixelSize: choosePixelSize,
+		chooseShapePixelSize: chooseShapePixelSize,
+		chooseAdaptivePixelSize: chooseAdaptivePixelSize,
 		polygonBounds: polygonBounds,
 		maskBytes: maskBytes,
-		DEFAULT_RASTER_DIVISOR: DEFAULT_RASTER_DIVISOR
+		DEFAULT_RASTER_DIVISOR: DEFAULT_RASTER_DIVISOR,
+		DEFAULT_TARGET_AMBIGUITY: DEFAULT_TARGET_AMBIGUITY
 	};
 
 	root.RasterCollision = api;
