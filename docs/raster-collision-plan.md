@@ -1,6 +1,8 @@
 # Raster Collision Tier — "make fine rotation affordable" — Implementation Plan
 
-Status: PLAN — not started. Motivated by a measured wall, not a hunch: see §1.
+Status: RC-1 implemented and measured 2026-07-25. Soundness passed; the
+divisor-64 laurel ambiguity gate failed, so RC-2 is blocked pending an explicit
+resolution-policy amendment. See §3.1.
 
 Author: Claude-Code, 2026-07-25 (against commit `7360de2`, product 0.8.0).
 
@@ -131,6 +133,98 @@ contains(sheetMask, partOuter, offset) -> boolean          // containment test
    of this plan is not worth doing at that rate.
 3. Memory: report bytes per part per angle at the chosen resolution, and the
    projected total for 24 sources x 16 angles.
+
+### 3.1 RC-1 measured outcome (2026-07-25)
+
+Implementation: `main/util/raster-collision.js`, loaded by both renderer
+contexts but not wired into engine decisions. The module uses conservative
+cell-boundary coverage, even/odd scanline filling, one-cell dilation/erosion,
+packed `Uint32Array` rows, and overlap-window word ANDs.
+
+- Randomised soundness: 5,000 polygon pairs, covering convex, concave, and
+  hole-bearing inputs at random subpixel offsets. `outer` made 1,623 disjoint
+  decisions and `inner` made 1,669 overlap decisions with **0 unsafe decisions
+  in either direction**. A separate 1,000-placement containment audit produced
+  239 conservative accepts with **0 outside-part accepts**.
+- ESICUP ambiguity at divisor 64: **18.84%** across 7,968 sampled candidate-like
+  placements. Mean storage was 10,218 bytes per part-angle; the 24-source x
+  16-angle mean projection was 3.92 MB.
+- Laurel ambiguity at divisor 64: **55.80%**, above the 40% off-ramp. The
+  actual crossed fixture pair was also ambiguous despite 538,655 square units
+  of exact intersection. RC-2 must therefore not start under the written
+  divisor-64 default.
+- Resolution diagnosis (same deterministic 2,500 laurel poses): divisor 96
+  52.72%, divisor 128 50.40%, divisor 192 **32.52%**, divisor 256 **11.44%**.
+  The actual crossed pair becomes a proven overlap at 192. Laurel storage at
+  192 averaged 3,935 bytes per part-angle (1.51 MB for 24 x 16); at 256 it
+  averaged 7,025 bytes (2.70 MB for 24 x 16).
+
+Decision: **stop after RC-1 as originally specified.** The result does not
+invalidate raster filtering, but it invalidates divisor 64 for the target
+shape. Before RC-2, amend the policy explicitly to a finer or shape-aware
+resolution and measure its corpus-wide memory/rasterisation cost; do not
+silently reinterpret the existing gate.
+
+### 3.2 Policy amendment (Claude-Code, 2026-07-25)
+
+RC-1 stopping was correct. Three corrections follow, one of them to the gate
+itself.
+
+**(a) The 40 % off-ramp conflated two objectives — author error.** §3 gate 2
+says "the rest of this plan is not worth doing at that rate." That is wrong as
+written. Ambiguity governs how much the filter *accelerates search*; it does not
+govern the *fine-rotation unlock*, which is this plan's actual purpose. Testing a
+1° pose through raster-plus-exact-fallback avoids computing an NFP at that angle
+**at any ambiguity rate** — even at 55.8 %, the fallback is a Clipper intersection
+rather than a Minkowski sum plus a persistent cache write. So the threshold should
+gate **RC-3's speedup claim**, not RC-4's capability. Re-read it that way.
+
+**(b) Ambiguity is a hard ceiling on speedup, and the ceiling is modest.** With
+raster ~100x cheaper than exact, achievable speedup is `1 / (a + (1-a)/100)`:
+
+| case | ambiguity | speedup ceiling |
+|---|---|---|
+| laurel, divisor 64 | 55.8 % | ~1.8x |
+| laurel, divisor 192 | 32.5 % | ~3.0x |
+| ESICUP, divisor 64 | 18.8 % | ~5.1x |
+
+Nobody should expect 10x from this tier. RC-3 should state its achieved figure
+against these ceilings rather than against an invented target — the v4 §4.6
+mistake, restated so it is not made a third time.
+
+**(c) Replace the global divisor with a derived per-part resolution.** A global
+divisor forces slender and chunky parts to the same relative resolution, but the
+ambiguity band is one pixel wide *around the perimeter*, so for a part of area `A`
+and perimeter `P` the ambiguous fraction is approximately `P·p / A`. Solving for a
+target ambiguity `α` gives a closed form:
+
+```
+p_part = alpha * (area / perimeter)         // clamp to [curveTolerance/2, bboxDiag/16]
+```
+
+This self-adapts in exactly the direction the measurements demand: high
+perimeter-to-area parts (laurel branches) get fine pixels automatically, compact
+parts stay coarse, and memory is spent only where it buys something. It is also
+derived rather than tuned, so it should generalise to part libraries nobody has
+benchmarked. **Validate it against the empirical datapoints already collected** —
+at `alpha = 0.30` it should land near the divisor-192 behaviour on laurel and
+remain coarser than divisor 64 on compact ESICUP parts. If it does not reproduce
+those numbers, prefer the measured divisor and record why.
+
+Interim fallback if (c) underperforms: adopt divisor 192 globally, accepting ~9x
+the pixels of divisor 64 (3x linear) in both memory and rasterisation time.
+
+**Caveat on the measurement itself:** `candidateOffsets` in the harness forces
+25 % of samples into a shallow band 0.25–4 px deep, and every sample is
+bbox-overlapping by construction. That is deliberately adversarial and matches the
+population a spatial prefilter would hand the tier, but it over-weights near-contact
+poses relative to a real run, where rejections are dominated by *deep* overlaps.
+Treat the reported rates as **upper bounds**.
+
+**Consequence for RC-2:** its gate must measure **net** time — mask construction
+plus queries versus exact-only — not ambiguity alone. At 9x rasterisation cost, a
+tier that resolves 67 % of queries can still lose overall if masks are rebuilt too
+often. Report build time, query time, and the net, per instance.
 
 ---
 

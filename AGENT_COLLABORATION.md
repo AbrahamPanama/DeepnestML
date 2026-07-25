@@ -86,7 +86,9 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-25 by Codex): dirty — Local Refinement v4 implementation and verification are complete but uncommitted; generated benchmark-result JSONs remain untracked by convention.
+State (verified 2026-07-25 by Codex): dirty — RC-1 implementation and measured
+stop report are uncommitted; generated benchmark-result JSONs remain untracked
+by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -96,6 +98,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
 | Codex | Four-part continuous compaction efficacy | continuous refinement engine, exact 2+2 laurel fixture/smoke gate, `AGENT_COLLABORATION.md` | Completed: bounded whole-cluster rebuild produces a visibly tighter exact-legal result; deterministic and live-product gates green | 2026-07-10 |
@@ -158,6 +161,31 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-25 - RC-1 raster collision gate stops at the proposed default (Codex)
+
+- Added the pure UMD `main/util/raster-collision.js` module and loaded it in the
+  visible and background renderer contexts. There is no engine-decision wiring
+  in RC-1.
+- The rasteriser marks every polygon-boundary cell, fills material with an
+  even/odd scanline, dilates `outer` one cell, erodes wholly interior `inner`
+  cells one cell, and compares only overlapping packed-word windows. Hole rings
+  subtract through even/odd semantics. Continuous offsets are rounded to the
+  shared grid; conservative margins absorb the subpixel residual.
+- `ml/tests/raster_collision/run.js` uses Clipper as an independent oracle over
+  5,000 deterministic convex, concave, and hole-bearing random pairs. Results:
+  1,623 proven disjoint, 1,669 proven overlapping, 1,708 ambiguous, **0 unsafe
+  outer decisions and 0 unsafe inner decisions**. An additional 1,000-placement
+  containment audit exercised 239 fast accepts with 0 unsafe accepts.
+- Real-part gate: ESICUP aggregate ambiguity was 18.84%, but the target laurel
+  fixture was 55.80% at the specified divisor 64, and its actual deeply crossed
+  pair remained ambiguous. The test exits non-zero on this intentional gate.
+- Diagnostic only: divisor 192 lowers laurel ambiguity to 32.52% and correctly
+  resolves the actual crossed pair, averaging 3,935 bytes per laurel part-angle
+  (1.51 MB projected for 24 sources x 16 angles). Divisor 256 reaches 11.44% at
+  7,025 bytes per part-angle. Neither replaces the written default yet.
+- Per plan, stop before RC-2. Next decision is an explicit resolution-policy
+  amendment plus corpus-wide cost measurement, not shadow engine wiring.
 
 ### 2026-07-25 - v4 blocked-gate re-diagnosis: legality is the wall (Claude-Code)
 
