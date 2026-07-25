@@ -45,6 +45,121 @@ local fit**, which it currently cannot do at all.
   run. See the 2026-07-25 handoff in `AGENT_COLLABORATION.md` for commands and
   benchmark artifact names.
 
+## Follow-up findings (Claude-Code, 2026-07-25) — both blocked gates re-diagnosed
+
+**1. §4.5 rested on a false premise, and the 10× gate was therefore unreachable by
+design (author error).** §4.5 assumed `localRefinementMaterialOverlap` runs "per
+neighbour per candidate" and therefore dominates the hot path. It does not. The
+neighbour loop returns as soon as the NFP predicate reports penetration
+(`if(nfpOverlap) return false;` precedes the material call), so the exact Clipper
+check only ever executes for candidates the NFP has *already* declared legal.
+
+Measured on albano at a 10 s budget with `v4FastLegality` ON: **887 candidate
+evaluations vs 981 with it OFF** — no gain, slightly worse, i.e. noise. Removing a
+check that was already short-circuited for ~98 % of candidates cannot speed anything
+up. The correct reading of the 1.65 × result is therefore **not** "blocked by §4.5";
+it is "§4.5 was never worth ~8× of the gate." The gate should be deleted and replaced
+after a real profile of the hot path (prime suspects: `getOuterNfp` cache lookups and
+`SeparationUtil.penetration`, both of which run on every neighbour of every
+candidate, unlike the material check).
+
+The earlier observation that enabling `v4LegalityShadow` makes albano miss its time
+budget is consistent with this and does **not** contradict it: shadow mode
+deliberately disables the early return so that *both* predicates run on *every*
+candidate, which is precisely the workload the normal path avoids.
+
+**2. The predicate disagreements are entirely in the SAFE direction, which unblocks
+§4.5.** The original instrumentation counted disagreements without recording their
+*direction*, and `attemptDiagnostics` is capped at 12 — so the raw total could not
+distinguish "NFP is over-conservative" (harmless) from "NFP permits an actual
+overlap" (unsafe). Directional counters were added
+(`legalityDisagreementNfpStricter` / `legalityDisagreementMaterialStricter`).
+
+Measured on `svg-laurel-continuous-four` with the shadow audit on:
+
+| metric | count |
+|---|---|
+| total disagreements | 269 |
+| NFP stricter — NFP forbids, exact geometry says legal (**safe**) | **269** |
+| material stricter — NFP permits, parts actually overlap (**unsafe**) | **0** |
+
+All twelve captured diagnostics show `nfpOverlap=true, materialOverlap=false` at
+penetration depths of 3.8e-4 … 9.0e-4 — 13–30× the legality epsilon (3e-5), so these
+are not borderline tolerance cases. **The NFP is over-conservative on concave parts.**
+`v4FastLegality` only skips the exact check when the NFP already says *legal*, so on
+this evidence it cannot introduce an overlap; the unsafe direction was never observed.
+
+Disagreements are also strongly localised: 402 / 4 / 2 in the three laurel fixtures
+and **0 in all other smoke scenarios** — consistent with §10 trap 5 (both NFP
+producers reduce a multi-polygon Minkowski result to the largest-area ring and
+discard the rest; dropping an NFP hole enlarges the forbidden region, which is
+precisely an over-conservative NFP on a concave part). This is a real density cost
+on exactly the branch/laurel geometry the user cares about, and is worth its own WP.
+
+**3. The `shapes0` exported sliver is a specification mismatch, not necessarily a
+defect.** The engine's legality epsilon is `1e-4 × curveTolerance` = **3e-5** at the
+default `curveTolerance: 0.3` — the engine *explicitly permits* penetration up to
+that depth. `ml/tests/benchmark_legality` asserts `maxIntersectionArea === 0`, i.e.
+zero tolerance. The reported sliver area `5.026835e-5` is what a **1.68-unit-long**
+contact edge at exactly the permitted depth produces. Chasing exact-zero overlap in
+floating-point polygon geometry is not achievable and, at this magnitude, not
+physically meaningful. Decide the contract first: one epsilon, derived from
+`curveTolerance` (or better, from physical spacing/kerf), applied consistently by the
+NFP predicate, the material backstop, and the export audit — then re-run the gate.
+
+**3b. The binding constraint on dense sheets is LEGALITY, not acceptance and not
+speed.** This is the most important measurement of the session and it partially
+corrects the §0 diagnosis. Candidate dispositions on albano:
+
+| configuration | evaluations | reached scoring | rejected as illegal | utilisation |
+|---|---|---|---|---|
+| shipped smart (seeded) | 942 | 19 | 923 (98.0 %) | 0.798528 |
+| v4 contact acceptance ON | 117–126 | 12 | 105–114 (89.7 %) | 0.798528 |
+| v4 fast legality ON | 887 | 4 | 883 (99.5 %) | 0.798528 |
+
+Two things follow. First, **~98 % of candidates never reach the objective function at
+all** — they are killed by the legality predicate first. An acceptance-rule change
+cannot help a candidate that is never scored, and a throughput change only buys more
+rejections. Second, **utilisation is bit-identical (0.798528) across every
+configuration tried**, including shipped-smart: on this instance refinement is not
+changing the outcome under any flag combination.
+
+This does not invalidate WP-V4.1 — the laurel fixture (4 parts, ample free space,
+45° accepted, 24.88 % continuous improvement) proves contact acceptance works *where
+legal moves exist*. It localises the remaining problem: on a densely packed sheet
+there is essentially **no legal single-part move**, which is the same structural point
+recorded at the very start of this work ("in a contact-packed sheet there is no legal
+rigid rotation of meaningful size"). Sparse layouts are acceptance-limited; dense
+layouts are legality-limited.
+
+**Recommended order from here (revised by the measurements above):**
+(a) settle the legality-tolerance contract §3 — still worth doing, it unblocks the
+    corpus safety gate and is cheap;
+(b) **profile the hot path before optimising it further** — §4.5 is dead, and the
+    remaining per-candidate cost is unmeasured. Do not add another speed WP on
+    assumption;
+(c) invest in **move types that do not require a legal single-part move**, because
+    that is the actual wall on dense sheets: larger-window ruin-and-recreate (WP-V4.4
+    with k well above the current window), and/or the overlap-then-repair formulation
+    (allow temporary penetration, minimise depth, require legality only at commit —
+    the `SeparationUtil` machinery already exists for this);
+(d) the harvest pass in item 4 below, which is what converts any densification into
+    utilisation.
+`v4FastLegality` may be left enabled or removed on taste — it is safe (item 2) but
+buys nothing (item 1). Composing the spatial index with `skip` (three of the five
+`localRefinementSinglePlacementLegal` call sites bypass it) remains a genuine but
+now lower-priority throughput item.
+
+**4. Why contact moves are not converting to utilisation (design gap in this plan).**
+Densification frees space in the *interior*; utilisation only improves when the
+*frontier* contracts. No operator currently takes a frontier part and moves it into a
+void that densification just created, so contact gains have no path to the primary
+metric. Contact was specified as a stepping stone and the step that cashes it in was
+never specified. The missing piece is a **harvest pass**: after contact densification,
+attempt relocation of frontier-most parts into newly-freed interior regions, accepted
+on the *primary* metric. This is an extension of the existing relocate operator, not
+new machinery, and it is the actual efficacy hypothesis to test.
+
 ---
 
 ## 0. TL;DR for the implementing agent

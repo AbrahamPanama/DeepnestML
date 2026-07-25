@@ -158,6 +158,49 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 
 Use newest notes at the top.
 
+### 2026-07-25 - v4 blocked-gate re-diagnosis: legality is the wall (Claude-Code)
+
+- Committed Codex's v4 implementation as `6855b74` after verifying it (flag-off
+  equivalence, engine bugfixes, six new v4 suites, boot check all green).
+- Added directional disagreement counters (`legalityDisagreementNfpStricter` /
+  `legalityDisagreementMaterialStricter`) because the existing single total could not
+  distinguish a harmless over-conservative NFP from an unsafe permissive one, and
+  `attemptDiagnostics` caps at 12 so the split could not be inferred from samples.
+- **Disagreement direction is 100% safe.** `svg-laurel-continuous-four` with the
+  shadow audit on: 269 total, 269 NFP-stricter, **0 material-stricter**. Captured
+  depths 3.8e-4…9.0e-4 (13–30x the 3e-5 legality epsilon, so not borderline). albano
+  at a 45 s budget: 0 disagreements of any kind. Disagreements are exclusive to the
+  concave laurel geometry — consistent with the largest-area NFP ring reduction noted
+  in the v4 plan §10 trap 5, which enlarges the forbidden region on concave parts.
+  `v4FastLegality` is therefore safe; the unsafe direction was never observed.
+- **But fast legality buys nothing, because plan §4.5 rested on a false premise.**
+  The neighbour loop returns on NFP penetration *before* the material check, so the
+  exact Clipper test only runs for candidates the NFP already passed (~2%). Measured
+  on albano 10 s: 887 evaluations with the flag ON vs 981 OFF — no gain. The 10x
+  throughput gate was unreachable by construction and should be replaced only after a
+  real hot-path profile (`getOuterNfp` lookups and `SeparationUtil.penetration` run on
+  every neighbour of every candidate; the material check does not).
+- **The real wall on dense sheets is legality, not acceptance or speed.** albano
+  candidate dispositions: shipped-smart 942 evaluations / 19 scored / 923 illegal
+  (98.0%); v4 contact-on 117 / 12 / 105; v4 fast-legality-on 887 / 4 / 883 (99.5%).
+  ~98% of candidates never reach the objective at all. Utilization is bit-identical
+  at `0.798528` across every configuration including shipped-smart. WP-V4.1 is still
+  validated by the laurel fixture (sparse, legal moves exist, 45 deg accepted); dense
+  layouts are limited upstream at legality. Next investment should be move types that
+  do not need a legal single-part move (larger-window ruin-and-recreate, or
+  overlap-then-repair via the existing SeparationUtil penetration machinery).
+- The `shapes0` exported sliver (area 5.026835e-5) is a specification mismatch, not a
+  proven defect: the engine permits penetration up to `1e-4 x curveTolerance` = 3e-5,
+  which over a 1.68-unit contact edge produces exactly that area, while
+  `ml/tests/benchmark_legality` asserts exact zero. Settle one epsilon across the NFP
+  predicate, the material backstop, and the export audit before chasing it.
+- Verification: `node --check`, flag-off engine equivalence, engine bugfixes, boot
+  check all green after the counter change. Artifacts (untracked):
+  `20260725T052725Z-lr-v4-shadow-direction-albano.json`,
+  `20260725T052851Z-lr-v4-fastlegality-throughput.json`. Findings written up in
+  `docs/local-refinement-v4-plan.md` "Follow-up findings".
+- `npm run ml:checkpoint` still unavailable (no completed trained-model run).
+
 ### 2026-07-25 - Local Refinement v4 implementation and gate results (Codex)
 
 - Implemented WP-V4.1 through WP-V4.5 behind default-off controls. Added sampled contact-aware plateau acceptance with shared before/after neighbours and sample steps, quantized revisit rejection, plateau caps, additive contact statistics, and exact commit-time legality.

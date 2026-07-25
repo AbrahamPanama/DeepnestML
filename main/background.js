@@ -4501,6 +4501,20 @@ function localRefinementSinglePlacementLegal(sheet, placed, placements, config, 
 		if(runtimeStats && shadowAudit && nfpOverlap !== materialOverlap){
 			runtimeStats.legalityPredicateDisagreements =
 				(runtimeStats.legalityPredicateDisagreements || 0) + 1;
+			// Direction matters far more than the total. Only the "NFP permits,
+			// material rejects" direction is unsafe: it means a candidate the
+			// fast path would accept actually overlaps. The reverse direction is
+			// merely an over-conservative NFP (lost placements, never illegal
+			// ones). These are complete counts; attemptDiagnostics below is
+			// capped at 12 and cannot be used to infer the split.
+			if(nfpOverlap && !materialOverlap){
+				runtimeStats.legalityDisagreementNfpStricter =
+					(runtimeStats.legalityDisagreementNfpStricter || 0) + 1;
+			}
+			else{
+				runtimeStats.legalityDisagreementMaterialStricter =
+					(runtimeStats.legalityDisagreementMaterialStricter || 0) + 1;
+			}
 			if(!runtimeStats.attemptDiagnostics){
 				runtimeStats.attemptDiagnostics = [];
 			}
@@ -8318,6 +8332,8 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.plateauAccepted = 0;
 	stats.plateauRejectedRevisit = 0;
 	stats.legalityPredicateDisagreements = 0;
+	stats.legalityDisagreementNfpStricter = 0;
+	stats.legalityDisagreementMaterialStricter = 0;
 	stats.mergeCreditRejects = 0;
 	localRefinementEnsureSmartStats(stats);
 
@@ -8586,7 +8602,7 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'legalityPredicateDisagreements', 'mergeCreditRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'continuousAnglesEvaluated', 'continuousPosesScored', 'continuousProxyRejects', 'continuousExactChecks', 'continuousExactMs', 'continuousMovesAccepted', 'continuousElapsedMs', 'continuousSkippedHoles', 'continuousTargetsConsidered', 'continuousTargetsAttempted', 'continuousTargetsScouted', 'continuousTargetsExploited', 'continuousTaskBudgetMs', 'continuousClusterAttempts', 'continuousClusterExactChecks', 'continuousClusterFailures', 'continuousClusterLegalLayouts', 'continuousClusterAccepted', 'continuousClusterPartsMoved', 'wholeClusterAttempts', 'wholeClusterCandidates', 'wholeClusterProxyChecks', 'wholeClusterExactChecks', 'wholeClusterLegalLayouts', 'wholeClusterAccepted', 'wholeClusterPartsMoved', 'windowedRebuildAttempts', 'windowedRebuildRegionComputations', 'windowedRebuildEmptyRegions', 'windowedRebuildCandidates', 'windowedRebuildExactChecks', 'windowedRebuildAccepted', 'windowedRebuildSignaturesSkipped', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines', 'contactBefore', 'contactAfter', 'contactRelativeImprovement', 'plateauAccepted', 'plateauRejectedRevisit'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'legalityPredicateDisagreements', 'legalityDisagreementNfpStricter', 'legalityDisagreementMaterialStricter', 'mergeCreditRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'continuousAnglesEvaluated', 'continuousPosesScored', 'continuousProxyRejects', 'continuousExactChecks', 'continuousExactMs', 'continuousMovesAccepted', 'continuousElapsedMs', 'continuousSkippedHoles', 'continuousTargetsConsidered', 'continuousTargetsAttempted', 'continuousTargetsScouted', 'continuousTargetsExploited', 'continuousTaskBudgetMs', 'continuousClusterAttempts', 'continuousClusterExactChecks', 'continuousClusterFailures', 'continuousClusterLegalLayouts', 'continuousClusterAccepted', 'continuousClusterPartsMoved', 'wholeClusterAttempts', 'wholeClusterCandidates', 'wholeClusterProxyChecks', 'wholeClusterExactChecks', 'wholeClusterLegalLayouts', 'wholeClusterAccepted', 'wholeClusterPartsMoved', 'windowedRebuildAttempts', 'windowedRebuildRegionComputations', 'windowedRebuildEmptyRegions', 'windowedRebuildCandidates', 'windowedRebuildExactChecks', 'windowedRebuildAccepted', 'windowedRebuildSignaturesSkipped', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines', 'contactBefore', 'contactAfter', 'contactRelativeImprovement', 'plateauAccepted', 'plateauRejectedRevisit'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
 	}
