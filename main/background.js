@@ -4577,7 +4577,8 @@ function localRefinementEnsureSmartStats(stats){
 			rotateReflow: {tried: 0, accepted: 0},
 			relocate: {tried: 0, accepted: 0},
 			swap: {tried: 0, accepted: 0},
-			fineRotate: {tried: 0, accepted: 0}
+			fineRotate: {tried: 0, accepted: 0},
+			overlapRepair: {tried: 0, accepted: 0}
 		};
 	}
 	else{
@@ -4604,6 +4605,9 @@ function localRefinementEnsureSmartStats(stats){
 		}
 		if(!stats.operatorStats.fineRotate){
 			stats.operatorStats.fineRotate = {tried: 0, accepted: 0};
+		}
+		if(!stats.operatorStats.overlapRepair){
+			stats.operatorStats.overlapRepair = {tried: 0, accepted: 0};
 		}
 	}
 	return stats.operatorStats;
@@ -8264,6 +8268,256 @@ function refineByShrinkSeparate(sheet, placed, placements, config, sheetboundsFo
 	};
 }
 
+// ---------------------------------------------------------------------------
+// Overlap-then-repair (LRv4 §overlap-repair).
+//
+// Every other operator requires each intermediate state to be legal, which on a
+// dense sheet means ~98% of candidates are rejected before they are ever scored.
+// This operator inverts that: it places one part in a deliberately OVERLAPPING
+// but high-contact pose, pins it there, and asks the neighbours to yield via a
+// bounded local separation. Legality is required only at commit.
+//
+// Two constraints learned from the toy fixtures in ml/tests/separation:
+//   1. The mover must be PINNED. If it stays movable the separator simply
+//      reverts it to where it came from and "succeeds" without doing anything.
+//   2. Repair is bounded by neighbourhood slack. A jammed window fails at every
+//      window size, so failure must be cheap and fully transactional.
+// ---------------------------------------------------------------------------
+
+function localRefinementOverlapRepairWindow(placed, placements, index, windowSize){
+	var target = localRefinementWorldBounds(placed[index], placements[index]);
+	if(!target){
+		return [];
+	}
+	var targetCenter = {
+		x: target.x + target.width / 2,
+		y: target.y + target.height / 2
+	};
+	var ranked = [];
+	for(var i=0; i<placed.length; i++){
+		if(i === index){
+			continue;
+		}
+		var bounds = localRefinementWorldBounds(placed[i], placements[i]);
+		if(!bounds){
+			continue;
+		}
+		var dx = (bounds.x + bounds.width / 2) - targetCenter.x;
+		var dy = (bounds.y + bounds.height / 2) - targetCenter.y;
+		ranked.push({index: i, distance: Math.sqrt(dx * dx + dy * dy)});
+	}
+	ranked.sort(function(a, b){
+		if(a.distance !== b.distance){
+			return a.distance - b.distance;
+		}
+		return a.index - b.index;
+	});
+	var window = [];
+	for(var r=0; r<ranked.length && window.length < windowSize; r++){
+		window.push(ranked[r].index);
+	}
+	return window;
+}
+
+// Candidate poses for the pinned part: canonical rotations only (an off-grid
+// angle would make the separator's ctx.nfp() request a non-canonical NFP, which
+// the Phase 0 guard fails closed on), translated into the pack so the pose is
+// genuinely intrusive rather than a legal nudge.
+function localRefinementOverlapRepairPoses(sheet, placed, placements, config, index, windowIndices, poseCap){
+	var originalPart = placed[index];
+	var originalPlacement = clonePlacementPosition(placements[index]);
+	var diag = localRefinementBboxDiagonal(originalPart) || 1;
+	var target = localRefinementWorldBounds(originalPart, originalPlacement);
+	if(!target){
+		return [];
+	}
+	var center = {x: target.x + target.width / 2, y: target.y + target.height / 2};
+	var packX = 0;
+	var packY = 0;
+	var counted = 0;
+	for(var w=0; w<windowIndices.length; w++){
+		var bounds = localRefinementWorldBounds(placed[windowIndices[w]], placements[windowIndices[w]]);
+		if(!bounds){
+			continue;
+		}
+		packX += bounds.x + bounds.width / 2;
+		packY += bounds.y + bounds.height / 2;
+		counted++;
+	}
+	if(counted === 0){
+		return [];
+	}
+	var toPack = localRefinementNormalizeDirection({
+		x: packX / counted - center.x,
+		y: packY / counted - center.y
+	});
+	if(!toPack){
+		return [];
+	}
+
+	var rotationCount = Math.max(1, parseInt(config.rotations, 10) || 1);
+	var step = 360 / rotationCount;
+	var rotations = [normalizedRotation(originalPlacement.rotation || originalPart.rotation || 0)];
+	for(var k=0; k<rotationCount; k++){
+		var angle = normalizedRotation(k * step);
+		if(localRefinementAngularDistance(angle, rotations[0]) > 1e-7){
+			rotations.push(angle);
+		}
+	}
+
+	var intrusions = [0.2, 0.4];
+	var poses = [];
+	for(var rot=0; rot<rotations.length; rot++){
+		var part = localRefinementRotatedPartForRotation(originalPart, rotations[rot]);
+		for(var d=0; d<intrusions.length; d++){
+			var distance = intrusions[d] * diag;
+			var placement = localRefinementPlacementWithXY(
+				originalPlacement,
+				originalPlacement.x + toPack.x * distance,
+				originalPlacement.y + toPack.y * distance
+			);
+			placement.rotation = part.rotation;
+			// The pinned part is invisible to the separator (fixed parts are
+			// skipped in evaluateViolations), so its own sheet containment is
+			// never checked there. Validate it here or an out-of-sheet pose can
+			// survive a "feasible" separation.
+			if(!localRefinementExactSheetContains(part, placement, sheet, config)){
+				continue;
+			}
+			// Score the pose with the existing single-part contact scorer by
+			// applying it briefly; the caller's snapshot still owns the restore.
+			var restorePart = placed[index];
+			var restorePlacement = clonePlacementPosition(placements[index]);
+			placed[index] = part;
+			localRefinementSetPlacementPosition(placements[index], placement);
+			placements[index].rotation = part.rotation;
+			var contact = localRefinementWindowPartContact(sheet, placed, placements, config, index);
+			placed[index] = restorePart;
+			localRefinementSetPlacementPosition(placements[index], restorePlacement);
+			placements[index].rotation = restorePlacement.rotation;
+			poses.push({
+				part: part,
+				placement: placement,
+				contact: contact
+			});
+		}
+	}
+	poses.sort(function(a, b){
+		return b.contact - a.contact;
+	});
+	return poses.slice(0, Math.max(1, poseCap));
+}
+
+function localRefinementTryOverlapRepair(sheet, placed, placements, config, index, currentMetric, deadline, stats){
+	var result = {moved: false, metric: currentMetric};
+	if(!config || config.localRefinementOverlapRepair !== true || typeof SeparationUtil === 'undefined'){
+		return result;
+	}
+	if(placed.length < 3 || localRefinementHasChildren(placed[index])){
+		return result;
+	}
+	var operatorStats = stats ? localRefinementEnsureSmartStats(stats) : null;
+	var windowSize = Math.max(1, parseInt(config.overlapRepairWindowSize, 10) || 5);
+	var poseCap = Math.max(1, parseInt(config.overlapRepairPoses, 10) || 6);
+	var windowIndices = localRefinementOverlapRepairWindow(placed, placements, index, windowSize);
+	if(windowIndices.length === 0){
+		return result;
+	}
+
+	var snapshotPlaced = localRefinementCopyPlaced(placed);
+	var snapshotPlacements = localRefinementCopyPlacements(placements);
+	var poses = localRefinementOverlapRepairPoses(sheet, placed, placements, config, index, windowIndices, poseCap);
+	if(stats){
+		stats.overlapRepairPosesScored = (stats.overlapRepairPosesScored || 0) + poses.length;
+	}
+
+	var movable = {};
+	for(var w=0; w<windowIndices.length; w++){
+		movable[windowIndices[w]] = true;
+	}
+
+	for(var p=0; p<poses.length; p++){
+		if(Date.now() > deadline){
+			break;
+		}
+		if(operatorStats){
+			operatorStats.overlapRepair.tried++;
+		}
+		if(stats){
+			stats.overlapRepairAttempts = (stats.overlapRepairAttempts || 0) + 1;
+		}
+
+		placed[index] = poses[p].part;
+		localRefinementSetPlacementPosition(placements[index], poses[p].placement);
+		placements[index].rotation = poses[p].part.rotation;
+
+		var separationDeadline = Math.min(deadline, Date.now() + Math.max(120, Math.floor((deadline - Date.now()) / Math.max(1, poses.length - p))));
+		var ctx = localRefinementCreateSeparationContext(
+			sheet, placed, placements, config, separationDeadline, SeparationUtil.mulberry32(1013 + index * 31 + p), null
+		);
+		ctx.movable = function(i){
+			return movable[i] === true;
+		};
+		// Record the intrusion this pose actually created. A pose that overlaps
+		// nothing makes the separation trivially "feasible" and proves nothing,
+		// so this distinguishes real overlap-then-repair from a plain nudge.
+		if(stats){
+			var residual = localRefinementMeasureSeparationResidual(ctx);
+			var initialDepth = residual ? residual.maxPairDepth : 0;
+			if(!(initialDepth > 0)){
+				stats.overlapRepairNoIntrusion = (stats.overlapRepairNoIntrusion || 0) + 1;
+			}
+			if(typeof stats.overlapRepairMaxInitialDepth !== 'number' || initialDepth > stats.overlapRepairMaxInitialDepth){
+				stats.overlapRepairMaxInitialDepth = initialDepth;
+			}
+		}
+		var separated = SeparationUtil.separate(ctx);
+		if(!separated || !separated.feasible){
+			if(stats){
+				stats.overlapRepairInfeasible = (stats.overlapRepairInfeasible || 0) + 1;
+			}
+			localRefinementRestorePlaced(placed, snapshotPlaced);
+			localRefinementRestorePlacements(placements, snapshotPlacements);
+			continue;
+		}
+		if(stats){
+			stats.overlapRepairSeparationFeasible = (stats.overlapRepairSeparationFeasible || 0) + 1;
+		}
+
+		var movedIndices = [index];
+		for(w=0; w<windowIndices.length; w++){
+			movedIndices.push(windowIndices[w]);
+		}
+		var primaryAfter = localRefinementAcceptanceMetric(sheet, placed, placements, config);
+		var acceptance = primaryAfter === null ? {accepted: false} : localRefinementAcceptanceCandidate(
+			sheet, snapshotPlaced, snapshotPlacements, placed, placements, config, movedIndices, currentMetric, primaryAfter, stats
+		);
+		if(!acceptance.accepted || !localRefinementFinalLayoutLegalForRotations(sheet, placed, placements, config)){
+			if(stats){
+				stats.overlapRepairRejected = (stats.overlapRepairRejected || 0) + 1;
+			}
+			localRefinementRestorePlaced(placed, snapshotPlaced);
+			localRefinementRestorePlacements(placements, snapshotPlacements);
+			continue;
+		}
+
+		if(operatorStats){
+			operatorStats.overlapRepair.accepted++;
+		}
+		if(stats){
+			stats.overlapRepairAccepted = (stats.overlapRepairAccepted || 0) + 1;
+			stats.movesAccepted = (stats.movesAccepted || 0) + 1;
+		}
+		result.moved = true;
+		result.metric = acceptance.primary;
+		return result;
+	}
+
+	localRefinementRestorePlaced(placed, snapshotPlaced);
+	localRefinementRestorePlacements(placements, snapshotPlacements);
+	return result;
+}
+
 function refineSmartPlacements(sheet, placed, placements, config, sheetboundsForScoring, nestindex){
 	var stats = createLocalRefinementStats(config && config.localRefinement === true);
 	stats.engine = 'smart';
@@ -8454,6 +8708,22 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 			}
 		}
 
+		// Overlap-then-repair runs last in the pass: it is the only operator that
+		// can make progress once every legal single-part move has been exhausted,
+		// which is precisely the state the loop reaches on a dense sheet.
+		if(config.localRefinementOverlapRepair === true &&
+			Date.now() + Math.max(0, parseInt(config.overlapRepairMinBudgetMs, 10) || 400) < deadline){
+			order = localRefinementSmartTargetOrder(placed, placements, config);
+			targetLimit = Math.min(order.length, Math.max(1, parseInt(config.overlapRepairMaxTargets, 10) || 4));
+			for(t=0; t<targetLimit && Date.now() < deadline; t++){
+				var repaired = localRefinementTryOverlapRepair(sheet, placed, placements, config, order[t], currentMetric, deadline, stats);
+				if(repaired.moved){
+					currentMetric = repaired.metric;
+					madeProgress = true;
+				}
+			}
+		}
+
 		if(!madeProgress){
 			break;
 		}
@@ -8602,7 +8872,7 @@ function mergeLocalRefinementStats(total, stats){
 			}
 		}
 	}
-	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'legalityPredicateDisagreements', 'legalityDisagreementNfpStricter', 'legalityDisagreementMaterialStricter', 'mergeCreditRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'continuousAnglesEvaluated', 'continuousPosesScored', 'continuousProxyRejects', 'continuousExactChecks', 'continuousExactMs', 'continuousMovesAccepted', 'continuousElapsedMs', 'continuousSkippedHoles', 'continuousTargetsConsidered', 'continuousTargetsAttempted', 'continuousTargetsScouted', 'continuousTargetsExploited', 'continuousTaskBudgetMs', 'continuousClusterAttempts', 'continuousClusterExactChecks', 'continuousClusterFailures', 'continuousClusterLegalLayouts', 'continuousClusterAccepted', 'continuousClusterPartsMoved', 'wholeClusterAttempts', 'wholeClusterCandidates', 'wholeClusterProxyChecks', 'wholeClusterExactChecks', 'wholeClusterLegalLayouts', 'wholeClusterAccepted', 'wholeClusterPartsMoved', 'windowedRebuildAttempts', 'windowedRebuildRegionComputations', 'windowedRebuildEmptyRegions', 'windowedRebuildCandidates', 'windowedRebuildExactChecks', 'windowedRebuildAccepted', 'windowedRebuildSignaturesSkipped', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines', 'contactBefore', 'contactAfter', 'contactRelativeImprovement', 'plateauAccepted', 'plateauRejectedRevisit'];
+	var additiveStats = ['shrinkSteps', 'attemptsFeasible', 'attemptsInfeasible', 'deadlineHits', 'feasibleNotImproved', 'exactRelocations', 'emptyRegionHits', 'epsilonScaleFeasible', 'legalityRejects', 'legalityPredicateDisagreements', 'legalityDisagreementNfpStricter', 'legalityDisagreementMaterialStricter', 'mergeCreditRejects', 'passes', 'floatersDetected', 'floatersRelocated', 'settleRegionComputations', 'settleEmptyRegions', 'rotationsTried', 'settleLegalCandidates', 'continuousAnglesEvaluated', 'continuousPosesScored', 'continuousProxyRejects', 'continuousExactChecks', 'continuousExactMs', 'continuousMovesAccepted', 'continuousElapsedMs', 'continuousSkippedHoles', 'continuousTargetsConsidered', 'continuousTargetsAttempted', 'continuousTargetsScouted', 'continuousTargetsExploited', 'continuousTaskBudgetMs', 'continuousClusterAttempts', 'continuousClusterExactChecks', 'continuousClusterFailures', 'continuousClusterLegalLayouts', 'continuousClusterAccepted', 'continuousClusterPartsMoved', 'wholeClusterAttempts', 'wholeClusterCandidates', 'wholeClusterProxyChecks', 'wholeClusterExactChecks', 'wholeClusterLegalLayouts', 'wholeClusterAccepted', 'wholeClusterPartsMoved', 'windowedRebuildAttempts', 'windowedRebuildRegionComputations', 'windowedRebuildEmptyRegions', 'windowedRebuildCandidates', 'windowedRebuildExactChecks', 'windowedRebuildAccepted', 'windowedRebuildSignaturesSkipped', 'pairCompactionAnglePairs', 'pairCompactionCandidates', 'pairCompactionLegalLayouts', 'pairCompactionAccepted', 'pairCompactionPartsMoved', 'pairCompactionMissingNfps', 'pairCompactionSkippedBudget', 'rotationReflowAttempts', 'rotationReflowRegionComputations', 'rotationReflowEmptyRegions', 'rotationReflowLegalCandidates', 'rotationReflowLegalLayouts', 'rotationReflowPartsMoved', 'rotationReflowRotationsAccepted', 'rotationReflowSkippedBudget', 'nonCanonicalNfpLookups', 'fineRotateCandidates', 'fineRotateSlideCandidates', 'fineRotateLegalCandidates', 'fineRotateExactChecks', 'fineRotateExactMs', 'fineRotateNeutralAccepted', 'fineRotateNearNeutralAccepted', 'fineRotateSlideAccepted', 'fineRotateSkippedHoles', 'fineRotateSkippedBudget', 'fineRotateSkippedMergeLines', 'contactBefore', 'contactAfter', 'contactRelativeImprovement', 'plateauAccepted', 'plateauRejectedRevisit', 'overlapRepairAttempts', 'overlapRepairPosesScored', 'overlapRepairSeparationFeasible', 'overlapRepairInfeasible', 'overlapRepairRejected', 'overlapRepairAccepted', 'overlapRepairNoIntrusion'];
 	if(typeof stats.settleBestDelta === 'number' && (typeof total.settleBestDelta !== 'number' || stats.settleBestDelta < total.settleBestDelta)){
 		total.settleBestDelta = stats.settleBestDelta;
 	}
@@ -8626,6 +8896,9 @@ function mergeLocalRefinementStats(total, stats){
 	}
 	if(typeof stats.fineRotateMaxDeltaDeg === 'number'){
 		total.fineRotateMaxDeltaDeg = Math.max(total.fineRotateMaxDeltaDeg || 0, stats.fineRotateMaxDeltaDeg);
+	}
+	if(typeof stats.overlapRepairMaxInitialDepth === 'number'){
+		total.overlapRepairMaxInitialDepth = Math.max(total.overlapRepairMaxInitialDepth || 0, stats.overlapRepairMaxInitialDepth);
 	}
 	if(typeof stats.continuousMaxAngleDeltaDeg === 'number'){
 		total.continuousMaxAngleDeltaDeg = Math.max(total.continuousMaxAngleDeltaDeg || 0, stats.continuousMaxAngleDeltaDeg);

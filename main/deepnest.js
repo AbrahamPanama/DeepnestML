@@ -50,6 +50,11 @@
 			rotationReflowMaxNeighbors: 3,
 			rotationReflowMinBudgetMs: 400,
 			localRefinementFineRotation: false,
+			localRefinementOverlapRepair: false,
+			overlapRepairMaxTargets: 4,
+			overlapRepairWindowSize: 5,
+			overlapRepairPoses: 6,
+			overlapRepairMinBudgetMs: 400,
 			localRefinementContinuous: true,
 			localRefinementContactAcceptance: false,
 			v4AcceptEpsPrimary: 0.000001,
@@ -897,6 +902,26 @@
 
 			if(c.localRefinementFineRotation === true || c.localRefinementFineRotation === false){
 				config.localRefinementFineRotation = !!c.localRefinementFineRotation;
+			}
+
+			if(c.localRefinementOverlapRepair === true || c.localRefinementOverlapRepair === false){
+				config.localRefinementOverlapRepair = !!c.localRefinementOverlapRepair;
+			}
+			var overlapRepairMaxTargets = Number(c.overlapRepairMaxTargets);
+			if(isFinite(overlapRepairMaxTargets) && overlapRepairMaxTargets >= 1){
+				config.overlapRepairMaxTargets = Math.min(Math.floor(overlapRepairMaxTargets), 64);
+			}
+			var overlapRepairWindowSize = Number(c.overlapRepairWindowSize);
+			if(isFinite(overlapRepairWindowSize) && overlapRepairWindowSize >= 1){
+				config.overlapRepairWindowSize = Math.min(Math.floor(overlapRepairWindowSize), 16);
+			}
+			var overlapRepairPoses = Number(c.overlapRepairPoses);
+			if(isFinite(overlapRepairPoses) && overlapRepairPoses >= 1){
+				config.overlapRepairPoses = Math.min(Math.floor(overlapRepairPoses), 32);
+			}
+			var overlapRepairMinBudgetMs = Number(c.overlapRepairMinBudgetMs);
+			if(isFinite(overlapRepairMinBudgetMs) && overlapRepairMinBudgetMs >= 0){
+				config.overlapRepairMinBudgetMs = Math.min(Math.floor(overlapRepairMinBudgetMs), 30000);
 			}
 
 			if(c.localRefinementContinuous === true || c.localRefinementContinuous === false){
