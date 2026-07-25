@@ -58,6 +58,8 @@
 			directPoseMaxEdges: 6,
 			directPoseMaxCandidates: 24,
 			directPoseSlideSamples: 12,
+			directPoseContactSamples: 16,
+			directPoseTangentWindow: 0.05,
 			rasterDivisor: 64,
 			rasterTargetAmbiguity: 0.30,
 			overlapRepairMaxTargets: 4,

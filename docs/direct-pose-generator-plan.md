@@ -210,7 +210,47 @@ family for smooth/arc-heavy outlines — which is precisely the geometry that
 motivated this whole line of work. The §2.2 pivot-rotation and §2.3 sibling
 families are unaffected and remain viable.
 
-The successor family for arc-heavy parts is **contact walking**: sample the
+### 4.2 Contact walking also fails — and the reason is structural (2026-07-25)
+
+Contact walking was implemented (`PoseGenerator.contactWalkPoses`, smoothed
+normals over an arc-length window) and wired alongside edge mating. It behaves
+correctly in isolation: on a synthetic leafy contour it produces 16/16 correctly
+outward normals and 256 poses, 192 of them off-grid, i.e. it does **not**
+degenerate the way edge mating does.
+
+On the laurel fixture it still produced **0 legal poses from 10,070 generated,
+720 validated**.
+
+**Root cause — local contact conditions do not imply global non-overlap for
+concave parts.** Both families place the target so that one *local* feature
+touches a neighbour: a mated edge, or a boundary point with opposing normals. For
+a convex part that is sufficient — local contact implies disjoint interiors, which
+is why these techniques work in the literature for convex and near-convex shapes.
+For a deeply concave part it constrains nothing about the rest of the boundary,
+and the arms interpenetrate elsewhere. A C-shape can touch another C-shape at a
+point with perfectly opposing normals while the arms pass straight through each
+other.
+
+**That global guarantee is precisely what NFP provides**, and it is why NFP exists
+in this engine. Local pose derivation cannot substitute for it on concave
+geometry, and the laurel branch is about as concave as parts get.
+
+**The missing piece is repair, not a better family.** §2.2 specified
+slide-to-contact — a bisection on the exact predicate — and DP-1 emitted rotations
+*without* it. A generated pose should not be accepted or rejected as-is: it should
+be pushed out along the contact normal until the exact predicate reports legal,
+which converts a locally-touching-but-globally-overlapping pose into the nearest
+genuinely legal one. At ~19 µs per exact test, a 34-step bisection costs ~0.65 ms,
+so it is affordable on the top-ranked few dozen poses per target.
+
+That is the next thing to try, and it is a small increment on what exists: the
+generator, the validator, the ranking, the acceptance rule, and the wiring are all
+in place and verified. **Do not add a third pose family before adding repair** —
+the evidence says families are not the bottleneck.
+
+---
+
+The original successor note (superseded by §4.2 above): contact walking samples the
 target's boundary, sample the neighbour's boundary, and for each sampled point
 pair derive the rotation that aligns the local boundary *tangents* antiparallel,
 then translate to touch at that point. That degrades gracefully as segment length

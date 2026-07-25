@@ -4286,6 +4286,20 @@ function localRefinementDirectPoseCandidates(sheet, placed, placements, config, 
 		for(var m=0; m<mated.length; m++){
 			poses.push(mated[m]);
 		}
+		// Contact walking: the family that survives arc-heavy outlines, where
+		// edge mating degenerates because the longest edge is ~1% of the part.
+		var walked = PoseGenerator.contactWalkPoses(
+			placed[index], placements[index], placed[j], placements[j],
+			{
+				samples: Math.max(3, parseInt(config.directPoseContactSamples, 10) || 16),
+				windowFraction: Number(config.directPoseTangentWindow) > 0 ?
+					Number(config.directPoseTangentWindow) : 0.05,
+				separation: 0
+			}
+		);
+		for(var cw=0; cw<walked.length; cw++){
+			poses.push(walked[cw]);
+		}
 	}
 	// Alignment pressure: for repeated slender parts the dense answer is agreement,
 	// not thirty independent diagonals. Without this the generator can rebuild the

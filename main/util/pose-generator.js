@@ -274,6 +274,143 @@
 	}
 
 	/*
+	 * Contact walking — the pose family for arc-heavy outlines.
+	 *
+	 * Edge mating assumes a part has long straight edges whose direction means
+	 * something. A leafy or curved outline is thousands of short segments, where
+	 * the longest edge is ~1% of the part and its direction is noise (measured on
+	 * the laurel fixture: edge mating produced 0 legal poses out of 2,048).
+	 *
+	 * Contact walking instead samples both boundaries at equal arc length and uses
+	 * a SMOOTHED normal — the chord across a window of the boundary rather than one
+	 * segment. That is what makes it degrade gracefully as segment length goes to
+	 * zero: the window captures the local spine direction, not a leaf wiggle.
+	 *
+	 * For a legal touch the two outward normals must oppose, which pins the
+	 * rotation exactly: delta = neighbourNormal + 180 - targetNormal.
+	 */
+	function boundarySamples(polygon, sampleCount, windowFraction){
+		var ring = ringOf(polygon);
+		var samples = [];
+		if(!ring || ring.length < 3){
+			return samples;
+		}
+		sampleCount = Math.max(3, parseInt(sampleCount, 10) || 16);
+		windowFraction = finite(windowFraction, 0.05);
+
+		// Cumulative arc length around the ring.
+		var cumulative = [0];
+		var total = 0;
+		for(var i=0; i<ring.length; i++){
+			total += edgeLength(ring[i], ring[(i + 1) % ring.length]);
+			cumulative.push(total);
+		}
+		if(total <= 0){
+			return samples;
+		}
+
+		function pointAt(distance){
+			var d = distance % total;
+			if(d < 0){
+				d += total;
+			}
+			var lo = 0;
+			var hi = ring.length;
+			while(lo < hi){
+				var mid = (lo + hi) >> 1;
+				if(cumulative[mid + 1] < d){
+					lo = mid + 1;
+				}
+				else{
+					hi = mid;
+				}
+			}
+			var segStart = ring[lo % ring.length];
+			var segEnd = ring[(lo + 1) % ring.length];
+			var segLength = cumulative[lo + 1] - cumulative[lo];
+			var t = segLength > 0 ? (d - cumulative[lo]) / segLength : 0;
+			return {
+				x: segStart.x + (segEnd.x - segStart.x) * t,
+				y: segStart.y + (segEnd.y - segStart.y) * t
+			};
+		}
+
+		var window = Math.max(total * windowFraction, total / (sampleCount * 4));
+		for(var s=0; s<sampleCount; s++){
+			var distance = total * (s / sampleCount);
+			var here = pointAt(distance);
+			var back = pointAt(distance - window);
+			var forward = pointAt(distance + window);
+			// Smoothed tangent: the chord across the window, not the local segment.
+			var tangent = {x: forward.x - back.x, y: forward.y - back.y};
+			var length = Math.sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
+			if(length <= 0){
+				continue;
+			}
+			var candidate = {x: tangent.y / length, y: -tangent.x / length};
+			var probeDistance = Math.max(1e-9, window * 1e-3);
+			var probe = {
+				x: here.x + candidate.x * probeDistance,
+				y: here.y + candidate.y * probeDistance
+			};
+			if(pointInRing(probe, ring)){
+				candidate = {x: -candidate.x, y: -candidate.y};
+			}
+			samples.push({
+				x: here.x,
+				y: here.y,
+				normal: candidate,
+				normalAngle: normalizeAngle(Math.atan2(candidate.y, candidate.x) * 180 / Math.PI)
+			});
+		}
+		return samples;
+	}
+
+	function contactWalkPoses(target, targetPlacement, neighbour, neighbourPlacement, options){
+		options = options || {};
+		var poses = [];
+		var seen = {};
+		var targetRing = ringOf(target);
+		var neighbourRing = ringOf(neighbour);
+		if(!targetRing || !neighbourRing){
+			return poses;
+		}
+		var sampleCount = Math.max(3, parseInt(options.samples, 10) || 16);
+		var windowFraction = finite(options.windowFraction, 0.05);
+		var separation = finite(options.separation, 0);
+		var baseRotation = normalizeAngle(finite(
+			targetPlacement && targetPlacement.rotation,
+			finite(target.rotation, 0)
+		));
+
+		var neighbourWorldRing = shiftRing(neighbourRing, neighbourPlacement);
+		var neighbourSamples = boundarySamples(neighbourWorldRing, sampleCount, windowFraction);
+		var targetSamples = boundarySamples(targetRing, sampleCount, windowFraction);
+
+		for(var n=0; n<neighbourSamples.length; n++){
+			var ns = neighbourSamples[n];
+			for(var t=0; t<targetSamples.length; t++){
+				var ts = targetSamples[t];
+				// Opposing outward normals is the condition for a legal touch, and
+				// it determines the rotation uniquely.
+				var delta = normalizeAngle(ns.normalAngle + 180 - ts.normalAngle);
+				var rotatedContact = rotatePoint({x: ts.x, y: ts.y}, delta);
+				var desired = {
+					x: ns.x + ns.normal.x * separation,
+					y: ns.y + ns.normal.y * separation
+				};
+				pushUnique(poses, seen, {
+					rotation: normalizeAngle(baseRotation + delta),
+					x: desired.x - rotatedContact.x,
+					y: desired.y - rotatedContact.y,
+					provenance: 'contactWalk'
+				});
+			}
+		}
+		return poses;
+	}
+
+	/*
 	 * Rotate about a world-space pivot, keeping that pivot fixed.
 	 *
 	 * newPlacement = P - R(delta) * p_local, where p_local is the pivot in the
@@ -367,6 +504,8 @@
 		edgeOutwardNormal: edgeOutwardNormal,
 		rotateRing: rotateRing,
 		edgeMatingPoses: edgeMatingPoses,
+		boundarySamples: boundarySamples,
+		contactWalkPoses: contactWalkPoses,
 		rotateAboutPivot: rotateAboutPivot,
 		rotationPoses: rotationPoses,
 		siblingPoses: siblingPoses,
