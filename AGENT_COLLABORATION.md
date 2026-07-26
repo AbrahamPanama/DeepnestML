@@ -181,6 +181,14 @@ Use newest notes at the top.
   its area is below the old `1e-6` threshold; a 1-unit overlap also fails.
 - Recomputed `jakobs2` result: legal, two numerical contacts, raw maximum area
   `1.92e-5`, maximum depth `3.4e-6`, tolerance `7.0007e-6`.
+- A preflight over every compact-demand corpus source then exposed a real
+  startup exception in `gardeyn4` source 4: Clipper's optional exact-union path
+  threw `this.ParseFirstLeft is not a function`. `buildCollisionEnvelope` now
+  records that exception and falls back to the already-required conservative
+  convex hull. A fixture test proves both original members remain contained.
+- The repaired preflight completed all 23 instances with zero exceptions and
+  predicts production-threshold clustering in seven: `gardeyn4`, `gardeyn5`,
+  `gardeyn6`, `gardeyn7`, `shapes0`, `shapes1`, and `swim`.
 
 ### 2026-07-26 - SP-1..SP-5 candidate reaches Tier 1 (Codex)
 

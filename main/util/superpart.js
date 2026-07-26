@@ -589,12 +589,23 @@
 	function buildCollisionEnvelope(fixed, moved, curveTolerance, scale){
 		var fixedPath = toClipperPath(fixed, scale);
 		var sourceOrientation = ClipperLib.Clipper.Orientation(fixedPath);
-		var exact = envelopeFromRings([fixed, moved], sourceOrientation, scale);
+		var exact = null;
+		var exactUnionError = null;
+		try{
+			exact = envelopeFromRings([fixed, moved], sourceOrientation, scale);
+		}
+		catch(err){
+			// Some valid self-touching rings trigger an internal Clipper
+			// PolyTree join error. The hull below is conservative, so falling
+			// back cannot admit an illegal placement.
+			exactUnionError = err && err.message ? err.message : String(err);
+		}
 		if(exact){
 			return {
 				polygon: exact,
 				mode: 'exactUnion',
-				expansion: 0
+				expansion: 0,
+				exactUnionError: null
 			};
 		}
 
@@ -608,7 +619,8 @@
 		return {
 			polygon: hull,
 			mode: 'convexHull',
-			expansion: null
+			expansion: null,
+			exactUnionError: exactUnionError
 		};
 	}
 
@@ -829,7 +841,8 @@
 				proxyPointCount: proxy.length,
 				proxyTests: context.proxyTests,
 				exactTests: context.exactTests,
-				exactIntersectionArea: intersectionArea
+				exactIntersectionArea: intersectionArea,
+				envelopeUnionError: envelope.exactUnionError || null
 			}
 		};
 		if(cache){
@@ -840,6 +853,7 @@
 			gain: result.gain,
 			angle: result.angle,
 			deadlineHit: result.diagnostics.deadlineHit,
+			envelopeUnionError: result.diagnostics.envelopeUnionError,
 			proxyTests: context.proxyTests,
 			exactTests: context.exactTests
 		});

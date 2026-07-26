@@ -1,10 +1,13 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const ClipperLib = require('../../../main/util/clippernode.js');
 const PoseGenerator = require('../../../main/util/pose-generator.js');
 const Superpart = require('../../../main/util/superpart.js');
 const ConfigCompatibility = require('../../../main/util/configcompatibility.js');
+const Esicup = require('../../lib/esicup-convert.js');
 const LaurelFixture = require('../raster_collision/run.js');
 
 function lShape() {
@@ -289,10 +292,63 @@ function assertExpandedPlacementValidation() {
 	);
 }
 
+function assertEnvelopeUnionFailureFallsBack() {
+	const fixturePath = path.resolve(
+		__dirname,
+		'..',
+		'..',
+		'benchmark',
+		'esicup',
+		'instances',
+		'gardeyn4.json'
+	);
+	const converted = Esicup.instanceToSvg(
+		JSON.parse(fs.readFileSync(fixturePath, 'utf8')),
+		{compactDemands: true}
+	);
+	const record = converted.meta.sourceMap['4'];
+	const polygon = record.polygon.map((point) => ({x: point.x, y: point.y}));
+	polygon.children = (record.holes || []).map((hole) =>
+		hole.map((point) => ({x: point.x, y: point.y}))
+	);
+	const trace = {};
+	const result = Superpart.findBestPair(polygon, {
+		sourceKey: 'gardeyn4-source-4-union-fallback',
+		curveTolerance: 0.72,
+		clipperScale: 10000000,
+		budgetMs: 2000,
+		minGain: 0.10,
+		metric: 'convexhull',
+		cache: {},
+		trace: trace
+	});
+	assert.ok(result, 'gardeyn4 source 4 must fail soft to a conservative envelope');
+	assert.strictEqual(result.envelopeMode, 'convexHull');
+	assert.match(
+		result.diagnostics.envelopeUnionError,
+		/ParseFirstLeft/,
+		'Clipper union failure must remain observable in diagnostics'
+	);
+	assert.strictEqual(trace.envelopeUnionError, result.diagnostics.envelopeUnionError);
+	const fixed = transformRing(
+		polygon,
+		result.members[0].rotation,
+		result.members[0].offset
+	);
+	const moved = transformRing(
+		polygon,
+		result.members[1].rotation,
+		result.members[1].offset
+	);
+	assert.ok(outsideEnvelopeArea(fixed, result.unionPolygon) <= 1e-8);
+	assert.ok(outsideEnvelopeArea(moved, result.unionPolygon) <= 1e-8);
+}
+
 assertDeterministic();
 assertCompatibilityGate();
 assertConnectedEnvelopePreservesHoles();
 assertExpandedPlacementValidation();
+assertEnvelopeUnionFailureFallsBack();
 const report = assertLaurelPair();
 console.log(JSON.stringify(report, null, 2));
 console.log('superpart SP-1 tests passed');
