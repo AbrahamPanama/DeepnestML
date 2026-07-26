@@ -1,0 +1,26 @@
+{
+  "name": "svg-superpart-flagoff-equivalence",
+  "description": "Deterministic gravity nest proving superpartClustering=false preserves exported SVG bytes.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "isolatedUserData": true,
+  "randomSeed": 81173,
+  "timeoutMs": 60000,
+  "timeBudgetSec": 8,
+  "partQuantities": [2, 1, 1],
+  "configOverrides": {
+    "placementType": "gravity",
+    "rotations": 1,
+    "adaptiveRotations": false,
+    "improvedPlacementScoring": false,
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 3,
+    "mutationRate": 0,
+    "threads": 1,
+    "localRefinement": false,
+    "superpartClustering": false,
+    "curveTolerance": 0.3
+  }
+}

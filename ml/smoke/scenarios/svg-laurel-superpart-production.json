@@ -1,0 +1,41 @@
+{
+  "name": "svg-laurel-superpart-production",
+  "description": "User-settings parity: default-on repeated-part interlock with the persisted gravity/adaptive/slide profile.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "isolatedUserData": true,
+  "timeoutMs": 120000,
+  "timeBudgetSec": 30,
+  "partQuantities": [2, 2],
+  "expectedPartsPlaced": 4,
+  "expectedSuperpartMinimums": {
+    "sourcesPaired": 2,
+    "clusterPlacements": 2,
+    "partsPlaced": 4
+  },
+  "expectedNonCanonicalNfpLookups": 0,
+  "expectedIndependentLegality": true,
+  "expectedLayoutMaximums": {
+    "usedSheetWidth": 410
+  },
+  "expectedRuntimeConfig": {
+    "superpartClustering": true,
+    "mergeLines": false
+  },
+  "configOverrides": {
+    "placementType": "gravity",
+    "rotations": 4,
+    "adaptiveRotations": true,
+    "improvedPlacementScoring": true,
+    "localRefinement": true,
+    "localRefinementEngine": "slide",
+    "localRefinementContinuous": false,
+    "localRefinementBudgetMs": 25000,
+    "processHoles": true,
+    "populationSize": 10,
+    "mutationRate": 10,
+    "threads": 8,
+    "curveTolerance": 0.36
+  }
+}

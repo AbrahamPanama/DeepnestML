@@ -815,32 +815,41 @@ function measureEsicup() {
 	};
 }
 
-runUnitTests();
-testResolutionPolicies();
+if (require.main === module) {
+	runUnitTests();
+	testResolutionPolicies();
 
-const report = {
-	soundness: runRandomizedSoundness(),
-	containment: runRandomizedContainment(),
-	laurel: measureLaurel(),
-	esicup: measureEsicup()
+	const report = {
+		soundness: runRandomizedSoundness(),
+		containment: runRandomizedContainment(),
+		laurel: measureLaurel(),
+		esicup: measureEsicup()
+	};
+
+	console.log(JSON.stringify(report, null, 2));
+
+	assert.strictEqual(
+		report.soundness.unsafeOuterDecisions,
+		0,
+		'outer masks must never produce an unsafe legal decision'
+	);
+	assert.strictEqual(
+		report.soundness.unsafeInnerDecisions,
+		0,
+		'inner masks must never produce an unsafe overlap decision'
+	);
+	assert.ok(
+		report.laurel.sampled.ambiguityRate <= 0.4,
+		'laurel ambiguity gate failed: ' +
+			(report.laurel.sampled.ambiguityRate * 100).toFixed(2) + '% > 40%'
+	);
+
+	console.log('raster collision RC-1 gate passed');
+}
+
+module.exports = {
+	loadLaurelPolygon: loadLaurelPolygon,
+	laurelPathPolygon: laurelPathPolygon,
+	rotateRing: rotateRing,
+	cloneRing: cloneRing
 };
-
-console.log(JSON.stringify(report, null, 2));
-
-assert.strictEqual(
-	report.soundness.unsafeOuterDecisions,
-	0,
-	'outer masks must never produce an unsafe legal decision'
-);
-assert.strictEqual(
-	report.soundness.unsafeInnerDecisions,
-	0,
-	'inner masks must never produce an unsafe overlap decision'
-);
-assert.ok(
-	report.laurel.sampled.ambiguityRate <= 0.4,
-	'laurel ambiguity gate failed: ' +
-		(report.laurel.sampled.ambiguityRate * 100).toFixed(2) + '% > 40%'
-);
-
-console.log('raster collision RC-1 gate passed');

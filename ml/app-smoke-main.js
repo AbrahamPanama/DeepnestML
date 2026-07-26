@@ -382,6 +382,7 @@ function runLocalConversion(payload) {
 	var mode = sourceFormat + '-to-' + targetFormat;
 	var supported = mode === 'pdf-to-svg' ||
 		mode === 'svg-to-pdf' ||
+		mode === 'svg-to-tiff' ||
 		mode === 'png-to-svg' ||
 		mode === 'jpg-to-svg' ||
 		mode === 'jpeg-to-svg';
@@ -474,17 +475,16 @@ function runLocalConversion(payload) {
 app.commandLine.appendSwitch('--enable-precise-memory-info');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
+var startupCliArgs = parseArgs(process.argv.slice(2));
+var startupScenario = loadScenario(startupCliArgs.scenario || '');
+if (startupCliArgs.isolatedUserData || startupCliArgs['isolated-user-data'] ||
+	startupScenario.isolatedUserData === true) {
+	app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'deepnest-app-smoke-userdata-')));
+}
+
 app.on('ready', function () {
-	var cliArgs = parseArgs(process.argv.slice(2));
-	var scenario;
-	try {
-		scenario = loadScenario(cliArgs.scenario || '');
-	}
-	catch (err) {
-		console.error(err && err.message ? err.message : String(err));
-		app.exit(1);
-		return;
-	}
+	var cliArgs = startupCliArgs;
+	var scenario = startupScenario;
 
 	var scenarioName = cliArgs.scenarioName || scenario.name || 'ad-hoc';
 	var scenarioBaseDir = scenario.__dir || projectRoot;

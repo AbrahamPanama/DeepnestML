@@ -690,6 +690,7 @@ window.onload = function () {
 			ipcRenderer.send('background-progress', {index: index, progress: -1});
 			ipcRenderer.send('background-response', {
 				index: data.index,
+				nestToken: data.nestToken,
 				fitness: Number.MAX_VALUE,
 				placements: [],
 				error: geometryData.error,
@@ -707,6 +708,7 @@ window.onload = function () {
 			try{
 				var stepPlacement = placePartsStepRepeat(data.sheets, parts, data.config, index);
 				stepPlacement.index = data.index;
+				stepPlacement.nestToken = data.nestToken;
 				stepPlacement.localRefinement = createLocalRefinementStats(false);
 				stepPlacement.timing = stepPlacement.timing || {};
 				stepPlacement.timing.dispatchMs = dispatchMs;
@@ -717,6 +719,7 @@ window.onload = function () {
 				ipcRenderer.send('background-progress', {index: index, progress: -1});
 				ipcRenderer.send('background-response', {
 					index: data.index,
+					nestToken: data.nestToken,
 					fitness: Number.MAX_VALUE,
 					placements: [],
 					error: stepRepeatError && stepRepeatError.message ? stepRepeatError.message : 'Step & Repeat failed'
@@ -870,6 +873,7 @@ window.onload = function () {
 		  	var placement = placeParts(data.sheets, parts, data.config, index);
 
 			placement.index = data.index;
+			placement.nestToken = data.nestToken;
 			placement.pairsCacheHits = pairsCacheHits;
 			placement.pairsMissing = pairsMissing;
 			placement.timing = placement.timing || {};

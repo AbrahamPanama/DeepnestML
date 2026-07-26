@@ -11,6 +11,8 @@ const INSTANCE_DIR = path.join(ROOT, 'ml', 'benchmark', 'esicup', 'instances');
 const RESULTS_DIR = path.join(ROOT, 'ml', 'benchmark', 'results');
 const ARTIFACT_ROOT = path.join(ROOT, 'ml', 'artifacts', 'nest-benchmark');
 const SMOKE_SCRIPT = path.join(ROOT, 'ml', 'scripts', 'run_app_smoke_test.sh');
+const NATIVE_ELECTRON = path.join(ROOT, 'node_modules', '.bin', 'electron');
+const APP_SMOKE_MAIN = path.join(ROOT, 'ml', 'app-smoke-main.js');
 
 const DEFAULT_RUNS = 3;
 const DEFAULT_TIME_BUDGET_SEC = 120;
@@ -182,6 +184,14 @@ function adaptiveRotationOptions(options) {
 	};
 }
 
+function superpartOptions(options) {
+	return {
+		superpartClustering: booleanOption(optionValue(options, 'superpartClustering', 'superpart-clustering', undefined), false),
+		superpartSearchMs: Math.floor(numberOption(optionValue(options, 'superpartSearchMs', 'superpart-search-ms', undefined), 2000, 100, 30000)),
+		superpartMinGain: numberOption(optionValue(options, 'superpartMinGain', 'superpart-min-gain', undefined), 0.05, 0, 0.9)
+	};
+}
+
 function ensureDir(dir) {
 	if (!fs.existsSync(dir)) {
 		fs.mkdirSync(dir, { recursive: true });
@@ -232,6 +242,23 @@ function gitDirty() {
 			cwd: ROOT,
 			encoding: 'utf8'
 		}).trim();
+		return status.length > 0;
+	}
+	catch (err) {
+		return null;
+	}
+}
+
+function gitTrackedDirty() {
+	try {
+		const status = childProcess.execFileSync(
+			'git',
+			['status', '--short', '--untracked-files=no'],
+			{
+				cwd: ROOT,
+				encoding: 'utf8'
+			}
+		).trim();
 		return status.length > 0;
 	}
 	catch (err) {
@@ -323,11 +350,12 @@ function rotationsForMeta(meta) {
 	return rotations;
 }
 
-function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig) {
+function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig, superpartConfig) {
 	fitnessVersion = parseInt(fitnessVersion || 1, 10) === 2 ? 2 : 1;
 	refinementOptions = refinementOptions || localRefinementOptions({});
 	mergeConfig = mergeConfig || mergeOptions({});
 	adaptiveConfig = adaptiveConfig || adaptiveRotationOptions({});
+	superpartConfig = superpartConfig || superpartOptions({});
 	return {
 		placementType: 'gravity',
 		spacing: 0,
@@ -341,6 +369,9 @@ function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeCo
 		adaptiveRotationMaxAngles: adaptiveConfig.adaptiveRotationMaxAngles,
 		adaptiveRotationMinAspectRatio: adaptiveConfig.adaptiveRotationMinAspectRatio,
 		adaptiveRotationAlignmentBias: adaptiveConfig.adaptiveRotationAlignmentBias,
+		superpartClustering: superpartConfig.superpartClustering,
+		superpartSearchMs: superpartConfig.superpartSearchMs,
+		superpartMinGain: superpartConfig.superpartMinGain,
 		fitnessVersion: fitnessVersion,
 		localRefinement: refinementOptions.localRefinement,
 		localRefinementEngine: refinementOptions.localRefinementEngine,
@@ -396,14 +427,23 @@ function buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeCo
 	};
 }
 
-function runSmokeScenario(scenarioPath, timeoutMs) {
-	const child = childProcess.spawnSync('bash', [
+function runSmokeScenario(scenarioPath, timeoutMs, runtime) {
+	const useNative = runtime === 'native';
+	const command = useNative ? NATIVE_ELECTRON : 'bash';
+	const args = useNative ? [
+		APP_SMOKE_MAIN,
+		'--scenario',
+		scenarioPath,
+		'--timeoutMs',
+		String(timeoutMs)
+	] : [
 		SMOKE_SCRIPT,
 		'--scenario',
 		scenarioPath,
 		'--timeoutMs',
 		String(timeoutMs)
-	], {
+	];
+	const child = childProcess.spawnSync(command, args, {
 		cwd: ROOT,
 		stdio: 'inherit'
 	});
@@ -424,6 +464,9 @@ function runBenchmark(options) {
 	const refinementOptions = localRefinementOptions(options);
 	const mergeConfig = mergeOptions(options);
 	const adaptiveConfig = adaptiveRotationOptions(options);
+	const superpartConfig = superpartOptions(options);
+	const runtime = String(optionValue(options, 'runtime', 'runtime', 'legacy')).toLowerCase() === 'native' ? 'native' : 'legacy';
+	const compactDemands = booleanOption(optionValue(options, 'compactDemands', 'compact-demands', undefined), false);
 	const selectedInstances = listInstances(options.instances || options.instance || 'all');
 	const stamp = timestamp();
 	const artifactRoot = path.join(ARTIFACT_ROOT, stamp + '-' + label);
@@ -433,15 +476,19 @@ function runBenchmark(options) {
 		createdAt: new Date().toISOString(),
 		gitCommit: gitCommit(),
 		gitDirty: gitDirty(),
+		gitTrackedDirty: gitTrackedDirty(),
 		engineFlags: {
 			protocol: 'sota-wp0',
 			runsPerInstance: runCount,
 			timeBudgetSec: timeBudgetSec,
+			runtime: runtime,
+			compactDemands: compactDemands,
 			fitnessVersion: fitnessVersion,
 			localRefinement: refinementOptions,
 			merge: mergeConfig,
 			adaptiveRotations: adaptiveConfig,
-			baseConfig: buildConfigPreset('<per-instance rotations>', fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig)
+			superparts: superpartConfig,
+			baseConfig: buildConfigPreset('<per-instance rotations>', fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig, superpartConfig)
 		},
 		artifactRoot: artifactRoot,
 		instances: [],
@@ -462,9 +509,11 @@ function runBenchmark(options) {
 		}
 
 		const instance = readJson(instancePath);
-		const converted = esicup.instanceToSvg(instance);
+		const converted = esicup.instanceToSvg(instance, {
+			compactDemands: compactDemands
+		});
 		const rotations = rotationsForMeta(converted.meta);
-		const configOverrides = buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig);
+		const configOverrides = buildConfigPreset(rotations, fitnessVersion, refinementOptions, mergeConfig, adaptiveConfig, superpartConfig);
 		const instanceResult = {
 			name: converted.meta.name || name,
 			file: path.relative(ROOT, instancePath),
@@ -495,11 +544,18 @@ function runBenchmark(options) {
 				benchmarkMetaPath: metaPath,
 				randomSeed: runIndex,
 				timeoutMs: Math.ceil((timeBudgetSec + 60) * 1000),
-				configOverrides: configOverrides
+				configOverrides: configOverrides,
+				partQuantities: compactDemands ? converted.meta.sourceOrder.map(function(source) {
+					var record = converted.meta.sourceMap[String(source)];
+					var item = converted.meta.items.find(function(candidate) {
+						return candidate.id === record.itemId;
+					});
+					return item ? item.demand : 1;
+				}) : undefined
 			});
 
 			console.log('[nest-benchmark]', name, 'run', runIndex + 1, 'of', runCount, 'budget', timeBudgetSec + 's');
-			runSmokeScenario(scenarioPath, Math.ceil((timeBudgetSec + 60) * 1000));
+			runSmokeScenario(scenarioPath, Math.ceil((timeBudgetSec + 60) * 1000), runtime);
 
 			const report = readJson(reportPath);
 			if (!report || report.status !== 'completed' || !report.details) {
@@ -526,6 +582,7 @@ function runBenchmark(options) {
 				fitness: report.details.fitness,
 				fitnessBreakdown: report.details.fitnessBreakdown,
 				timing: report.details.timing || null,
+				superpartClustering: report.details.superpartClustering || null,
 				localRefinement: report.details.localRefinement || null,
 				localRefinementSummary: report.details.localRefinementSummary || null,
 				legality: report.details.legality || null,

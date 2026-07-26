@@ -1,0 +1,34 @@
+{
+  "name": "svg-laurel-superpart",
+  "description": "Two repeated instances of each crossed-laurel source are paired offline, nested as two conservative synthetic parts, then exported as four exact original paths.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "timeBudgetSec": 30,
+  "partQuantities": [2, 2],
+  "expectedPartsPlaced": 4,
+  "expectedSvgPathCount": 4,
+  "expectedNonCanonicalNfpLookups": 0,
+  "expectedSuperpartMinimums": {
+    "sourcesPaired": 2,
+    "superpartInstances": 2,
+    "expandedMemberPlacements": 4
+  },
+  "configOverrides": {
+    "placementType": "gravity",
+    "rotations": 4,
+    "adaptiveRotations": false,
+    "improvedPlacementScoring": true,
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "localRefinement": false,
+    "superpartClustering": true,
+    "superpartSearchMs": 5000,
+    "superpartMinGain": 0.05,
+    "curveTolerance": 0.3
+  }
+}

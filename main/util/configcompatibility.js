@@ -17,15 +17,30 @@
 			reason: 'Continuous compaction uses the Smart refinement engine.'
 		}
 	];
+	var superpartClusteringRules = [
+		{
+			key: 'mergeLines',
+			value: false,
+			reason: 'Common-line merging is disabled while repeated parts are interlocked so every exported member keeps its exact cut path.'
+		}
+	];
 
-	function rulesForContinuousCompaction(){
-		return continuousCompactionRules.map(function(rule){
+	function cloneRules(rules){
+		return rules.map(function(rule){
 			return {
 				key: rule.key,
 				value: rule.value,
 				reason: rule.reason
 			};
 		});
+	}
+
+	function rulesForContinuousCompaction(){
+		return cloneRules(continuousCompactionRules);
+	}
+
+	function rulesForSuperpartClustering(){
+		return cloneRules(superpartClusteringRules);
 	}
 
 	function applyContinuousCompaction(config){
@@ -45,10 +60,29 @@
 		return applyContinuousCompaction(config);
 	}
 
+	function applySuperpartClustering(config, pairingActive){
+		if(!config){
+			return config;
+		}
+		if(config.placementType === 'steprepeat'){
+			config.superpartClustering = false;
+			return config;
+		}
+		if(config.superpartClustering !== true || pairingActive !== true){
+			return config;
+		}
+		for(var i=0; i<superpartClusteringRules.length; i++){
+			config[superpartClusteringRules[i].key] = superpartClusteringRules[i].value;
+		}
+		return config;
+	}
+
 	var api = {
 		rulesForContinuousCompaction: rulesForContinuousCompaction,
+		rulesForSuperpartClustering: rulesForSuperpartClustering,
 		applyContinuousCompaction: applyContinuousCompaction,
-		applyActiveContinuousCompaction: applyActiveContinuousCompaction
+		applyActiveContinuousCompaction: applyActiveContinuousCompaction,
+		applySuperpartClustering: applySuperpartClustering
 	};
 
 	root.ConfigCompatibility = api;

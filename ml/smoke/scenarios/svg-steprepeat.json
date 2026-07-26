@@ -4,6 +4,10 @@
   "input": "ml/examples/app-smoke.svg",
   "sourceFormat": "svg",
   "outputFormat": "svg",
+  "expectedSuperpartEnabled": false,
+  "expectedRuntimeConfig": {
+    "superpartClustering": false
+  },
   "timeoutMs": 60000,
   "configOverrides": {
     "placementType": "steprepeat",

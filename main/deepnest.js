@@ -27,6 +27,9 @@
 			adaptiveRotationMaxAngles: 6,
 			adaptiveRotationMinAspectRatio: 1.35,
 			adaptiveRotationAlignmentBias: 0.7,
+			superpartClustering: true,
+			superpartSearchMs: 2000,
+			superpartMinGain: 0.10,
 			populationSize: 10,
 			mutationRate: 10,
 			threads: 4,
@@ -127,6 +130,10 @@
 			var activeWorkerPayloads = {};
 			var activeNestToken = null;
 			var refinementCounter = 0;
+			var activeSuperparts = {};
+			var activeSuperpartValidationParts = null;
+			var superpartCache = {};
+			var activeSuperpartStats = null;
 		
 		var progressCallback = null;
 		var displayCallback = null;
@@ -194,6 +201,276 @@
 				return geometry;
 			}
 
+			function prepareSuperpartSources(parts, userConfig){
+				activeSuperparts = {};
+				activeSuperpartValidationParts = parts;
+				self.lastSuperpartError = null;
+				var stats = {
+					enabled: !!(userConfig && userConfig.superpartClustering === true),
+					sourcesChecked: 0,
+					sourcesSkippedNoHeadroom: 0,
+					sourcesSkippedJobBudget: 0,
+					sourcesPaired: 0,
+					superpartInstances: 0,
+					memberInstances: 0,
+					searchMs: 0,
+					pairs: []
+				};
+				activeSuperpartStats = stats;
+				self.lastSuperpartStats = stats;
+				if(!stats.enabled){
+					return stats;
+				}
+				if(typeof Superpart === 'undefined' || typeof Superpart.findBestPair !== 'function'){
+					stats.reason = 'helperUnavailable';
+					return stats;
+				}
+
+				var originalSourceCount = parts.length;
+				var minimumGain = Math.max(0, Number(userConfig.superpartMinGain) || 0.05);
+				var searchBudget = Math.max(50, Number(userConfig.superpartSearchMs) || 2000);
+				var jobBudget = searchBudget * 2;
+				var jobDeadline = Date.now() + jobBudget;
+				stats.jobBudgetMs = jobBudget;
+				for(var i=0; i<originalSourceCount; i++){
+					var part = parts[i];
+					var quantity = Math.max(0, parseInt(part.quantity, 10) || 0);
+					if(part.sheet || quantity < 2 || !part.polygontree || part.polygontree.length < 3){
+						continue;
+					}
+					stats.sourcesChecked++;
+					if(Superpart.theoreticalHullGain(part.polygontree) < minimumGain){
+						stats.sourcesSkippedNoHeadroom++;
+						continue;
+					}
+					var remainingJobBudget = jobDeadline - Date.now();
+					if(remainingJobBudget < 50){
+						stats.sourcesSkippedJobBudget++;
+						continue;
+					}
+
+					var searchStartedAt = Date.now();
+					var searchTrace = {
+						source: i,
+						quantity: quantity
+					};
+					var pairing = Superpart.findBestPair(part.polygontree, {
+						sourceKey: i,
+						curveTolerance: Number(userConfig.curveTolerance) || 0.3,
+						clipperScale: Number(userConfig.clipperScale) || 10000000,
+						budgetMs: Math.min(searchBudget, remainingJobBudget),
+						minGain: minimumGain,
+						spacing: Number(userConfig.spacing) || 0,
+						processHoles: userConfig.processHoles === true,
+						// Disconnected members are represented by a conservative
+						// convex-hull shell. Rank the mating pose by that shell;
+						// placementType still governs where the finished rigid pair
+						// is placed on the sheet.
+						metric: 'convexhull',
+						cache: superpartCache,
+						trace: searchTrace
+					});
+					stats.searchMs += Date.now() - searchStartedAt;
+					if(!stats.attempts){
+						stats.attempts = [];
+					}
+					stats.attempts.push(searchTrace);
+					if(!pairing || pairing.gain < minimumGain){
+						continue;
+					}
+
+					var pairQuantity = Math.floor(quantity / 2);
+					part.quantity = quantity % 2;
+					var syntheticSource = parts.length;
+					var members = [];
+					for(var memberIndex=0; memberIndex<pairing.members.length; memberIndex++){
+						members.push({
+							sourceIndex: i,
+							rotation: pairing.members[memberIndex].rotation,
+							offset: {
+								x: pairing.members[memberIndex].offset.x,
+								y: pairing.members[memberIndex].offset.y
+							}
+						});
+					}
+					activeSuperparts[syntheticSource] = {
+						source: syntheticSource,
+						originalSource: i,
+						members: members,
+						gain: pairing.gain,
+						objective: pairing.objective,
+						gravityGain: pairing.gravityGain,
+						bboxGain: pairing.bboxGain,
+						angle: pairing.angle,
+						envelopeMode: pairing.envelopeMode,
+						diagnostics: pairing.diagnostics
+					};
+					parts.push({
+						quantity: pairQuantity,
+						sheet: false,
+						polygontree: Superpart.cloneRing(pairing.collisionEnvelope),
+						superpart: activeSuperparts[syntheticSource]
+					});
+					stats.sourcesPaired++;
+					stats.superpartInstances += pairQuantity;
+					stats.memberInstances += pairQuantity * members.length;
+					stats.pairs.push({
+						source: i,
+						syntheticSource: syntheticSource,
+						quantity: pairQuantity,
+						gain: pairing.gain,
+						bboxGain: pairing.bboxGain,
+						angle: pairing.angle,
+						envelopeMode: pairing.envelopeMode,
+						searchMs: pairing.diagnostics ? pairing.diagnostics.elapsedMs : null,
+						cacheHit: pairing.diagnostics ? !!pairing.diagnostics.cacheHit : false
+					});
+				}
+				return stats;
+			}
+
+			function expandSuperpartPayload(payload){
+				if(!payload || !payload.placements || !activeSuperpartStats ||
+					activeSuperpartStats.sourcesPaired === 0 ||
+					typeof Superpart === 'undefined'){
+					return payload;
+				}
+				var expandedPayload = {};
+				for(var key in payload){
+					if(Object.prototype.hasOwnProperty.call(payload, key) && key !== 'placements'){
+						expandedPayload[key] = payload[key];
+					}
+				}
+				expandedPayload.placements = [];
+				var expandedCount = 0;
+				var clusterPlacements = 0;
+				var expectedExpandedCount = 0;
+				var seenIds = {};
+				var expansionError = null;
+				for(var sheetIndex=0; sheetIndex<payload.placements.length; sheetIndex++){
+					var sheet = payload.placements[sheetIndex];
+					var expandedSheet = {};
+					for(var sheetKey in sheet){
+						if(Object.prototype.hasOwnProperty.call(sheet, sheetKey) && sheetKey !== 'sheetplacements'){
+							expandedSheet[sheetKey] = sheet[sheetKey];
+						}
+					}
+					expandedSheet.sheetplacements = [];
+					for(var partIndex=0; partIndex<sheet.sheetplacements.length; partIndex++){
+						var placement = sheet.sheetplacements[partIndex];
+						var superpart = activeSuperparts[placement.source];
+						if(!superpart){
+							if(!self.parts[placement.source]){
+								expansionError = 'Worker result contains an unknown synthetic source.';
+								break;
+							}
+							expectedExpandedCount++;
+							expandedSheet.sheetplacements.push(placement);
+							continue;
+						}
+						clusterPlacements++;
+						expectedExpandedCount += superpart.members.length;
+						for(var memberIndex=0; memberIndex<superpart.members.length; memberIndex++){
+							var member = superpart.members[memberIndex];
+							if(!self.parts[member.sourceIndex]){
+								expansionError = 'Superpart member references an unknown original source.';
+								break;
+							}
+							var memberPlacement = Superpart.composeMemberPlacement(
+								placement,
+								member,
+								String(placement.id) + '-m' + memberIndex,
+								member.sourceIndex
+							);
+							if(!memberPlacement){
+								expansionError = 'Superpart expansion produced a non-finite member transform.';
+								break;
+							}
+							expandedSheet.sheetplacements.push(memberPlacement);
+							expandedCount++;
+						}
+						if(expansionError){
+							break;
+						}
+					}
+					if(expansionError){
+						break;
+					}
+					expandedPayload.placements.push(expandedSheet);
+				}
+				if(!expansionError && expandedPayload.placements.length !== payload.placements.length){
+					expansionError = 'Superpart expansion dropped a placement sheet.';
+				}
+				if(!expansionError){
+					var validatedCount = 0;
+					for(var validationSheet=0; validationSheet<expandedPayload.placements.length; validationSheet++){
+						var validationPlacements = expandedPayload.placements[validationSheet].sheetplacements;
+						for(var validationIndex=0; validationIndex<validationPlacements.length; validationIndex++){
+							var expandedPlacement = validationPlacements[validationIndex];
+							if(activeSuperparts[expandedPlacement.source] || !self.parts[expandedPlacement.source]){
+								expansionError = 'Synthetic source escaped into the presentation payload.';
+								break;
+							}
+							if(!isFinite(Number(expandedPlacement.x)) ||
+								!isFinite(Number(expandedPlacement.y)) ||
+								!isFinite(Number(expandedPlacement.rotation))){
+								expansionError = 'Expanded member placement contains a non-finite transform.';
+								break;
+							}
+							var idKey = String(expandedPlacement.id);
+							if(Object.prototype.hasOwnProperty.call(seenIds, idKey)){
+								expansionError = 'Superpart expansion produced duplicate placement IDs.';
+								break;
+							}
+							seenIds[idKey] = true;
+							validatedCount++;
+						}
+						if(expansionError){
+							break;
+						}
+					}
+					if(!expansionError && validatedCount !== expectedExpandedCount){
+						expansionError = 'Superpart expansion count does not match represented members.';
+					}
+				}
+				if(!expansionError){
+					var exactValidation = Superpart.validateExpandedPlacements(
+						expandedPayload.placements,
+						activeSuperpartValidationParts,
+						{
+							clipperScale: config.clipperScale,
+							areaEpsilon: 0
+						}
+					);
+					if(!exactValidation.valid){
+						expansionError = 'Expanded superpart layout failed exact validation: ' +
+							exactValidation.reason + '.';
+					}
+					activeSuperpartStats.exactExpansionValidation = exactValidation;
+				}
+				if(expansionError){
+					activeSuperpartStats.expansionError = expansionError;
+					self.lastSuperpartError = expansionError;
+					return null;
+				}
+				expandedPayload.superpartClustering = {
+					enabled: true,
+					sourcesChecked: activeSuperpartStats.sourcesChecked,
+					sourcesPaired: activeSuperpartStats.sourcesPaired,
+					superpartInstances: activeSuperpartStats.superpartInstances,
+					clusterPlacements: clusterPlacements,
+					partsPlaced: expectedExpandedCount,
+					expandedMemberPlacements: expandedCount,
+					searchMs: activeSuperpartStats.searchMs,
+					mergeLinesDisabled: activeSuperpartStats.mergeLinesDisabled === true,
+					expansionValidated: true,
+					exactExpansionValidation: activeSuperpartStats.exactExpansionValidation,
+					pairs: activeSuperpartStats.pairs,
+					attempts: activeSuperpartStats.attempts || []
+				};
+				return expandedPayload;
+			}
+
 			function requestLocalRefinementForBest(basePayload, userConfig){
 			if(!basePayload || basePayload.postProcessRefinement || !userConfig || userConfig.localRefinement !== true){
 				return;
@@ -252,6 +529,11 @@
 				payload.localRefinement.enabled = true;
 				payload.localRefinement.pending = false;
 				payload.localRefinement.token = payload.refinementToken;
+			}
+			payload = expandSuperpartPayload(payload);
+			if(!payload){
+				existing.localRefinement.error = self.lastSuperpartError || 'Superpart expansion failed.';
+				return;
 			}
 			payload.selected = existing.selected;
 			self.nests.splice(index, 1);
@@ -361,6 +643,9 @@
 		}
 		
 		this.importsvg = function(filename, dirpath, svgstring, scalingFactor, dxfFlag){
+			if(typeof Superpart !== 'undefined' && typeof Superpart.clearCache === 'function'){
+				Superpart.clearCache(superpartCache);
+			}
 			// parse svg
 			// config.scale is the default scale, and may not be applied
 			// scalingFactor is an absolute scaling that must be applied regardless of input svg contents
@@ -808,6 +1093,20 @@
 				config.adaptiveRotations = !!c.adaptiveRotations;
 			}
 
+			if(c.superpartClustering === true || c.superpartClustering === false){
+				config.superpartClustering = !!c.superpartClustering;
+			}
+
+			var superpartSearchMs = Number(c.superpartSearchMs);
+			if(isFinite(superpartSearchMs) && superpartSearchMs >= 50){
+				config.superpartSearchMs = Math.min(Math.floor(superpartSearchMs), 30000);
+			}
+
+			var superpartMinGain = Number(c.superpartMinGain);
+			if(isFinite(superpartMinGain) && superpartMinGain >= 0){
+				config.superpartMinGain = Math.min(superpartMinGain, 0.75);
+			}
+
 			if(c.adaptiveRotationMaxAngles && parseInt(c.adaptiveRotationMaxAngles, 10) >= 1){
 				config.adaptiveRotationMaxAngles = parseInt(c.adaptiveRotationMaxAngles, 10);
 			}
@@ -1140,6 +1439,10 @@
 
 			if(typeof ConfigCompatibility !== 'undefined'){
 				ConfigCompatibility.applyActiveContinuousCompaction(config);
+				ConfigCompatibility.applySuperpartClustering(config);
+			}
+			else if(config.superpartClustering){
+				config.mergeLines = false;
 			}
 			
 			var n = Number(c.timeRatio);
@@ -1632,6 +1935,20 @@
 				}
 			}
 
+			var superpartPreparation = prepareSuperpartSources(parts, config);
+			config.superpartPairingActive = superpartPreparation.sourcesPaired > 0;
+			if(typeof ConfigCompatibility !== 'undefined'){
+				ConfigCompatibility.applySuperpartClustering(
+					config,
+					superpartPreparation.sourcesPaired > 0
+				);
+			}
+			else if(superpartPreparation.sourcesPaired > 0){
+				config.mergeLines = false;
+			}
+			superpartPreparation.mergeLinesDisabled =
+				superpartPreparation.sourcesPaired > 0 && config.mergeLines === false;
+
 			// offset tree recursively
 			function offsetTree(t, offset, offsetFunction, simpleFunction, inside){
 				var simple = t;
@@ -1687,6 +2004,9 @@
 				// user might have quit while we're away
 				return;
 			}
+			if(!payload || payload.nestToken !== activeNestToken){
+				return;
+			}
 			// Late arrivals after this.stop() (error path, Step & Repeat completion,
 			// or user abort that didn't null GA) must not mutate GA state or the
 			// nests history. With bounded parallel evaluation we can have up to
@@ -1721,8 +2041,16 @@
 				bestComparisonFitness = (typeof this.nests[0].refinementBaseFitness === 'number') ? this.nests[0].refinementBaseFitness : this.nests[0].fitness;
 			}
 			if(this.nests.length == 0 || bestComparisonFitness > payload.fitness ){
-				this.nests.unshift(payload);
 				requestLocalRefinementForBest(payload, config);
+				payload = expandSuperpartPayload(payload);
+				if(!payload){
+					this.stop(true);
+					if(typeof window.message === 'function'){
+						window.message(self.lastSuperpartError || 'Superpart expansion failed.', true);
+					}
+					return;
+				}
+				this.nests.unshift(payload);
 
 				if(this.nests.length > 10){
 					this.nests.pop();
@@ -2021,6 +2349,7 @@
 			this.stop = function(drainBackground){
 				this.working = false;
 				activeNestToken = null;
+				activeSuperpartValidationParts = null;
 				if(GA && GA.population && GA.population.length > 0){
 					GA.population.forEach(function(i){
 						i.processing = false;
@@ -2044,6 +2373,10 @@
 				GA = null;
 				activeWorkerPayloads = {};
 				activeNestToken = null;
+				activeSuperparts = {};
+				activeSuperpartValidationParts = null;
+				activeSuperpartStats = null;
+				this.lastSuperpartError = null;
 				while(this.nests.length > 0){
 					this.nests.pop();
 				}
@@ -2066,6 +2399,28 @@
 		this.population = [];
 		var seedPlacements = this.seedPlacements(adam);
 		var seen = {};
+
+		// A two-superpart job has only two distinct insertion orders. Without
+		// this expansion, the normal seed loop never reaches its 90/180-degree
+		// deterministic presets and relies on mutation to discover them.
+		if(this.config.superpartPairingActive === true){
+			var rotationPresetCount = Math.max(
+				1,
+				Math.min(4, parseInt(this.config.rotations, 10) || 1)
+			);
+			for(var placementSeed=0;
+				placementSeed<seedPlacements.length && this.population.length<populationSize;
+				placementSeed++){
+				for(var rotationSeed=1;
+					rotationSeed<=rotationPresetCount && this.population.length<populationSize;
+					rotationSeed++){
+					this.addIndividual({
+						placement: seedPlacements[placementSeed],
+						rotation: this.seedRotations(seedPlacements[placementSeed], rotationSeed)
+					}, seen);
+				}
+			}
+		}
 
 		for(var i=0; i<seedPlacements.length && this.population.length < populationSize; i++){
 			var individual = {

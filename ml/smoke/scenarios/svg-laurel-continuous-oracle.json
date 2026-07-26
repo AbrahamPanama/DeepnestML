@@ -8,6 +8,7 @@
   "timeBudgetSec": 35,
   "expectedNonCanonicalNfpLookups": 0,
   "configOverrides": {
+    "superpartClustering": false,
     "placementType": "gravity",
     "mergeLines": false,
     "processHoles": false,

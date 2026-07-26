@@ -7,7 +7,7 @@ ARTIFACT_ROOT="${DEEPNEST_SMOKE_ARTIFACT_ROOT:-"$ROOT_DIR/ml/artifacts/smoke-bat
 if [ "$#" -gt 0 ]; then
   SCENARIOS=("$@")
 else
-  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-laurel-v4-contact" "svg-steprepeat" "svg-export-pdf")
+  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-laurel-v4-contact" "svg-laurel-superpart-default" "svg-steprepeat" "svg-export-pdf")
 fi
 
 mkdir -p "$ARTIFACT_ROOT"
@@ -99,6 +99,47 @@ if (typeof scenario.expectedNonCanonicalNfpLookups === 'number') {
     process.exit(1);
   }
 }
+if (scenario.expectedSuperpartMinimums && typeof scenario.expectedSuperpartMinimums === 'object') {
+  const superpart = report.details && report.details.superpartClustering;
+  for (const field of Object.keys(scenario.expectedSuperpartMinimums)) {
+    const expected = Number(scenario.expectedSuperpartMinimums[field]);
+    const actual = superpart && typeof superpart[field] === 'number' ? superpart[field] : null;
+    if (actual === null || actual < expected) {
+      console.error('[smoke-battery] superpart minimum not met:', field, expected, actual);
+      process.exit(1);
+    }
+  }
+}
+if (typeof scenario.expectedSuperpartEnabled === 'boolean') {
+  const superpart = report.details && report.details.superpartClustering;
+  const actual = superpart ? superpart.enabled === true : null;
+  if (actual !== scenario.expectedSuperpartEnabled) {
+    console.error('[smoke-battery] unexpected superpart enabled state:', scenario.expectedSuperpartEnabled, actual);
+    process.exit(1);
+  }
+}
+if (scenario.expectedRuntimeConfig && typeof scenario.expectedRuntimeConfig === 'object') {
+  const runtimeConfig = report.details && report.details.runtimeConfig;
+  for (const field of Object.keys(scenario.expectedRuntimeConfig)) {
+    const expected = scenario.expectedRuntimeConfig[field];
+    const actual = runtimeConfig ? runtimeConfig[field] : undefined;
+    if (actual !== expected) {
+      console.error('[smoke-battery] runtime config mismatch:', field, expected, actual);
+      process.exit(1);
+    }
+  }
+}
+if (scenario.expectedLayoutMaximums && typeof scenario.expectedLayoutMaximums === 'object') {
+  const layout = report.details && report.details.layout;
+  for (const field of Object.keys(scenario.expectedLayoutMaximums)) {
+    const expected = Number(scenario.expectedLayoutMaximums[field]);
+    const actual = layout && typeof layout[field] === 'number' ? layout[field] : null;
+    if (actual === null || actual > expected) {
+      console.error('[smoke-battery] layout maximum exceeded:', field, expected, actual);
+      process.exit(1);
+    }
+  }
+}
 if (scenario.expectedLocalRefinementMinimums && typeof scenario.expectedLocalRefinementMinimums === 'object') {
   const local = report.details && report.details.localRefinement;
   for (const field of Object.keys(scenario.expectedLocalRefinementMinimums)) {
@@ -144,6 +185,15 @@ if (scenario.continuousOracle && typeof scenario.continuousOracle === 'object') 
 }
 console.log('[smoke-battery] passed:', report.scenarioName, report.outputFormat, stat.size + ' bytes');
 NODE
+
+  independent_legality="$(node -e "const s=require(process.argv[1]); console.log(s.expectedIndependentLegality === true ? 'true' : 'false')" "$scenario_path")"
+  if [ "$independent_legality" = "true" ]; then
+    expected_parts="$(node -e "const s=require(process.argv[1]); console.log(Number(s.expectedPartsPlaced || 0))" "$scenario_path")"
+    node "$ROOT_DIR/ml/tests/exported_layout_legality/run.js" \
+      --export "$output_path" \
+      --expected-parts "$expected_parts" \
+      --report "$scenario_dir/export-legality.json"
+  fi
 done
 
 echo "[smoke-battery] all scenarios passed"

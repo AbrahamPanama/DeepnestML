@@ -245,7 +245,17 @@ function layoutDemandedCopies(normalized, opts) {
 
 	var stripLength = Number(opts.stripLengthEstimate);
 	if (!isFinite(stripLength) || stripLength <= 0) {
-		stripLength = 2 * normalized.totalArea / normalized.stripHeight;
+		if (opts.compactDemands === true) {
+			stripLength = margin;
+			for (var safeIndex = 0; safeIndex < normalized.items.length; safeIndex++) {
+				var safeBounds = boundsForShape(normalized.items[safeIndex].shape);
+				stripLength += normalized.items[safeIndex].demand *
+					(safeBounds.width + margin);
+			}
+		}
+		else {
+			stripLength = 2 * normalized.totalArea / normalized.stripHeight;
+		}
 	}
 	if (!isFinite(stripLength) || stripLength <= 0) {
 		stripLength = normalized.stripHeight;
@@ -266,7 +276,8 @@ function layoutDemandedCopies(normalized, opts) {
 
 	for (var i = 0; i < normalized.items.length; i++) {
 		var item = normalized.items[i];
-		for (var copyIndex = 0; copyIndex < item.demand; copyIndex++) {
+		var copyCount = opts.compactDemands === true ? 1 : item.demand;
+		for (var copyIndex = 0; copyIndex < copyCount; copyIndex++) {
 			var bounds = boundsForShape(item.shape);
 			var paddedWidth = bounds.width + margin;
 			var paddedHeight = bounds.height + margin;
@@ -372,6 +383,9 @@ function instanceToSvg(instanceJson, opts) {
 		svgText: svg.join('\n') + '\n',
 		meta: {
 			name: normalized.name,
+			compactDemands: opts && opts.compactDemands === true,
+			stripLengthPolicy: opts && opts.compactDemands === true ?
+				'safe-demand-row' : 'area-2x',
 			stripHeight: normalized.stripHeight,
 			stripLengthEstimate: layout.stripLength,
 			sheetSource: 0,

@@ -22,6 +22,7 @@
     "continuousElapsedMs": 8000
   },
   "configOverrides": {
+    "superpartClustering": false,
     "placementType": "gravity",
     "rotations": 1,
     "adaptiveRotations": false,

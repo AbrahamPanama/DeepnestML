@@ -8,10 +8,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ## Current Local Release
 
-- **Version:** `0.7.5`
+- **Version:** `0.9.0`
 - **Product name:** `Deepnest ML`
 - **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
-- **macOS local build:** `dist/Deepnest ML-0.7.5-mac-arm64.dmg`
+- **macOS local build:** `dist/Deepnest ML-0.9.0-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
 
@@ -28,11 +28,18 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Export SVG, PDF, DXF, and per-sheet TIFF through a unified export modal.
 - Export TIFFs for print/RIP workflows with artwork-only outline filtering, optional top-edge indicator marks, optional sheet numbering, DPI presets/custom DPI, RGB/CMYK color handling, ICC profile embedding/conversion, transparent RGB output, and TIFF compression choices.
 - Use the standard compact nesting modes or the deterministic **Step & Repeat** optimization mode for print/template layouts.
+- Pre-pair profitable repeated concave parts into conservative rigid clusters, then expand every member back to its exact cut path for export.
 - Route outer NFP generation through the native Boost addon first, with JS fallbacks and an optional hole-processing toggle.
 - Run opt-in local-refinement experiments and engine benchmark checks from the included `ml/` harnesses.
 - Run in a unified light workspace where the parts list remains visible while nesting runs in the main workspace pane.
 
-## Recent 0.7.x Highlights
+## Recent Highlights
+
+### 0.9.0: Repeated-Part Interlocking
+
+Deepnest ML can now measure and pre-pair repeated concave parts before the normal NFP placement pass. The laurel validation job forms two visible interlocked pairs and reduces used sheet width from `477.98` to `394.26` units at defaults and `406.21` under the saved user-settings profile. The search is capped and geometry-screened, keeps the proven four construction rotations, and expands every pair back to its original member paths before SVG, PDF, DXF, or TIFF export.
+
+The feature is enabled by default with a conservative 10% mating-gain threshold. Common-line merging is disabled while interlocking is active so no synthetic envelope can reach a cut file. Step & Repeat remains a separate fixed-grid mode and disables interlocking at runtime.
 
 ### 0.7.5: Final Legality Gate For Slide Local Refinement
 

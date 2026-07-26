@@ -1,0 +1,38 @@
+{
+  "name": "svg-laurel-superpart-default",
+  "description": "Four-part laurel efficacy using the migrated product default for superpart clustering.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "isolatedUserData": true,
+  "timeoutMs": 90000,
+  "timeBudgetSec": 30,
+  "partQuantities": [2, 2],
+  "expectedPartsPlaced": 4,
+  "expectedNonCanonicalNfpLookups": 0,
+  "expectedIndependentLegality": true,
+  "expectedSuperpartMinimums": {
+    "sourcesPaired": 2,
+    "clusterPlacements": 2,
+    "partsPlaced": 4
+  },
+  "expectedLayoutMaximums": {
+    "usedSheetWidth": 410
+  },
+  "expectedRuntimeConfig": {
+    "superpartClustering": true,
+    "mergeLines": false
+  },
+  "configOverrides": {
+    "placementType": "gravity",
+    "rotations": 4,
+    "adaptiveRotations": false,
+    "improvedPlacementScoring": true,
+    "localRefinement": false,
+    "processHoles": false,
+    "populationSize": 10,
+    "mutationRate": 10,
+    "threads": 4,
+    "curveTolerance": 0.3
+  }
+}

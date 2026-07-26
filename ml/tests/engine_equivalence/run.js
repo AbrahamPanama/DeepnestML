@@ -76,6 +76,7 @@ function stableConfigOverrides(scenario) {
 	overrides.localRefinementBudgetMs = 1500;
 	overrides.localRefinementRotations = false;
 	overrides.localRefinementMaxColdAnglesPerPart = 3;
+	overrides.superpartClustering = false;
 	return overrides;
 }
 

@@ -86,9 +86,8 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-25 by Codex): dirty — RC-1 implementation and measured
-stop report are uncommitted; generated benchmark-result JSONs remain untracked
-by convention.
+State (verified 2026-07-26 by Codex): dirty by claimed SP-1..SP-5
+implementation; generated benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -98,6 +97,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, docs, `AGENT_COLLABORATION.md` | In progress. SP-0 passed: L control bbox gain 40.00%; laurel hull gain 18.63% at 9 degrees with zero exact overlap and a visually compact pair. Exhaustive laurel search took 181.7 s, so bounded coarse-to-fine performance is a hard SP-1 gate | 2026-07-26 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
@@ -162,6 +162,66 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-26 - SP-1..SP-5 candidate reaches Tier 1 (Codex)
+
+- Tier 1 is substantively green, not accept-count green: exact SP-0 hull mating
+  gain is 18.634%; the default candidate reduces used width 477.983 -> 394.258
+  (17.516%) and used-strip utilization rises 18.169% -> 22.027%. This recovers
+  94.0% of theoretical gain against the required 60%.
+- Three seeded 15-second production runs remain under the hard 410-unit gate:
+  405.249, 394.261, and 394.261. The saved user-settings profile reaches
+  406.212. Every run expands four original members, reports zero non-canonical
+  NFP lookups, and passes both the in-engine fail-closed Clipper gate and an
+  independent exported-SVG sweep with zero overlap/outside area.
+- The initial placementType-specific pair objectives were measured and rejected:
+  Gravity-linear and bbox pairing produced 462.640 and 452.989 units. Ranking
+  the conservative convex-hull collision shell recovers the repeatedly observed
+  9/5-degree pairs and the real 394-unit result.
+- A small-job GA blind spot was fixed only when pairing is active: two synthetic
+  parts previously exposed only two order seeds, never deterministic rotation
+  presets 2-4. Clustered jobs now seed all four canonical patterns; flag-off
+  remains byte-identical to `a00d17a` under an isolated, fixed-seed scenario.
+- Tier 2 all-corpus, packaging, and installed-app production parity remain before
+  completion. The separate RC-1 raster test still fails its documented 55.8%
+  ambiguity off-ramp; that stopped/default-off experiment is not part of SP.
+
+### 2026-07-26 - SP-0 superpart go/no-go passed; SP-1 integration claimed (Codex)
+
+- Prediction recorded before execution: laurel mating gain >= 10%, L-shape
+  control >= 20%; stop if the L control passed but laurel gain was below 5%.
+- Exact SP-0 results (`ml/tests/superpart_gain/run.js`, 22,680 deterministic
+  poses):
+  - L control: 40.00% bbox gain, 18.18% hull gain, zero exact overlap.
+  - Laurel bbox winner: 44.96% bbox gain but only 7.56% hull gain; rendered SVG
+    exposed this as a large U-shaped enclosure, so it was rejected as a scoring
+    artifact.
+  - Laurel hull winner: 18.63% hull gain and 31.97% bbox gain at 9 degrees, zero
+    exact overlap; rendered SVG shows the second branch occupying the first
+    branch's concave interior rather than enclosing a large void.
+  - Runtime: 181.7 s for laurel, contradicting the plan's ~0.5 s estimate. SP-1
+    must recover the useful pose with bounded coarse-to-fine work.
+- The active legacy part model accepts one outer component. Clipper union of the
+  proven laurel members returns two components, so SP-2 cannot pass a
+  disconnected union through as an ordinary part. Planned conservative
+  representation: exact original members plus a minimal non-exported connector
+  in the synthetic collision envelope; placements are expanded back to original
+  members before display/export.
+- Required pre-edit checkpoint attempted with
+  `npm run ml:checkpoint -- --name superpart-clustering-pre`; it failed because
+  no completed training run with a trained model exists. No checkpoint artifact
+  was created. Flag-off equivalence and corpus gates remain mandatory.
+
+### 2026-07-26 - SP-0 pre-run prediction (Codex)
+
+- Prediction recorded before implementation or measurement: the laurel pair
+  search will find at least 10% mating gain, informed by the earlier 13.3%
+  canonical pair-compaction result; the obvious L-shape control will exceed 20%.
+- Falsification rule: if the L-control passes but laurel mating gain is below 5%,
+  stop the superpart plan and report that the target geometry lacks profitable
+  pair interlock. Do not tune the threshold or proceed to SP-1.
+- Initial scope is the standalone exact search and visual SVG only. No engine,
+  UI, cache, or export files are claimed until SP-0 passes.
 
 ### 2026-07-25 - RC-1 raster collision gate stops at the proposed default (Codex)
 

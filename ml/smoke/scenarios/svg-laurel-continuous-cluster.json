@@ -24,6 +24,7 @@
     "continuousMaxAngleDeltaDeg": 45.000001
   },
   "configOverrides": {
+    "superpartClustering": false,
     "placementType": "gravity",
     "mergeLines": false,
     "processHoles": false,

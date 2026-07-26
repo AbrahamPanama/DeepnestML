@@ -1,0 +1,29 @@
+{
+  "name": "svg-laurel-superpart-off",
+  "description": "Exact flag-off baseline for the four-part laurel superpart efficacy comparison.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 360000,
+  "timeBudgetSec": 300,
+  "partQuantities": [2, 2],
+  "expectedPartsPlaced": 4,
+  "expectedSvgPathCount": 4,
+  "expectedNonCanonicalNfpLookups": 0,
+  "configOverrides": {
+    "placementType": "gravity",
+    "rotations": 4,
+    "adaptiveRotations": false,
+    "improvedPlacementScoring": true,
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "localRefinement": false,
+    "superpartClustering": false,
+    "superpartSearchMs": 5000,
+    "superpartMinGain": 0.05,
+    "curveTolerance": 0.3
+  }
+}

@@ -24,6 +24,7 @@
     "minimumRecovery": 0.6
   },
   "configOverrides": {
+    "superpartClustering": false,
     "placementType": "gravity",
     "mergeLines": false,
     "processHoles": false,

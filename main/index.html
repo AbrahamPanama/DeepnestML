@@ -2,7 +2,7 @@
 <html itemscope="" itemtype="http://schema.org/WebPage" lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Deepnest ML 0.7.5</title>
+		<title>Deepnest ML 0.9.0</title>
 
 		<link type="text/css" rel="stylesheet" media="all" href="font/latolatinfonts.css" />
 		<link rel="stylesheet" type="text/css" href="style.css" />
@@ -16,6 +16,7 @@
 		<script src="util/configcompatibility.js"></script>
 		<script src="util/raster-collision.js"></script>
 		<script src="util/pose-generator.js"></script>
+		<script src="util/superpart.js"></script>
 		<script src="util/refinement-contact.js"></script>
 		<script src="util/placementworker.js"></script>
 		<script src="util/interact.js"></script>
@@ -399,6 +400,7 @@
 			// config form
 			const config = createSettingsBridge();
 			window.config = config;
+			var previousSuperpartDefaultVersion = Number(config.getSync('superpartDefaultVersion')) || 0;
 			
 			var defaultconfig = {
 			  units: 'inch',
@@ -411,6 +413,10 @@
 			  adaptiveRotationMaxAngles: 6,
 			  adaptiveRotationMinAspectRatio: 1.35,
 			  adaptiveRotationAlignmentBias: 0.7,
+			  superpartClustering: true,
+			  superpartSearchMs: 2000,
+			  superpartMinGain: 0.10,
+			  superpartDefaultVersion: 1,
 			  threads: 4,
 			  populationSize: 10,
 			  mutationRate: 10,
@@ -491,6 +497,12 @@
 			};
 			
 			config.defaults(defaultconfig);
+			if(previousSuperpartDefaultVersion < 1){
+				config.setSync('superpartClustering', true);
+				config.setSync('superpartSearchMs', 2000);
+				config.setSync('superpartMinGain', 0.10);
+				config.setSync('superpartDefaultVersion', 1);
+			}
 
 			function enforceContinuousCompactionConfigGate(enabled){
 				if(enabled !== true || typeof ConfigCompatibility === 'undefined'){
@@ -503,7 +515,7 @@
 					}
 				}
 			}
-			
+
 			const defaultConversionServer = 'http://convert.deepnest.io';
 			
 			// set to default if not set (for people with old configs stored)
@@ -543,7 +555,7 @@
 						}
 					}
 					
-						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'localRefinementContactAcceptance' || key == 'v4FastLegality' || key == 'v4IncrementalScoring' || key == 'v4ScaledCoverage' || key == 'v4EnableSwap' || key == 'v4WindowedRebuild' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'superpartClustering' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'localRefinementContactAcceptance' || key == 'v4FastLegality' || key == 'v4IncrementalScoring' || key == 'v4ScaledCoverage' || key == 'v4EnableSwap' || key == 'v4WindowedRebuild' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							val = i.checked;
 						}
 					
@@ -594,6 +606,7 @@
 				function updateForm(c){
 					function updateStepRepeatOptions(currentConfig){
 						var active = currentConfig && currentConfig.placementType == 'steprepeat';
+						var disabledReason = 'Step & Repeat uses a fixed grid, so this setting does not apply.';
 						var rows = document.querySelectorAll('.steprepeat-only');
 						Array.from(rows).forEach(function(node){
 							node.style.display = active ? '' : 'none';
@@ -601,9 +614,21 @@
 						var disabledRows = document.querySelectorAll('.steprepeat-disabled');
 						Array.from(disabledRows).forEach(function(node){
 							node.classList.toggle('steprepeat-disabled-active', active);
+							if(active){
+								node.setAttribute('title', disabledReason);
+							}
+							else if(node.getAttribute('title') === disabledReason){
+								node.removeAttribute('title');
+							}
 							var controls = node.querySelectorAll('input, select, textarea');
 							Array.from(controls).forEach(function(control){
 								control.disabled = active;
+								if(active){
+									control.setAttribute('title', disabledReason);
+								}
+								else if(control.getAttribute('title') === disabledReason){
+									control.removeAttribute('title');
+								}
 							});
 						});
 					}
@@ -644,6 +669,49 @@
 								valueCell.removeAttribute('aria-disabled');
 								control.removeAttribute('title');
 							}
+						}
+					}
+
+					function updateSuperpartClusteringOptions(currentConfig){
+						if(typeof ConfigCompatibility === 'undefined'){
+							return;
+						}
+						var active = currentConfig &&
+							currentConfig.superpartClustering === true &&
+							DeepNest.lastSuperpartStats &&
+							DeepNest.lastSuperpartStats.sourcesPaired > 0;
+						var stepRepeatActive = currentConfig && currentConfig.placementType == 'steprepeat';
+						var rules = ConfigCompatibility.rulesForSuperpartClustering();
+						for(var i=0; i<rules.length; i++){
+							var control = document.querySelector('#config [data-config="' + rules[i].key + '"]');
+							if(!control || !control.parentNode){
+								continue;
+							}
+							var valueCell = control.parentNode;
+							var labelCell = valueCell.previousElementSibling;
+							var cells = labelCell ? [labelCell, valueCell] : [valueCell];
+							for(var j=0; j<cells.length; j++){
+								cells[j].classList.toggle('config-incompatible', active);
+								if(active){
+									cells[j].setAttribute('data-disabled-reason', rules[i].reason);
+									cells[j].setAttribute('title', rules[i].reason);
+								}
+								else{
+									cells[j].removeAttribute('data-disabled-reason');
+									cells[j].removeAttribute('title');
+								}
+							}
+							if(active){
+								valueCell.setAttribute('tabindex', '0');
+								valueCell.setAttribute('aria-disabled', 'true');
+								control.setAttribute('title', rules[i].reason);
+							}
+							else{
+								valueCell.removeAttribute('tabindex');
+								valueCell.removeAttribute('aria-disabled');
+								control.removeAttribute('title');
+							}
+							control.disabled = active || stepRepeatActive;
 						}
 					}
 
@@ -688,7 +756,7 @@
 					else if(i.getAttribute('data-conversion') == 'true'){
 						i.value = c[i.getAttribute('data-config')]/scale.value;
 					}
-						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'localRefinementContactAcceptance' || key == 'v4FastLegality' || key == 'v4IncrementalScoring' || key == 'v4ScaledCoverage' || key == 'v4EnableSwap' || key == 'v4WindowedRebuild' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
+						else if(key == 'mergeLines' || key == 'simplify' || key == 'stepRepeatAlternate180' || key == 'adaptiveRotations' || key == 'superpartClustering' || key == 'improvedPlacementScoring' || key == 'localRefinement' || key == 'localRefinementRotations' || key == 'localRefinementRotationReflow' || key == 'localRefinementFineRotation' || key == 'localRefinementContinuous' || key == 'localRefinementContactAcceptance' || key == 'v4FastLegality' || key == 'v4IncrementalScoring' || key == 'v4ScaledCoverage' || key == 'v4EnableSwap' || key == 'v4WindowedRebuild' || key == 'processHoles' || key == 'exportSheetOutline' || key == 'exportTopIndicator' || key == 'exportSheetNumber'){
 							i.checked = c[i.getAttribute('data-config')];
 						}
 					else{
@@ -698,6 +766,7 @@
 
 				updateStepRepeatOptions(c);
 				updateContinuousCompactionOptions(c);
+				updateSuperpartClusteringOptions(c);
 				refreshModelArtifactChoices(c);
 				refreshMlRuntimeStatus(c);
 			}
@@ -2306,11 +2375,16 @@
 					return false;
 				}
 
+					var normalizedConfig = cloneConfigObject(runtimeConfig);
+					if(typeof ConfigCompatibility !== 'undefined'){
+						ConfigCompatibility.applyActiveContinuousCompaction(normalizedConfig);
+						ConfigCompatibility.applySuperpartClustering(normalizedConfig);
+					}
 					prepareFreshNestRun();
-					window.DeepNestRuntimeConfig = cloneConfigObject(runtimeConfig);
+					window.DeepNestRuntimeConfig = normalizedConfig;
 				window.DeepNestLastMLRecommendation = recommendation || null;
-				refreshMlRuntimeStatus(runtimeConfig);
-				window.DeepNest.config(runtimeConfig);
+				refreshMlRuntimeStatus(normalizedConfig);
+				window.DeepNest.config(normalizedConfig);
 
 				document.querySelectorAll('li.progress').forEach(function(p){
 					p.className = 'progress active';
@@ -2329,6 +2403,8 @@
 					message(DeepNest.lastStartError || 'Could not start the nest.', true);
 					return false;
 				}
+				window.DeepNestRuntimeConfig = cloneConfigObject(DeepNest.config());
+				updateForm(window.DeepNestRuntimeConfig);
 				return true;
 			}
 
@@ -3226,6 +3302,11 @@
 					sheetPlacement.sheetplacements.forEach(function(p){
 						var part = DeepNest.parts[p.source];
 						var partgroup = document.createElementNS(svgns, 'g');
+						if(n.superpartClustering && n.superpartClustering.enabled){
+							partgroup.setAttribute('data-deepnest-source', String(p.source));
+							partgroup.setAttribute('data-deepnest-instance', String(p.id));
+							partgroup.setAttribute('data-deepnest-expanded-member', 'true');
+						}
 												
 						part.svgelements.forEach(function(e){
 							if(!shouldAppendExportNode(e)){
@@ -3451,6 +3532,134 @@
 						return crypto.createHash('sha1').update(JSON.stringify(normalized)).digest('hex');
 					}
 
+					function placementLayoutMetrics(nest){
+						if(!nest || !Array.isArray(nest.placements)){
+							return null;
+						}
+						var minX = Infinity;
+						var minY = Infinity;
+						var maxX = -Infinity;
+						var maxY = -Infinity;
+						var materialArea = 0;
+						var hullPoints = [];
+
+						function signedArea(ring){
+							var area = 0;
+							for(var i=0; i<ring.length; i++){
+								var next = ring[(i + 1) % ring.length];
+								area += ring[i].x * next.y - next.x * ring[i].y;
+							}
+							return area / 2;
+						}
+
+						function treeMaterialArea(ring){
+							var area = Math.abs(signedArea(ring));
+							if(ring.children){
+								for(var i=0; i<ring.children.length; i++){
+									area -= treeMaterialArea(ring.children[i]);
+								}
+							}
+							return area;
+						}
+
+						function addRingPoints(ring, placement){
+							var radians = (Number(placement.rotation) || 0) * Math.PI / 180;
+							var cos = Math.cos(radians);
+							var sin = Math.sin(radians);
+							for(var i=0; i<ring.length; i++){
+								var x = ring[i].x * cos - ring[i].y * sin + (Number(placement.x) || 0);
+								var y = ring[i].x * sin + ring[i].y * cos + (Number(placement.y) || 0);
+								minX = Math.min(minX, x);
+								minY = Math.min(minY, y);
+								maxX = Math.max(maxX, x);
+								maxY = Math.max(maxY, y);
+								hullPoints.push({x: x, y: y});
+							}
+							if(ring.children){
+								for(var childIndex=0; childIndex<ring.children.length; childIndex++){
+									addRingPoints(ring.children[childIndex], placement);
+								}
+							}
+						}
+
+						function convexHull(points){
+							var sorted = points.slice().sort(function(a, b){
+								return a.x - b.x || a.y - b.y;
+							});
+							if(sorted.length <= 2){
+								return sorted;
+							}
+							function cross(origin, a, b){
+								return (a.x - origin.x) * (b.y - origin.y) -
+									(a.y - origin.y) * (b.x - origin.x);
+							}
+							var lower = [];
+							var upper = [];
+							var i;
+							for(i=0; i<sorted.length; i++){
+								while(lower.length >= 2 &&
+									cross(lower[lower.length - 2], lower[lower.length - 1], sorted[i]) <= 0){
+									lower.pop();
+								}
+								lower.push(sorted[i]);
+							}
+							for(i=sorted.length - 1; i>=0; i--){
+								while(upper.length >= 2 &&
+									cross(upper[upper.length - 2], upper[upper.length - 1], sorted[i]) <= 0){
+									upper.pop();
+								}
+								upper.push(sorted[i]);
+							}
+							lower.pop();
+							upper.pop();
+							return lower.concat(upper);
+						}
+
+						for(var sheetIndex=0; sheetIndex<nest.placements.length; sheetIndex++){
+							var sheetPlacement = nest.placements[sheetIndex];
+							var placed = sheetPlacement && Array.isArray(sheetPlacement.sheetplacements) ?
+								sheetPlacement.sheetplacements : [];
+							for(var partIndex=0; partIndex<placed.length; partIndex++){
+								var placement = placed[partIndex];
+								var part = DeepNest.parts[placement.source];
+								if(!part || !part.polygontree || part.polygontree.length < 3){
+									continue;
+								}
+								materialArea += treeMaterialArea(part.polygontree);
+								addRingPoints(part.polygontree, placement);
+							}
+						}
+						if(hullPoints.length < 3 || !isFinite(minX) || !isFinite(minY)){
+							return null;
+						}
+						var hull = convexHull(hullPoints);
+						var hullArea = Math.abs(signedArea(hull));
+						var width = maxX - minX;
+						var height = maxY - minY;
+						var bboxArea = width * height;
+						var firstSheet = nest.placements[0];
+						var sheetPart = firstSheet ? DeepNest.parts[firstSheet.sheet] : null;
+						var sheetBounds = sheetPart && sheetPart.bounds ? sheetPart.bounds : null;
+						var usedSheetWidth = sheetBounds ? Math.max(0, maxX - sheetBounds.x) : width;
+						var usedSheetArea = sheetBounds ? usedSheetWidth * sheetBounds.height : bboxArea;
+						return {
+							minX: roundedPlacementNumber(minX),
+							minY: roundedPlacementNumber(minY),
+							maxX: roundedPlacementNumber(maxX),
+							maxY: roundedPlacementNumber(maxY),
+							width: roundedPlacementNumber(width),
+							height: roundedPlacementNumber(height),
+							bboxArea: roundedPlacementNumber(bboxArea),
+							hullArea: roundedPlacementNumber(hullArea),
+							materialArea: roundedPlacementNumber(materialArea),
+							bboxUtilization: bboxArea > 0 ? materialArea / bboxArea : null,
+							hullUtilization: hullArea > 0 ? materialArea / hullArea : null,
+							usedSheetWidth: roundedPlacementNumber(usedSheetWidth),
+							usedSheetArea: roundedPlacementNumber(usedSheetArea),
+							usedSheetUtilization: usedSheetArea > 0 ? materialArea / usedSheetArea : null
+						};
+					}
+
 					function updateBestTiming(){
 						if(!DeepNest.nests || DeepNest.nests.length === 0 || !DeepNest.nests[0]){
 							return;
@@ -3465,6 +3674,21 @@
 					}
 
 					function writeSmokeOutput(selectedNest, exportedSvg, timeoutHandle){
+						function failSmokeExport(err){
+							clearTimeout(timeoutHandle);
+							var messageText = err && err.message ? err.message : String(err);
+							writeReport('failed', {
+								reason: 'export_conversion_failed',
+								outputFormat: outputFormat,
+								message: messageText
+							});
+							finish('failed', {
+								reason: 'export_conversion_failed',
+								outputFormat: outputFormat,
+								message: messageText
+							});
+						}
+
 						if(outputFormat === 'svg'){
 							fs.writeFileSync(outputPath, exportedSvg);
 							clearTimeout(timeoutHandle);
@@ -3481,19 +3705,60 @@
 									clearTimeout(timeoutHandle);
 									completeSmokeSuccess(selectedNest);
 								})
-								.catch(function(err){
+								.catch(failSmokeExport);
+							return;
+						}
+						if(outputFormat === 'tiff' || outputFormat === 'tif'){
+							var smokeSheets = exportNest(selectedNest, { perSheet: true });
+							if(!Array.isArray(smokeSheets) || smokeSheets.length !== 1){
+								failSmokeExport(new Error('TIFF smoke export requires exactly one sheet'));
+								return;
+							}
+							var smokeSheet = smokeSheets[0];
+							requestLocalConversion('tiff', 'svg', smokeSheet.svg, 'deepnest.svg', {
+								dpi: 72,
+								widthInches: smokeSheet.widthInches,
+								heightInches: smokeSheet.heightInches,
+								colorMode: 'rgb',
+								background: 'white',
+								compression: 'lzw'
+							})
+								.then(function(response){
+									if(!response.outputBase64){
+										throw new Error('local conversion did not return a TIFF');
+									}
+									fs.writeFileSync(outputPath, base64ToBytes(response.outputBase64));
 									clearTimeout(timeoutHandle);
-									writeReport('failed', {
-										reason: 'export_conversion_failed',
-										outputFormat: outputFormat,
-										message: err && err.message ? err.message : String(err)
-									});
-									finish('failed', {
-										reason: 'export_conversion_failed',
-										outputFormat: outputFormat,
-										message: err && err.message ? err.message : String(err)
-									});
-								});
+									completeSmokeSuccess(selectedNest);
+								})
+								.catch(failSmokeExport);
+							return;
+						}
+						if(outputFormat === 'dxf'){
+							var conversionUrl = config.getSync('conversionServer') || defaultConversionServer;
+							var req = request.post(conversionUrl, function(err, resp, body){
+								if(err){
+									failSmokeExport(err);
+									return;
+								}
+								if(!resp || resp.statusCode < 200 || resp.statusCode >= 300){
+									failSmokeExport(new Error('DXF conversion returned HTTP ' + (resp ? resp.statusCode : 'unknown')));
+									return;
+								}
+								if(typeof body !== 'string' || body.substring(0, 5) === 'error'){
+									failSmokeExport(new Error(body || 'DXF conversion returned no output'));
+									return;
+								}
+								fs.writeFileSync(outputPath, body);
+								clearTimeout(timeoutHandle);
+								completeSmokeSuccess(selectedNest);
+							});
+							var form = req.form();
+							form.append('format', 'dxf');
+							form.append('fileUpload', exportNest(selectedNest, { dxf: true }), {
+								filename: 'deepnest.svg',
+								contentType: 'image/svg+xml'
+							});
 							return;
 						}
 						clearTimeout(timeoutHandle);
@@ -3544,6 +3809,9 @@
 							pairsCacheHits: selectedNest && typeof selectedNest.pairsCacheHits !== 'undefined' ? selectedNest.pairsCacheHits : null,
 							pairsMissing: selectedNest && typeof selectedNest.pairsMissing !== 'undefined' ? selectedNest.pairsMissing : null,
 							adaptiveRotationAnglesBySource: engineConfig && engineConfig.adaptiveRotationAnglesBySource ? engineConfig.adaptiveRotationAnglesBySource : null,
+							superpartClustering: selectedNest && selectedNest.superpartClustering ?
+								selectedNest.superpartClustering :
+								(DeepNest.lastSuperpartStats || null),
 							localRefinement: localRefinement,
 							localRefinementSummary: localRefinement ? {
 								enabled: !!localRefinement.enabled,
@@ -3553,10 +3821,12 @@
 								movesAccepted: Number(localRefinement.movesAccepted) || 0
 							} : null,
 							runtimePlacementType: window.DeepNestRuntimeConfig && window.DeepNestRuntimeConfig.placementType ? window.DeepNestRuntimeConfig.placementType : null,
+							runtimeConfig: cloneConfigObject(window.DeepNestRuntimeConfig || {}),
 							mlMode: smokeMlMode || config.getSync('mlMode') || 'off',
 							mlRecommendation: window.DeepNestLastMLRecommendation || null,
 							mlDiagnostic: window.DeepNestLastMLDiagnostic || null
 						};
+						details.layout = placementLayoutMetrics(selectedNest);
 						if(isFinite(randomSeed) && randomSeed >= 0){
 							details.randomSeed = randomSeed;
 						}
@@ -3596,8 +3866,14 @@
 						}
 						updateBestTiming();
 						if(!DeepNest.nests || DeepNest.nests.length === 0){
-							writeReport('failed', { reason: 'no_nest_before_time_budget', timeBudgetSec: timeBudgetSec });
-							finish('failed', { reason: 'no_nest_before_time_budget', timeBudgetSec: timeBudgetSec });
+							var noNestDetails = {
+								reason: 'no_nest_before_time_budget',
+								timeBudgetSec: timeBudgetSec,
+								superpartClustering: DeepNest.lastSuperpartStats || null,
+								runtimeConfig: cloneConfigObject(window.DeepNestRuntimeConfig || {})
+							};
+							writeReport('failed', noNestDetails);
+							finish('failed', noNestDetails);
 							return;
 						}
 						var selectedNest = DeepNest.nests[0];
@@ -3729,17 +4005,18 @@
 								writeSmokeOutput(selectedNest, exportedSvg, timeoutHandle);
 							};
 
+							nestStartedAt = Date.now();
 							startnest({
 								mlMode: smokeMlMode || undefined,
 								mlModelPath: smokeMlModelPath || undefined,
 								configOverrides: configOverrides
 							});
-							nestStartedAt = Date.now();
 							if(timeBudgetMs > 0){
+								var remainingBudgetMs = Math.max(0, timeBudgetMs - (Date.now() - nestStartedAt));
 								budgetHandle = setTimeout(function(){
 									budgetHandle = null;
 									exportBestAvailable(timeoutHandle);
-								}, timeBudgetMs);
+								}, remainingBudgetMs);
 							}
 						});
 					}
@@ -4994,6 +5271,11 @@
 						<dd class="steprepeat-disabled">
 							<input type="number" value="4" data-config="rotations" readonly />
 						</dd>
+
+					<dt class="steprepeat-disabled">Interlock repeated parts</dt>
+					<dd class="steprepeat-disabled">
+						<input type="checkbox" checked="checked" data-config="superpartClustering" /> <span class="radiolabel">Pre-pair profitable shapes before nesting</span>
+					</dd>
 
 					<dt>Optimization type</dt>
 					<dd>
