@@ -189,6 +189,11 @@ Use newest notes at the top.
 - The repaired preflight completed all 23 instances with zero exceptions and
   predicts production-threshold clustering in seven: `gardeyn4`, `gardeyn5`,
   `gardeyn6`, `gardeyn7`, `shapes0`, `shapes1`, and `swim`.
+- The first restarted A/B exposed thousands of `Timer 'Total' already exists`
+  warnings. `background.js` started that timer for every dispatch but ended it
+  only when an NFP cache miss existed; its adjacent `pairs`/`in sync`/cache-count
+  logs were also on the hot path. These stale diagnostics are removed.
+  `engine_bugfixes` and the committed-output equivalence suite remain green.
 
 ### 2026-07-26 - SP-1..SP-5 candidate reaches Tier 1 (Codex)
 

@@ -774,8 +774,6 @@ window.onload = function () {
 		}
 		pairsMissing = pairs.length;
 		
-		console.log('pairs: ',pairs.length);
-		  
 		  var process = function(pair){
 			
 			var A = rotatePolygon(pair.A, pair.Arotation);
@@ -863,13 +861,6 @@ window.onload = function () {
 		  
 		  // run the placement synchronously
 		  function sync(){
-		  	//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
-		  	console.log('in sync');
-		  	var c=0;
-		  	for (var key in window.nfpcache) {
-				c++;
-			}
-			console.log('nfp cached:', c);
 		  	var placement = placeParts(data.sheets, parts, data.config, index);
 
 			placement.index = data.index;
@@ -890,9 +881,6 @@ window.onload = function () {
 			}
 			ipcRenderer.send('background-response', placement);
 		  }
-		  
-		  console.time('Total');
-		  
 		  
 		  if(pairs.length > 0){
 			  var p = new Parallel(pairs, {
@@ -958,8 +946,6 @@ window.onload = function () {
 					window.db.insert(doc);
 					
 				}
-				console.timeEnd('Total');
-				console.log('before sync');
 				sync();
 			  });
 		  }
