@@ -563,7 +563,75 @@ function boundsOverlap(a, b, tolerance) {
 		a.y + a.height >= b.y - tolerance;
 }
 
-function materialIntersectionArea(left, right, scale, clipperLib) {
+function convexHullForClipperPath(path) {
+	var points = path.slice().sort(function(a, b) {
+		return a.X === b.X ? a.Y - b.Y : a.X - b.X;
+	});
+	var unique = [];
+	for (var i = 0; i < points.length; i++) {
+		if (!unique.length ||
+			unique[unique.length - 1].X !== points[i].X ||
+			unique[unique.length - 1].Y !== points[i].Y) {
+			unique.push(points[i]);
+		}
+	}
+	if (unique.length <= 2) {
+		return unique;
+	}
+	function cross(origin, left, right) {
+		return (left.X - origin.X) * (right.Y - origin.Y) -
+			(left.Y - origin.Y) * (right.X - origin.X);
+	}
+	var lower = [];
+	for (i = 0; i < unique.length; i++) {
+		while (lower.length >= 2 &&
+			cross(lower[lower.length - 2], lower[lower.length - 1], unique[i]) <= 0) {
+			lower.pop();
+		}
+		lower.push(unique[i]);
+	}
+	var upper = [];
+	for (i = unique.length - 1; i >= 0; i--) {
+		while (upper.length >= 2 &&
+			cross(upper[upper.length - 2], upper[upper.length - 1], unique[i]) <= 0) {
+			upper.pop();
+		}
+		upper.push(unique[i]);
+	}
+	lower.pop();
+	upper.pop();
+	return lower.concat(upper);
+}
+
+function minimumClipperPathWidth(path) {
+	var hull = convexHullForClipperPath(path);
+	if (hull.length < 3) {
+		return 0;
+	}
+	var minimumWidth = Number.POSITIVE_INFINITY;
+	for (var edgeIndex = 0; edgeIndex < hull.length; edgeIndex++) {
+		var start = hull[edgeIndex];
+		var end = hull[(edgeIndex + 1) % hull.length];
+		var dx = end.X - start.X;
+		var dy = end.Y - start.Y;
+		var length = Math.sqrt(dx * dx + dy * dy);
+		if (!(length > 0)) {
+			continue;
+		}
+		var width = 0;
+		for (var pointIndex = 0; pointIndex < hull.length; pointIndex++) {
+			var point = hull[pointIndex];
+			var distance = Math.abs(
+				dx * (point.Y - start.Y) - dy * (point.X - start.X)
+			) / length;
+			width = Math.max(width, distance);
+		}
+		minimumWidth = Math.min(minimumWidth, width);
+	}
+	return isFinite(minimumWidth) ? minimumWidth : 0;
+}
+
+function materialIntersection(left, right, scale, clipperLib) {
 	var clipper = new clipperLib.Clipper();
 	var solution = new clipperLib.Paths();
 	clipper.AddPaths(left, clipperLib.PolyType.ptSubject, true);
@@ -574,13 +642,24 @@ function materialIntersectionArea(left, right, scale, clipperLib) {
 		clipperLib.PolyFillType.pftEvenOdd,
 		clipperLib.PolyFillType.pftEvenOdd
 	)) {
-		return Number.POSITIVE_INFINITY;
+		return {
+			area: Number.POSITIVE_INFINITY,
+			maxPenetrationDepth: Number.POSITIVE_INFINITY
+		};
 	}
 	var signedArea = 0;
+	var maxPenetrationDepth = 0;
 	for (var i = 0; i < solution.length; i++) {
 		signedArea += clipperLib.Clipper.Area(solution[i]);
+		maxPenetrationDepth = Math.max(
+			maxPenetrationDepth,
+			minimumClipperPathWidth(solution[i]) / scale
+		);
 	}
-	return Math.abs(signedArea) / (scale * scale);
+	return {
+		area: Math.abs(signedArea) / (scale * scale),
+		maxPenetrationDepth: maxPenetrationDepth
+	};
 }
 
 function legalityFromPlacements(meta, placements, clipperLib) {
@@ -590,15 +669,22 @@ function legalityFromPlacements(meta, placements, clipperLib) {
 	if (!clipperLib || !clipperLib.Clipper) {
 		throw new Error('missing Clipper library');
 	}
-	var scale = 100000;
-	var coordinateTolerance = Math.max(1e-7, Number(meta.stripHeight || 0) * 1e-10);
-	var areaTolerance = 1e-6;
+	var scale = 10000000;
+	var stripHeight = Number(meta.stripHeight || 0);
+	var coordinateTolerance = Math.max(1e-7, stripHeight * 1e-10);
+	// NFP boundary contact can acquire a few floating-point microunits after
+	// rotation and SVG transform composition. Judge overlap by linear
+	// penetration, not area, so a long numerical contact sliver stays legal
+	// while a small but materially deep overlap still fails closed.
+	var penetrationTolerance = Math.max(1e-7, stripHeight * 1e-7);
 	var groups = placementGroups(placements);
 	var placedCount = 0;
 	var overlapCount = 0;
+	var numericalContactCount = 0;
 	var outsideCount = 0;
 	var missingSourceCount = 0;
 	var maxIntersectionArea = 0;
+	var maxPenetrationDepth = 0;
 	var collisions = [];
 	var sheetBounds = meta.sheetBounds;
 
@@ -638,18 +724,26 @@ function legalityFromPlacements(meta, placements, clipperLib) {
 				if (!boundsOverlap(left.bounds, right.bounds, coordinateTolerance)) {
 					continue;
 				}
-				var area = materialIntersectionArea(left.paths, right.paths, scale, clipperLib);
-				maxIntersectionArea = Math.max(maxIntersectionArea, area);
-				if (area > areaTolerance) {
+				var intersection = materialIntersection(left.paths, right.paths, scale, clipperLib);
+				maxIntersectionArea = Math.max(maxIntersectionArea, intersection.area);
+				maxPenetrationDepth = Math.max(
+					maxPenetrationDepth,
+					intersection.maxPenetrationDepth
+				);
+				if (intersection.maxPenetrationDepth > penetrationTolerance) {
 					overlapCount++;
 					if (collisions.length < 20) {
 						collisions.push({
 							sheetIndex: g,
 							leftSource: left.source,
 							rightSource: right.source,
-							intersectionArea: area
+							intersectionArea: intersection.area,
+							penetrationDepth: intersection.maxPenetrationDepth
 						});
 					}
+				}
+				else if (intersection.area > 0) {
+					numericalContactCount++;
 				}
 			}
 		}
@@ -667,9 +761,12 @@ function legalityFromPlacements(meta, placements, clipperLib) {
 		expectedPartCount: Number(meta.totalDemand),
 		sheetCount: groups.length,
 		overlapCount: overlapCount,
+		numericalContactCount: numericalContactCount,
 		outsideCount: outsideCount,
 		missingSourceCount: missingSourceCount,
 		maxIntersectionArea: maxIntersectionArea,
+		maxPenetrationDepth: maxPenetrationDepth,
+		penetrationTolerance: penetrationTolerance,
 		collisions: collisions
 	};
 }

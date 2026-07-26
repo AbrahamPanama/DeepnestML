@@ -40,12 +40,42 @@ const touching = esicup.legalityFromPlacements(meta, [{
 assert.strictEqual(touching.legal, true, 'edge contact must remain legal');
 assert.strictEqual(touching.maxIntersectionArea, 0, 'edge contact has zero area');
 
+const numericalContact = esicup.legalityFromPlacements(meta, [{
+	sheetplacements: [placement(1, 0, 0), placement(2, 4.9999998, 0)]
+}], ClipperLib);
+assert.strictEqual(
+	numericalContact.legal,
+	true,
+	'floating-point contact sliver below the linear tolerance must remain legal'
+);
+assert.strictEqual(numericalContact.numericalContactCount, 1);
+assert(numericalContact.maxPenetrationDepth < numericalContact.penetrationTolerance);
+
 const overlapping = esicup.legalityFromPlacements(meta, [{
 	sheetplacements: [placement(1, 0, 0), placement(2, 4, 0)]
 }], ClipperLib);
 assert.strictEqual(overlapping.legal, false, 'positive-area overlap must fail');
 assert.strictEqual(overlapping.overlapCount, 1);
 assert(overlapping.maxIntersectionArea > 4.99);
+assert(overlapping.maxPenetrationDepth > 0.99);
+
+const tinyDeepMeta = JSON.parse(JSON.stringify(meta));
+tinyDeepMeta.sourceMap['2'].polygon = [
+	{x: 0, y: 0},
+	{x: 0.0005, y: 0},
+	{x: 0.0005, y: 0.0005},
+	{x: 0, y: 0.0005}
+];
+const tinyButDeep = esicup.legalityFromPlacements(tinyDeepMeta, [{
+	sheetplacements: [placement(1, 0, 0), placement(2, 1, 1)]
+}], ClipperLib);
+assert.strictEqual(
+	tinyButDeep.legal,
+	false,
+	'small-area overlap deeper than the linear tolerance must still fail'
+);
+assert(tinyButDeep.maxIntersectionArea < 1e-6);
+assert(tinyButDeep.maxPenetrationDepth > tinyButDeep.penetrationTolerance);
 
 const outside = esicup.legalityFromPlacements(meta, [{
 	sheetplacements: [placement(1, -0.1, 0), placement(2, 5, 0)]

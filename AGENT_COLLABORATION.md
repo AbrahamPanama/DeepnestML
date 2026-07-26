@@ -87,7 +87,7 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 ## Working Tree State
 
 State (verified 2026-07-26 by Codex): dirty by claimed SP-1..SP-5
-implementation; generated benchmark-result JSONs remain untracked by convention.
+verification; generated benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -97,7 +97,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, docs, `AGENT_COLLABORATION.md` | In progress. SP-0 passed: L control bbox gain 40.00%; laurel hull gain 18.63% at 9 degrees with zero exact overlap and a visually compact pair. Exhaustive laurel search took 181.7 s, so bounded coarse-to-fine performance is a hard SP-1 gate | 2026-07-26 |
+| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 corpus rerun pending after dimensional legality-audit correction; packaging and installed-app parity follow | 2026-07-26 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
@@ -162,6 +162,25 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-26 - Tier 2 numerical-contact audit correction (Codex)
+
+- The first clean 23-instance compact-demand A/B stopped identically on both
+  sides at `jakobs2` run 1. The off/on SVG SHA-256 and placement digest were
+  byte-identical, proving this was not a superpart regression.
+- The independent audit exposed a `3.4e-6`-unit-wide contact sliver
+  (`4.7e-8` inch at the job scale). Its old fixed area threshold misclassified
+  long floating-point contact as material overlap; area is dimensionally
+  unsuitable for this decision.
+- `ml/lib/esicup-convert.js` now uses 1e7 Clipper scaling and judges intersection
+  by the minimum width of each exact intersection hull. The linear tolerance is
+  `max(1e-7, stripHeight * 1e-7)`. Raw intersection area, penetration depth,
+  tolerance, and numerical-contact count remain visible in every report.
+- Adversarial tests prove the gate remains fail-closed: exact contact and a
+  sub-tolerance floating sliver pass; a `0.0005`-deep overlap fails even though
+  its area is below the old `1e-6` threshold; a 1-unit overlap also fails.
+- Recomputed `jakobs2` result: legal, two numerical contacts, raw maximum area
+  `1.92e-5`, maximum depth `3.4e-6`, tolerance `7.0007e-6`.
 
 ### 2026-07-26 - SP-1..SP-5 candidate reaches Tier 1 (Codex)
 
