@@ -86,8 +86,9 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): dirty by the claimed SP-5 import-polygon
-fidelity fix; generated benchmark-result JSONs remain untracked by convention.
+State (verified 2026-07-27 by Codex): clean tracked tree after the SP-5
+import-polygon fidelity and refinement-reachability fix (`92c957f`); generated
+benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -97,7 +98,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 probes require the frozen 240-second budget. `gardeyn8` exposed an exported-overlap cause: curve-tolerance import cleanup shrank the nesting proxy below the original cut silhouette; integer-grid-only cleanup and a shallow-feature regression are in progress. Clean full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
+| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 probes require the frozen 240-second budget. Export-proxy fidelity and the affected rotation gates are fixed in `92c957f`; full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
