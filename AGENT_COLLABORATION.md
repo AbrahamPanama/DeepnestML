@@ -86,9 +86,9 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): dirty by claimed SP-1..SP-5
-verification and the production-parity smoke dispatcher fix; generated
-benchmark-result JSONs remain untracked by convention.
+State (verified 2026-07-27 by Codex): clean tracked tree after the claimed SP-5
+Tier 2 legality-auditor correction; generated benchmark-result JSONs remain
+untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -98,7 +98,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Hardest Tier 2 instance is now 3/3 legal at 30 seconds through a production-parity worker pool; clean full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
+| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, `ml/tests/benchmark_legality/`, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 budget probes found `gardeyn3` needs the frozen 240-second corpus budget (first best at 156.54 s); `gardeyn5` exposed a false sheet-contact rejection now under a targeted auditor regression. Clean full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
@@ -163,6 +163,20 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-27 - Tier 2 sheet-contact audit correction (Codex)
+
+- A 120-second `gardeyn5` probe placed 80/80 parts with zero pair overlaps, but
+  the independent ESICUP auditor rejected one sheet-edge contact: the measured
+  escape was only `4e-7`, below the existing `2e-4` linear penetration
+  tolerance.
+- `legalityFromPlacements` now applies that same dimensionally compatible
+  linear tolerance to sheet contact. The focused regression accepts a
+  sub-tolerance boundary sliver and still rejects a real `0.1`-unit escape.
+- Replaying the saved `gardeyn5` placements through the corrected auditor is
+  legal: 80/80 placed, zero overlaps, zero outside.
+- Verification: syntax checks and `node ml/tests/benchmark_legality/run.js`
+  pass.
 
 ### 2026-07-27 - Tier 2 smoke parity and nested-worker budget (Codex)
 

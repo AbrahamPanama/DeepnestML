@@ -51,6 +51,16 @@ assert.strictEqual(
 assert.strictEqual(numericalContact.numericalContactCount, 1);
 assert(numericalContact.maxPenetrationDepth < numericalContact.penetrationTolerance);
 
+const numericalBoundaryContact = esicup.legalityFromPlacements(meta, [{
+	sheetplacements: [placement(1, -0.0000005, 0), placement(2, 5, 0)]
+}], ClipperLib);
+assert.strictEqual(
+	numericalBoundaryContact.legal,
+	true,
+	'sub-tolerance sheet-boundary roundoff must remain legal'
+);
+assert.strictEqual(numericalBoundaryContact.outsideCount, 0);
+
 const overlapping = esicup.legalityFromPlacements(meta, [{
 	sheetplacements: [placement(1, 0, 0), placement(2, 4, 0)]
 }], ClipperLib);

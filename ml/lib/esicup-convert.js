@@ -671,12 +671,15 @@ function legalityFromPlacements(meta, placements, clipperLib) {
 	}
 	var scale = 10000000;
 	var stripHeight = Number(meta.stripHeight || 0);
-	var coordinateTolerance = Math.max(1e-7, stripHeight * 1e-10);
 	// NFP boundary contact can acquire a few floating-point microunits after
 	// rotation and SVG transform composition. Judge overlap by linear
 	// penetration, not area, so a long numerical contact sliver stays legal
 	// while a small but materially deep overlap still fails closed.
 	var penetrationTolerance = Math.max(1e-7, stripHeight * 1e-7);
+	// Sheet contact is subject to the same transform roundoff and is measured
+	// in the same linear units. A tighter coordinate epsilon can reject a
+	// layout whose part-to-part contacts are correctly classified as numerical.
+	var coordinateTolerance = penetrationTolerance;
 	var groups = placementGroups(placements);
 	var placedCount = 0;
 	var overlapCount = 0;
