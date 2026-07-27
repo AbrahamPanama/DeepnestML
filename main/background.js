@@ -83,7 +83,6 @@ function calculateNativeAddonNfp(ipcRenderer, A, B){
 	return response.value;
 }
 
-
 function clone(nfp){
 	var newnfp = [];
 	for(var i=0; i<nfp.length; i++){
@@ -128,7 +127,7 @@ function cloneNfp(nfp, inner){
 // NFP_CACHE_VERSION is part of the cache key so a schema change invalidates
 // all persisted entries. The size / byte / manifest-path constants used to
 // live here too — they moved to main.js along with cache ownership.
-var NFP_CACHE_VERSION = 3;
+var NFP_CACHE_VERSION = 4;
 
 var nonCanonicalNfpLookups = 0;
 var backgroundGeometryCache = {};
@@ -9904,6 +9903,35 @@ function buildClipperNfpFromMinkowskiSolution(solution, B, scale){
 	return clipperNfp;
 }
 
+function nativeOuterNfpRingIsConvex(ring){
+	if(!ring || ring.length < 3){
+		return false;
+	}
+	var direction = 0;
+	for(var i=0; i<ring.length; i++){
+		var previous = ring[(i + ring.length - 1) % ring.length];
+		var current = ring[i];
+		var next = ring[(i + 1) % ring.length];
+		var cross = (current.x - previous.x) * (next.y - current.y) -
+			(current.y - previous.y) * (next.x - current.x);
+		if(Math.abs(cross) <= 1e-12){
+			continue;
+		}
+		var nextDirection = cross > 0 ? 1 : -1;
+		if(direction !== 0 && direction !== nextDirection){
+			return false;
+		}
+		direction = nextDirection;
+	}
+	return direction !== 0;
+}
+
+function nativeOuterNfpIsRisky(A, B, processHoles){
+	return !!(processHoles && A && A.children && A.children.length > 0) ||
+		!nativeOuterNfpRingIsConvex(A) ||
+		!nativeOuterNfpRingIsConvex(B);
+}
+
 function getSheetHoleForbiddenNfps(A, B){
 	var holes = [];
 	if(!A.children || A.children.length == 0){
@@ -10094,6 +10122,13 @@ function tryNativeOuterNfp(A, B, processHoles){
 		payloadA.children = [];
 	}
 	var payloadB = B.slice();
+
+	// Boost Polygon's arbitrary-polygon reconstruction can segfault on valid
+	// concave or hole-bearing convolution sets. A native crash cannot be caught
+	// by JavaScript, so route those inputs to the exact JS fallbacks below.
+	if(nativeOuterNfpIsRisky(A, B, processHoles)){
+		return null;
+	}
 
 	var result;
 	try{

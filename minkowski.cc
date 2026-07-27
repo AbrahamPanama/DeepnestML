@@ -255,14 +255,25 @@ NAN_METHOD(calculateNFP) {
   std::vector<point> pts;
 
   unsigned int len = A->Length();
+  if (len < 3 || B->Length() < 3) {
+    info.GetReturnValue().Set(Array::New(isolate));
+    return;
+  }
+
+  Local<Object> Aorigin = GetObjectAt(A, 0);
+  Local<Object> Borigin = GetObjectAt(B, 0);
+  double Aoriginx = GetNumberProp(Aorigin, keyX);
+  double Aoriginy = GetNumberProp(Aorigin, keyY);
+  double Boriginx = GetNumberProp(Borigin, keyX);
+  double Boriginy = GetNumberProp(Borigin, keyY);
   double Amaxx = 0;
   double Aminx = 0;
   double Amaxy = 0;
   double Aminy = 0;
   for (unsigned int i = 0; i < len; i++) {
     Local<Object> obj = GetObjectAt(A, i);
-    double x = GetNumberProp(obj, keyX);
-    double y = GetNumberProp(obj, keyY);
+    double x = GetNumberProp(obj, keyX) - Aoriginx;
+    double y = GetNumberProp(obj, keyY) - Aoriginy;
     Amaxx = (std::max)(Amaxx, x);
     Aminx = (std::min)(Aminx, x);
     Amaxy = (std::max)(Amaxy, y);
@@ -276,8 +287,8 @@ NAN_METHOD(calculateNFP) {
   double Bminy = 0;
   for (unsigned int i = 0; i < len; i++) {
     Local<Object> obj = GetObjectAt(B, i);
-    double x = GetNumberProp(obj, keyX);
-    double y = GetNumberProp(obj, keyY);
+    double x = GetNumberProp(obj, keyX) - Boriginx;
+    double y = GetNumberProp(obj, keyY) - Boriginy;
     Bmaxx = (std::max)(Bmaxx, x);
     Bminx = (std::min)(Bminx, x);
     Bmaxy = (std::max)(Bmaxy, y);
@@ -305,8 +316,8 @@ NAN_METHOD(calculateNFP) {
 
   for (unsigned int i = 0; i < len; i++) {
     Local<Object> obj = GetObjectAt(A, i);
-    int x = (int)(inputscale * GetNumberProp(obj, keyX));
-    int y = (int)(inputscale * GetNumberProp(obj, keyY));
+    int x = (int)(inputscale * (GetNumberProp(obj, keyX) - Aoriginx));
+    int y = (int)(inputscale * (GetNumberProp(obj, keyY) - Aoriginy));
     pts.push_back(point(x, y));
   }
 
@@ -329,8 +340,8 @@ NAN_METHOD(calculateNFP) {
     unsigned int hlen = hole->Length();
     for (unsigned int j = 0; j < hlen; j++) {
       Local<Object> obj = GetObjectAt(hole, j);
-      int x = (int)(inputscale * GetNumberProp(obj, keyX));
-      int y = (int)(inputscale * GetNumberProp(obj, keyY));
+      int x = (int)(inputscale * (GetNumberProp(obj, keyX) - Aoriginx));
+      int y = (int)(inputscale * (GetNumberProp(obj, keyY) - Aoriginy));
       pts.push_back(point(x, y));
     }
     sanitize_ring(pts);
@@ -344,21 +355,16 @@ NAN_METHOD(calculateNFP) {
   pts.clear();
   len = B->Length();
 
-  double xshift = 0;
-  double yshift = 0;
+  double xshift = Aoriginx;
+  double yshift = Aoriginy;
 
   for (unsigned int i = 0; i < len; i++) {
     Local<Object> obj = GetObjectAt(B, i);
     double xValue = GetNumberProp(obj, keyX);
     double yValue = GetNumberProp(obj, keyY);
-    int x = -(int)(inputscale * xValue);
-    int y = -(int)(inputscale * yValue);
+    int x = -(int)(inputscale * (xValue - Boriginx));
+    int y = -(int)(inputscale * (yValue - Boriginy));
     pts.push_back(point(x, y));
-
-    if (i == 0) {
-      xshift = xValue;
-      yshift = yValue;
-    }
   }
 
   sanitize_ring(pts);

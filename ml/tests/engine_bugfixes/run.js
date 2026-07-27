@@ -142,6 +142,63 @@ function testEmptyClipperFallback() {
 	assert.strictEqual(result, null, 'empty Minkowski solution should return null');
 }
 
+function testNativeNfpRiskRouting() {
+	const ctx = loadBackgroundFunctions([
+		'nativeOuterNfpRingIsConvex',
+		'nativeOuterNfpIsRisky'
+	]);
+	const rectangle = rect(0, 0, 4, 2);
+	const concave = [
+		{x: 0, y: 0},
+		{x: 4, y: 0},
+		{x: 4, y: 1},
+		{x: 1, y: 1},
+		{x: 1, y: 4},
+		{x: 0, y: 4}
+	];
+	const withHole = rect(0, 0, 5, 5);
+	withHole.children = [rect(1, 1, 1, 1)];
+
+	assert.strictEqual(ctx.nativeOuterNfpRingIsConvex(rectangle), true, 'rectangle should use the native convex path');
+	assert.strictEqual(ctx.nativeOuterNfpRingIsConvex(concave), false, 'concave ring must avoid unsafe Boost reconstruction');
+	assert.strictEqual(ctx.nativeOuterNfpIsRisky(rectangle, rectangle, true), false, 'convex hole-free pair should remain native');
+	assert.strictEqual(ctx.nativeOuterNfpIsRisky(concave, rectangle, true), true, 'concave A must use the JS fallback');
+	assert.strictEqual(ctx.nativeOuterNfpIsRisky(rectangle, concave, true), true, 'concave B must use the JS fallback');
+	assert.strictEqual(ctx.nativeOuterNfpIsRisky(withHole, rectangle, true), true, 'processed holes must use the JS fallback');
+	assert.strictEqual(ctx.nativeOuterNfpIsRisky(withHole, rectangle, false), false, 'ignored holes should not block a convex outer ring');
+}
+
+function testRiskyNativeNfpNeverInvokesAddon() {
+	let nativeCalls = 0;
+	const ctx = loadBackgroundFunctions([
+		'nativeOuterNfpRingIsConvex',
+		'nativeOuterNfpIsRisky',
+		'tryNativeOuterNfp'
+	], null, {
+		window: {ipcRenderer: {}},
+		calculateNativeAddonNfp: function () {
+			nativeCalls += 1;
+			return [];
+		}
+	});
+	const rectangle = rect(0, 0, 4, 2);
+	const concave = [
+		{x: 0, y: 0},
+		{x: 4, y: 0},
+		{x: 4, y: 1},
+		{x: 1, y: 1},
+		{x: 1, y: 4},
+		{x: 0, y: 4}
+	];
+	const withHole = rect(0, 0, 5, 5);
+	withHole.children = [rect(1, 1, 1, 1)];
+
+	assert.strictEqual(ctx.tryNativeOuterNfp(concave, rectangle, true), null);
+	assert.strictEqual(ctx.tryNativeOuterNfp(rectangle, concave, true), null);
+	assert.strictEqual(ctx.tryNativeOuterNfp(withHole, rectangle, true), null);
+	assert.strictEqual(nativeCalls, 0, 'risky inputs must never enter the process-terminating native path');
+}
+
 function testRotationRetries() {
 	const ctx = loadBackgroundFunctions([
 		'normalizedRotation',
@@ -1163,6 +1220,8 @@ function run() {
 	testMergedLengthAfterFarCollinearEdge();
 	testMergedLengthChildrenCountOnce();
 	testEmptyClipperFallback();
+	testNativeNfpRiskRouting();
+	testRiskyNativeNfpNeverInvokesAddon();
 	testRotationRetries();
 	testRotationReflowSelectionHelpers();
 	testRotationReflowTransactionalCommitAndRollback();

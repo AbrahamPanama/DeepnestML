@@ -373,7 +373,7 @@ function getPersistentNfpCachePath() {
 // background windows that caused races on manifest-v2.json (torn writes,
 // inconsistent LRU bookkeeping) and wasted work on pruneNfpCache(). Ownership
 // now lives here: one manifest, one pruner, serialized by the Node event loop.
-const NFP_CACHE_VERSION = 3;
+const NFP_CACHE_VERSION = 4;
 const NFP_CACHE_MANIFEST = 'manifest-v3.json';
 const NFP_CACHE_MAX_ENTRIES = 2500;
 const NFP_CACHE_MAX_BYTES = 128 * 1024 * 1024;
