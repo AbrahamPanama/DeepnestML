@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.8.0`
+- Current version: `0.9.0` (source; packaged Tier 3 release gate in progress)
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.8.0-mac-arm64.dmg`
+- Local DMG artifact: `dist/Deepnest ML-0.9.0-mac-arm64.dmg` (pending rebuild)
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -86,9 +86,8 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): dirty only for the active SP-5
-mixed-library fail-soft policy and its corpus-gate coverage; generated
-benchmark-result JSONs remain untracked by convention.
+State (verified 2026-07-27 by Codex): dirty only for active SP-5 release
+documentation; generated benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -98,7 +97,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 hard batch exposed a `gardeyn4` mixed-library regression; final fail-soft eligibility now preserves the canonical path for jobs with >2 active part sources. Clean full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
+| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, packaging, installed app, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 passed across 23 instances x 3 seeds x 240 s at -0.01235 pp (limit -0.25 pp), all legal. Packaging and installed-app Tier 3 remain | 2026-07-27 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
@@ -147,7 +146,7 @@ Park future tasks both agents should be aware of. Keep entries short. Move items
 | Windows port (WIN-W1…W5) | `docs/windows-port-plan.md` | Ship a Windows x64 build preserving all features; mac stays unchanged. Three real risks: native addon (MSVC + header-only Boost.Polygon + `NOMINMAX`), the Python sidecar (bundle embeddable CPython + wheels for PDF/PNG/TIFF conversion), packaging (NSIS/portable, unsigned v1). JS layer is already platform-neutral. W1 compile / W2 bundling / W4 packaging need a Windows build host; W3 + config edits are Mac-authorable but must not regress the mac build. Claim WIN-W1…W5 from §10 |
 | TIFF bitmap export + unified export modal (TIFF-T1…T4) | `docs/tiff-export-plan.md` | Export nested layouts as per-sheet raster TIFFs for print/RIP: outline-removal enum, top-indicator fiducial, ICC (RGB embed / CMYK convert+embed), via the existing PyMuPDF+Pillow converter (no new deps). Refactors the export menu into a CollageMaker-style modal (light theme). Export-only; not ML-sensitive as long as `placeParts`/vector-export defaults are untouched. Claim TIFF-T1…T4 from the plan's §10 |
 | SOTA nesting engine (WP-0 … WP-4) | `docs/sota-nesting-implementation-plan.md` | Phased plan: benchmark harness → fitness v2 → separate-and-compact refinement (replaces slide Local Refinement) → `deepsearch` placement type → ML routing. Every WP lands behind a default-off flag with equivalence + benchmark gates. Claim individual WPs from the plan's §10 table |
-| **Superpart clustering (SP-0 … SP-5)** | `docs/superpart-clustering-plan.md` | RECOMMENDED NEXT. Written 2026-07-25 by Claude-Code after six refinement mechanisms were built, verified, and found not to improve a nest. Routes around all three measured walls (legality, acceptance, local-vs-global) by obtaining the interlock angle OFFLINE by construction, then letting the existing NFP placer nest the mated pair as one rigid part - no hot-path changes. Has an explicit one-hour go/no-go at the FRONT (WP-SP-0 mating gain >= 5%, with an L-shape control), a definition of done the agent cannot fool itself about, an operating protocol in §9, and stop conditions in §10. Claim SP-x from §3-§8 |
+| **Superpart clustering (SP-0 … SP-5)** | `docs/superpart-clustering-plan.md` | IMPLEMENTED; Tier 0/1/2 green. Final release packaging and installed-app Tier 3 verification are active under Codex. |
 | Direct-Clipper pose generator (DP-1 … DP-4) | `docs/direct-pose-generator-plan.md` | Written 2026-07-25 by Claude-Code; successor to the stopped raster plan. RC-2 measured exact Clipper collision at 19.3 us/pair, which prices 1-degree rotation at 8.7 ms/part (~0.9 s for 100 parts) with NO NFP and NO raster tier. The codebase can already VALIDATE off-grid angles; it cannot GENERATE good ones. DP-1 adds edge-mating, rotate-about-contact-then-slide, and sibling-alignment pose generation, ranked by contact score before exact validation. Expect the win on sparse/laurel fixtures, not the dense corpus - dense sheets are legality-limited. Claim DP-x from the plan's §6 table |
 | Raster collision tier (RC-1 … RC-5) | `docs/raster-collision-plan.md` | STOPPED at RC-2 (2026-07-25). Soundness passed twice (6,000 randomised + 1,867 production pairs, zero unsafe), but the tier is 1.9x SLOWER than exact geometry on this workload: raster query 37.5 us/pair vs Clipper 19.3 us/pair, net 87 ms loss. Premise was wrong - after curveTolerance simplification these polygons are cheap for Clipper. RC-3..RC-5 cancelled. Module kept, inert, default-off. See plan §3.4; successor is the pose-generator plan above || Local Refinement v4 gate follow-up | `main/background.js`, benchmark corpus | WP-V4.1-V4.5 are implemented default-off. Gate status revised 2026-07-25: predicate disagreements are 100% in the SAFE direction (269 NFP-stricter, 0 material-stricter), so fast legality is safe — but it buys nothing because the exact check was already short-circuited, and the 10x throughput gate was mis-specified. The binding constraint on dense sheets is legality (~98% of candidates rejected before scoring), not acceptance or speed. Do not flip defaults; see the plan's "Follow-up findings". |
 | Local Refinement v3 "smart" engine (WP-R1 … WP-R6) | `docs/local-refinement-v3-plan.md` | Approved 2026-06-11; supersedes SOTA WP-2.3. Prereqs: SOTA WP-2.1, WP-2.2, and the §8.3 equivalence harness. Contact-graph chain targeting, geometry-derived rotations with pivot rocking, void relocation, swaps, ruin-&-recreate under a budgeted orchestrator (`localRefinementEngine: 'smart'`, default stays 'slide') |
@@ -163,6 +162,22 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-27 - Superpart full Tier 2 corpus gate passed (Codex)
+
+- Completed the clean native A/B corpus at equal wall clock: 23 ESICUP
+  instances, 3 seeds each, 240 seconds per run.
+- Baseline mean-median utilization was `0.6670608056`; candidate was
+  `0.6669373283`, a delta of `-0.0123477 pp` against the allowed `-0.25 pp`.
+- All 69 candidate runs completed legally and reported
+  `nonCanonicalNfpLookups == 0`. Mixed-source corpus jobs correctly failed soft
+  with `reason: "mixedSourceLibrary"`; independent laurel activation evidence
+  proved the default-on feature path with two clusters/four expanded members.
+- Formal gate report: `/tmp/sp-tier2-a856323-gate.json`. Clean activation report:
+  `/tmp/deepnest-smoke-superpart-a856323-activation/svg-laurel-superpart-default/report.json`;
+  its exported SVG independently audited legal at used width `406.86961`.
+- Remaining release gate: build/sign the 0.9.0 arm64 DMG, install beside 0.8.0,
+  and reproduce the legal visible laurel interlock through the installed app.
 
 ### 2026-07-27 - Superpart mixed-library fail-soft gate (Codex)
 

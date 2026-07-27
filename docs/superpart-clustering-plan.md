@@ -1,8 +1,9 @@
 # Superpart Clustering — Goals, Success Measures, Implementation Plan
 
-Status: PLAN — not started. This is the route recommended after six refinement
-mechanisms were built, verified, and found not to improve a nest. Read §1 before
-deciding to deviate from it.
+Status: IMPLEMENTED — Tier 0, Tier 1, and Tier 2 are green. Tier 3 packaged-app
+verification is in progress. The production policy is intentionally narrower than
+the original plan: clustering activates only when a job has at most two active
+non-sheet source geometries.
 
 Author: Claude-Code, 2026-07-25 (against commit `4a58885`, product 0.8.0).
 
@@ -85,6 +86,23 @@ app with default settings, verified by the user's own job, not only the harness.
 
 Report every tier as a number, including when it fails.
 
+### Measured implementation results
+
+| tier | result |
+|---|---|
+| Tier 0 | PASS — laurel mating gain `18.634%` |
+| Tier 1 | PASS — default fixture width `477.983 -> 394.258` (`17.516%` less sheet width), approximately `94%` of theoretical mating gain; three seeded runs were all `<= 410`; exported SVG visibly contains two interlocked pairs and independently audits legal |
+| Tier 2 | PASS — 23 ESICUP instances x 3 seeds x 240 seconds, native runtime: candidate mean-median utilization `0.6669373` vs baseline `0.6670608`, delta `-0.01235 pp` against the allowed `-0.25 pp`; all 69 runs complete/legal and `nonCanonicalNfpLookups == 0` |
+| Tier 3 | PENDING — arm64 DMG build, side-by-side install, and installed-app laurel export |
+
+The clean Tier 2 hard slice exposed an important scope boundary before the final
+corpus run: pairing many sources in a heterogeneous library made `gardeyn4`
+`10.4526 pp` worse despite every placement being legal. Capping the number of
+pairs reduced but did not remove the regression. The accepted production policy
+therefore fails soft with `reason: "mixedSourceLibrary"` whenever a job has more
+than two active part sources. This preserves the canonical path for mixed
+libraries while retaining the measured laurel/repeated-part gain.
+
 ---
 
 ## 3. WP-SP-0 — the go/no-go measurement (do this first, it is ~1 hour)
@@ -135,11 +153,13 @@ polygon with the two members exactly reconstructible from the recorded transform
 
 ## 5. WP-SP-2 — superpart construction
 
-For each source with quantity ≥ 2 and `matingGain ≥ superpartMinGain` (default
-0.05): build a synthetic part whose outline is the Clipper **union** of the two
-mated members, carrying `members: [{sourceIndex, rotation, offset}, ...]`.
+For eligible jobs with at most two active non-sheet source geometries, each source
+with quantity ≥ 2 and `matingGain ≥ superpartMinGain` (production default `0.10`)
+may build a synthetic part whose outline is the Clipper **union** of the two mated
+members, carrying `members: [{sourceIndex, rotation, offset}, ...]`.
 
-- quantity: `floor(qty / 2)` superparts plus `qty % 2` singles;
+- quantity: `floor(qty / 2)` superparts plus `qty % 2` singles in eligible jobs;
+  mixed-source jobs construct no superparts and retain all singles;
 - the union outline must be simplified to `curveTolerance` like any imported part;
 - **holes matter**: the interlock may create an enclosed void between members. Keep
   it as a hole ring — it is legitimately nestable area.
@@ -157,7 +177,9 @@ placement worker, and refinement all treat them as ordinary parts at canonical
 rotations. This is the entire point of the approach — do not special-case them in
 the placer.
 
-Flag `superpartClustering`, default `false`.
+Flag `superpartClustering`, production default `true`. Runtime eligibility is
+still conservative: jobs with more than two active part sources fail soft to the
+unchanged canonical path.
 
 **Gate:** flag-off equivalence byte-identical; flag-on, a job containing superparts
 nests to completion with `nonCanonicalNfpLookups == 0`.
@@ -184,9 +206,11 @@ cut file as a single merged outline is scrap material. Gate it hard:
 
 ## 8. WP-SP-5 — efficacy and defaults
 
-Run Tier 1, 2, 3 from §2. Only after all three are green, propose a default flip
-with an ML checkpoint and bakeoff per the ML-sensitive protocol. Until then it
-ships default-off.
+Run Tier 1, 2, 3 from §2. The implementation ships default-on only for the narrow
+one-/two-source eligibility class proven by the laurel fixture; mixed libraries
+remain behaviorally on the canonical path. The ML checkpoint, flag-off
+equivalence, exact export audit, and full Tier 2 corpus gate are complete. Tier 3
+remains the release gate.
 
 ---
 
