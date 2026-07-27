@@ -630,6 +630,18 @@ function nfpBatchTiming(stats){
 	};
 }
 
+function nfpPrepassWorkerLimit(configuredThreads, availableWorkers){
+	configuredThreads = parseInt(configuredThreads, 10);
+	if(!configuredThreads || configuredThreads < 1){
+		configuredThreads = 1;
+	}
+	availableWorkers = parseInt(availableWorkers, 10);
+	if(!availableWorkers || availableWorkers < 1){
+		availableWorkers = 4;
+	}
+	return Math.max(1, Math.min(8, Math.ceil(availableWorkers / configuredThreads)));
+}
+
 window.db = {
 	has: function(obj){
 		var key = nfpCacheKey(obj, obj.inner);
@@ -732,6 +744,7 @@ window.onload = function () {
 		var nfpBatchStats = warmNfpCacheBatch(buildNfpPrefetchEntries(data.sheets, parts, data.config, processHoles));
 		var pairsCacheHits = 0;
 		var pairsMissing = 0;
+		var pairsPrepassFailures = 0;
 		var pairs = [];
 		var inpairs = function(key, p){
 			for(var i=0; i<p.length; i++){
@@ -807,6 +820,14 @@ window.onload = function () {
 					largestArea = sarea;
 				}
 			}
+
+			if(!clipperNfp || clipperNfp.length < 3){
+				pair.A = null;
+				pair.B = null;
+				pair.nfp = null;
+				pair.error = 'empty-clipper-nfp';
+				return pair;
+			}
 			
 			for(var i=0; i<clipperNfp.length; i++){
 				clipperNfp[i].x += B[0].x;
@@ -870,6 +891,8 @@ window.onload = function () {
 			placement.timing.dispatchMs = dispatchMs;
 			placement.timing.pairsCacheHits = pairsCacheHits;
 			placement.timing.pairsMissing = pairsMissing;
+			placement.timing.pairsPrepassFailures = pairsPrepassFailures;
+			placement.timing.pairsPrepassWorkers = pairWorkerLimit || 0;
 			placement.timing.processHoles = processHoles;
 			placement.timing.nfpBatch = nfpBatchTiming(nfpBatchStats);
 			placement.timing.geometryPath = geometryData.geometryPath;
@@ -882,8 +905,13 @@ window.onload = function () {
 		  }
 		  
 		  if(pairs.length > 0){
+			  var pairWorkerLimit = nfpPrepassWorkerLimit(
+				data.config ? data.config.threads : 1,
+				navigator.hardwareConcurrency
+			  );
 			  var p = new Parallel(pairs, {
 				evalPath: 'util/eval.js',
+				maxWorkers: pairWorkerLimit,
 				synchronous: false
 			  });
 			  
@@ -909,10 +937,18 @@ window.onload = function () {
 				  }
 				// store processed data in cache
 				for(var i=0; i<processed.length; i++){
+					if(!processed[i] || !processed[i].nfp){
+						pairsPrepassFailures++;
+						continue;
+					}
 					// returned data only contains outer nfp, we have to account for any holes separately in the synchronous portion
 					// this is because the c++ addon which can process interior nfps cannot run in the worker thread					
 					var A = getPart(processed[i].Asource);
 					var B = getPart(processed[i].Bsource);
+					if(!A || !B){
+						pairsPrepassFailures++;
+						continue;
+					}
 										
 					var Achildren = [];
 					
@@ -945,6 +981,11 @@ window.onload = function () {
 					window.db.insert(doc);
 					
 				}
+				sync();
+			  }, function(){
+				// A failed worker must not strand the GA individual. Uncached
+				// pairs are recomputed by the fail-closed synchronous NFP path.
+				pairsPrepassFailures = pairs.length;
 				sync();
 			  });
 		  }

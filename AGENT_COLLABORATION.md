@@ -86,8 +86,9 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-26 by Codex): dirty by claimed SP-1..SP-5
-verification; generated benchmark-result JSONs remain untracked by convention.
+State (verified 2026-07-27 by Codex): dirty by claimed SP-1..SP-5
+verification and the production-parity smoke dispatcher fix; generated
+benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -97,7 +98,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 corpus rerun pending after dimensional legality-audit correction; packaging and installed-app parity follow | 2026-07-26 |
+| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Hardest Tier 2 instance is now 3/3 legal at 30 seconds through a production-parity worker pool; clean full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
@@ -162,6 +163,33 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-27 - Tier 2 smoke parity and nested-worker budget (Codex)
+
+- The apparent cold `gardeyn2` NFP regression was diagnosed rather than tuned
+  around. Phase timing showed exact JS NFP generation at 5.6 s and placement at
+  3.3 s; the missing 34.4 s was queue wait in `ml/app-smoke-main.js`, whose
+  single hidden background window did not match the shipped app's dispatcher.
+- The smoke host now reuses `main/background-dispatcher.js` with the same
+  bounded eight-window topology as production. Renderer loss, ready, response,
+  progress, and stop handling follow the active main-process path.
+- Production parity exposed nested oversubscription: four GA workers each used
+  a hardware-sized Parallel.js NFP pool. `nfpPrepassWorkerLimit` now divides
+  available hardware across configured GA threads (10 cores / 4 threads -> 3
+  NFP workers each, capped at 8). Four workers was measured and rejected:
+  29.421 s versus 28.811 s on the isolated hard seed.
+- The pair pre-pass now returns a failure marker for an empty Clipper result and
+  has an error callback, so a malformed/failed map cannot leave a GA individual
+  permanently `processing`. Missing keys fall through to the existing
+  fail-closed synchronous path.
+- Focused final gate, `gardeyn2`, three seeds, 30 s, native runtime:
+  29.108 s / 17.858 s / 28.580 s; utilization 0.8006716262 in all runs; 50/50
+  placed, zero overlap, zero sheet escape, `pairsPrepassWorkers=3`.
+- Verification green: syntax checks, engine bugfix tests, background dispatcher
+  seven-case harness, superpart tests, NFP equivalence, engine equivalence, boot
+  check, and the full smoke battery including independent laurel export audit.
+- Clean full 23-instance Tier 2 A/B remains next. Generated benchmark JSONs stay
+  untracked by convention.
 
 ### 2026-07-26 - Tier 2 native NFP crash containment + pair admission (Codex)
 

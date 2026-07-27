@@ -142,6 +142,30 @@ function testEmptyClipperFallback() {
 	assert.strictEqual(result, null, 'empty Minkowski solution should return null');
 }
 
+function testNfpPrepassWorkerBudget() {
+	const ctx = loadBackgroundFunctions(['nfpPrepassWorkerLimit']);
+	assert.strictEqual(
+		ctx.nfpPrepassWorkerLimit(4, 10),
+		3,
+		'four GA workers should share ten cores as three NFP workers each'
+	);
+	assert.strictEqual(
+		ctx.nfpPrepassWorkerLimit(1, 10),
+		8,
+		'a single GA worker should retain the eight-worker safety cap'
+	);
+	assert.strictEqual(
+		ctx.nfpPrepassWorkerLimit(8, 10),
+		2,
+		'eight GA workers must not each launch a full hardware-sized pool'
+	);
+	assert.strictEqual(
+		ctx.nfpPrepassWorkerLimit('invalid', 0),
+		4,
+		'invalid inputs should retain the conservative four-worker fallback'
+	);
+}
+
 function testNativeNfpRiskRouting() {
 	const ctx = loadBackgroundFunctions([
 		'nativeOuterNfpRingIsConvex',
@@ -1220,6 +1244,7 @@ function run() {
 	testMergedLengthAfterFarCollinearEdge();
 	testMergedLengthChildrenCountOnce();
 	testEmptyClipperFallback();
+	testNfpPrepassWorkerBudget();
 	testNativeNfpRiskRouting();
 	testRiskyNativeNfpNeverInvokesAddon();
 	testRotationRetries();

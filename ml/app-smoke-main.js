@@ -7,23 +7,23 @@ const os = require('os');
 const path = require('path');
 const url = require('url');
 const electronSettings = require('electron-settings');
+const backgroundDispatcherModule = require('../main/background-dispatcher');
 const nestGeometryBrokerModule = require('../main/nest-geometry-broker');
 
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const ipcMain = electron.ipcMain;
+const createBackgroundDispatcher = backgroundDispatcherModule.createBackgroundDispatcher;
 const nestGeometryBroker = nestGeometryBrokerModule.createNestGeometryBroker(2);
 
-let backgroundWindow = null;
 let mainWindow = null;
+let backgroundDispatcher = null;
 let smokePayload = null;
 let smokeStartScheduled = false;
 let windowsReady = {
 	background: false,
 	main: false
 };
-let backgroundBusy = false;
-const backgroundQueue = [];
 let nativeAddon = null;
 let nativeAddonLoadError = null;
 let localConverterPythonBin = null;
@@ -131,14 +131,6 @@ function maybeStartSmoke() {
 	mainWindow.webContents.send('app-smoke-test-start', smokePayload);
 }
 
-function dispatchBackgroundQueue() {
-	if (!backgroundWindow || !windowsReady.background || backgroundBusy || backgroundQueue.length === 0) {
-		return;
-	}
-	backgroundBusy = true;
-	backgroundWindow.webContents.send('background-start', backgroundQueue.shift());
-}
-
 function createWindowPreferences() {
 	return {
 		nodeIntegration: true,
@@ -158,8 +150,8 @@ function forwardRendererErrors(label, webContents) {
 	});
 }
 
-function createBackgroundWindow() {
-	backgroundWindow = new BrowserWindow({
+function createBackgroundWorkerWindow() {
+	var backgroundWindow = new BrowserWindow({
 		show: false,
 		webPreferences: createWindowPreferences()
 	});
@@ -170,10 +162,32 @@ function createBackgroundWindow() {
 		slashes: true
 	}));
 	backgroundWindow.webContents.once('did-finish-load', function () {
-		windowsReady.background = true;
-		dispatchBackgroundQueue();
-		maybeStartSmoke();
+		// The renderer sends background-ready after its runtime is initialized.
 	});
+	backgroundWindow.webContents.on('render-process-gone', function (event, details) {
+		if (backgroundDispatcher) {
+			backgroundDispatcher.handleRendererGone(backgroundWindow, details);
+		}
+	});
+	backgroundWindow.on('closed', function () {
+		if (backgroundDispatcher) {
+			backgroundDispatcher.markClosed(backgroundWindow);
+		}
+	});
+	return backgroundWindow;
+}
+
+function createBackgroundWindows() {
+	if (!backgroundDispatcher) {
+		backgroundDispatcher = createBackgroundDispatcher({
+			maxWindows: Math.max(1, Math.min(8, (os.cpus() || []).length || 1)),
+			createWindow: createBackgroundWorkerWindow,
+			getMainWindow: function () {
+				return mainWindow;
+			}
+		});
+	}
+	backgroundDispatcher.createWindows();
 }
 
 function createMainWindow() {
@@ -194,9 +208,13 @@ function createMainWindow() {
 }
 
 function destroyAllWindows() {
-	if (backgroundWindow) {
-		backgroundWindow.destroy();
-		backgroundWindow = null;
+	if (backgroundDispatcher) {
+		var backgroundWindows = backgroundDispatcher.windows.slice();
+		for (var i = 0; i < backgroundWindows.length; i++) {
+			if (backgroundWindows[i]) {
+				backgroundWindows[i].destroy();
+			}
+		}
 	}
 	if (mainWindow) {
 		mainWindow.destroy();
@@ -526,7 +544,7 @@ app.on('ready', function () {
 		mlModelPath: cliArgs.mlModelPath || scenario.mlModelPath || ''
 	};
 
-	createBackgroundWindow();
+	createBackgroundWindows();
 	createMainWindow();
 });
 
@@ -535,8 +553,7 @@ app.on('window-all-closed', function () {
 });
 
 ipcMain.on('background-start', function (event, payload) {
-	backgroundQueue.push(payload);
-	dispatchBackgroundQueue();
+	backgroundDispatcher.enqueue(payload);
 });
 
 ipcMain.on('nest-geometry-set', function (event, geometry) {
@@ -548,11 +565,7 @@ ipcMain.on('nest-geometry-get-sync', function (event, token) {
 });
 
 ipcMain.on('background-response', function (event, payload) {
-	backgroundBusy = false;
-	if (mainWindow) {
-		mainWindow.webContents.send('background-response', payload);
-	}
-	dispatchBackgroundQueue();
+	backgroundDispatcher.handleResponse(event.sender, payload);
 });
 
 ipcMain.on('background-progress', function (event, payload) {
@@ -563,12 +576,15 @@ ipcMain.on('background-progress', function (event, payload) {
 
 ipcMain.on('background-stop', function () {
 	nestGeometryBroker.clear();
-	backgroundQueue.length = 0;
-	backgroundBusy = false;
-	if (backgroundWindow) {
-		backgroundWindow.destroy();
-		backgroundWindow = null;
+	if (backgroundDispatcher) {
+		backgroundDispatcher.recreate();
 	}
+});
+
+ipcMain.on('background-ready', function (event) {
+	windowsReady.background = true;
+	backgroundDispatcher.markReady(event.sender);
+	maybeStartSmoke();
 });
 
 ipcMain.on('settings-op-sync', function (event, operation, args) {
