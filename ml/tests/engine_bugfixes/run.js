@@ -66,6 +66,20 @@ function rect(x, y, width, height) {
 	];
 }
 
+function boundsForPoints(points) {
+	let minX = points[0].x;
+	let maxX = points[0].x;
+	let minY = points[0].y;
+	let maxY = points[0].y;
+	for (let i = 1; i < points.length; i++) {
+		minX = Math.min(minX, points[i].x);
+		maxX = Math.max(maxX, points[i].x);
+		minY = Math.min(minY, points[i].y);
+		maxY = Math.max(maxY, points[i].y);
+	}
+	return {x: minX, y: minY, width: maxX - minX, height: maxY - minY};
+}
+
 function loadBackgroundFunctions(names, geometryOverrides, runtimeOverrides) {
 	const source = fs.readFileSync(BACKGROUND_PATH, 'utf8');
 	const context = {
@@ -1040,6 +1054,110 @@ function testMergeCandidateCapHelpers() {
 	);
 }
 
+function testConstructionCandidateExactBackstop() {
+	const ClipperLib = require('../../../main/util/clippernode.js');
+	const ctx = loadBackgroundFunctions([
+		'toClipperCoordinates',
+		'shiftPolygon',
+		'localRefinementBoundsOverlap',
+		'localRefinementScaleClipperPath',
+		'localRefinementClipperPathsHaveArea',
+		'constructionPlacementTolerance',
+		'constructionAppendMaterialPaths',
+		'constructionMaterialOverlap',
+		'constructionCandidateLegal'
+	], {
+		getPolygonBounds: boundsForPoints
+	}, {
+		ClipperLib
+	});
+	const config = {
+		clipperScale: 10000000,
+		curveTolerance: 0.01
+	};
+	const sheet = rect(0, 0, 100, 100);
+	const tolerance = ctx.constructionPlacementTolerance(sheet, config);
+	const placed = rect(0, 0, 10, 10);
+	const placedWorld = [placed];
+	const placedBounds = [boundsForPoints(placed)];
+	const part = rect(0, 0, 5, 5);
+	const stats = {candidateChecks: 0, pairChecks: 0, rejected: 0};
+
+	assert.strictEqual(
+		ctx.constructionCandidateLegal(
+			part,
+			{x: 10, y: 0},
+			placedWorld,
+			placedBounds,
+			config,
+			tolerance,
+			stats
+		),
+		true,
+		'exact edge contact must remain legal'
+	);
+	assert.strictEqual(
+		ctx.constructionCandidateLegal(
+			part,
+			{x: 9.9999998, y: 0},
+			placedWorld,
+			placedBounds,
+			config,
+			tolerance,
+			stats
+		),
+		true,
+		'sub-tolerance floating contact must remain legal'
+	);
+	assert.strictEqual(
+		ctx.constructionCandidateLegal(
+			part,
+			{x: 9.999, y: 0},
+			placedWorld,
+			placedBounds,
+			config,
+			tolerance,
+			stats
+		),
+		false,
+		'material penetration exposed by an NFP candidate must be rejected'
+	);
+
+	const frame = rect(0, 0, 10, 10);
+	frame.children = [rect(2, 2, 6, 6)];
+	const framedWorld = [frame];
+	const framedBounds = [boundsForPoints(frame)];
+	const inset = rect(0, 0, 4, 4);
+	assert.strictEqual(
+		ctx.constructionCandidateLegal(
+			inset,
+			{x: 3, y: 3},
+			framedWorld,
+			framedBounds,
+			config,
+			tolerance,
+			stats
+		),
+		true,
+		'a part fully inside a material hole must remain legal'
+	);
+	assert.strictEqual(
+		ctx.constructionCandidateLegal(
+			inset,
+			{x: 1, y: 3},
+			framedWorld,
+			framedBounds,
+			config,
+			tolerance,
+			stats
+		),
+		false,
+		'a part crossing the material around a hole must be rejected'
+	);
+	assert.strictEqual(stats.candidateChecks, 5);
+	assert.strictEqual(stats.rejected, 2);
+}
+
 function run() {
 	testMergedLengthThreshold();
 	testMergedLengthAfterFarCollinearEdge();
@@ -1069,6 +1187,7 @@ function run() {
 	testBackgroundStartMissingTokenFailsClosed();
 	testBackgroundDispatchTiming();
 	testMergeCandidateCapHelpers();
+	testConstructionCandidateExactBackstop();
 	console.log('engine bugfix tests passed');
 }
 

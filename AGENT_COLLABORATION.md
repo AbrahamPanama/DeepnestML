@@ -194,6 +194,17 @@ Use newest notes at the top.
   only when an NFP cache miss existed; its adjacent `pairs`/`in sync`/cache-count
   logs were also on the hot path. These stale diagnostics are removed.
   `engine_bugfixes` and the committed-output equivalence suite remain green.
+- The next shared blocker was substantive: `fu` seed 1 placed a trapezoid 3 and
+  8 units into two earlier parts. A fresh isolated profile reproduced the same
+  digest, proving it was an active-engine NFP candidate leak rather than stale
+  cache state. `placeParts` now runs an exact, hole-aware material backstop only
+  when a candidate would become the current best, with bbox pruning and a
+  sheet-relative numerical-contact tolerance.
+- Three-seed focused `fu` off/on results are byte-equivalent and all legal;
+  median utilization is `0.809578154`. The selected nests perform 41-47 exact
+  candidate checks and 50-66 pair checks for only 0-2 ms total. The laurel
+  efficacy replay remains exactly at `394.25818` used width, with two validated
+  pairs, four expanded members, zero exact overlap, and 1 ms validation cost.
 
 ### 2026-07-26 - SP-1..SP-5 candidate reaches Tier 1 (Codex)
 

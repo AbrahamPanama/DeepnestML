@@ -3532,12 +3532,15 @@ function localRefinementScaleClipperPath(path, config){
 	return scaled;
 }
 
-function localRefinementClipperPathsHaveArea(paths, config){
+function localRefinementClipperPathsHaveArea(paths, config, depthTolerance){
 	if(!paths || paths.length === 0 || typeof ClipperLib === 'undefined'){
 		return false;
 	}
 	var scale = Number(config.clipperScale) || 10000000;
-	var epsDepth = Math.max(1e-9, 1e-4 * (Number(config.curveTolerance) || 0));
+	var epsDepth = Number(depthTolerance);
+	if(!isFinite(epsDepth) || epsDepth < 0){
+		epsDepth = Math.max(1e-9, 1e-4 * (Number(config.curveTolerance) || 0));
+	}
 	var eroded = new ClipperLib.Paths();
 	var offset = new ClipperLib.ClipperOffset(2, epsDepth * scale);
 	offset.AddPaths(paths, ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
@@ -10179,6 +10182,76 @@ function getInnerNfp(A, B, config){
 	return f;
 }
 
+function constructionPlacementTolerance(sheet, config){
+	var scale = Number(config && config.clipperScale) || 10000000;
+	var bounds = sheet && sheet.length >= 3 ? GeometryUtil.getPolygonBounds(sheet) : null;
+	var sheetSpan = bounds ? Math.min(
+		Math.abs(Number(bounds.width) || 0),
+		Math.abs(Number(bounds.height) || 0)
+	) : 0;
+	return Math.max(1 / scale, sheetSpan * 1e-7);
+}
+
+function constructionAppendMaterialPaths(polygon, config, paths){
+	if(!polygon || polygon.length < 3){
+		return;
+	}
+	paths.push(localRefinementScaleClipperPath(toClipperCoordinates(polygon), config));
+	if(polygon.children && polygon.children.length > 0){
+		for(var i=0; i<polygon.children.length; i++){
+			constructionAppendMaterialPaths(polygon.children[i], config, paths);
+		}
+	}
+}
+
+function constructionMaterialOverlap(A, B, config, depthTolerance){
+	if(typeof ClipperLib === 'undefined' || !A || !B || A.length < 3 || B.length < 3){
+		return true;
+	}
+	var aPaths = [];
+	var bPaths = [];
+	constructionAppendMaterialPaths(A, config, aPaths);
+	constructionAppendMaterialPaths(B, config, bPaths);
+	if(aPaths.length === 0 || bPaths.length === 0){
+		return true;
+	}
+	var solution = new ClipperLib.Paths();
+	var clipper = new ClipperLib.Clipper();
+	clipper.AddPaths(aPaths, ClipperLib.PolyType.ptSubject, true);
+	clipper.AddPaths(bPaths, ClipperLib.PolyType.ptClip, true);
+	if(!clipper.Execute(
+		ClipperLib.ClipType.ctIntersection,
+		solution,
+		ClipperLib.PolyFillType.pftEvenOdd,
+		ClipperLib.PolyFillType.pftEvenOdd
+	)){
+		return true;
+	}
+	return localRefinementClipperPathsHaveArea(solution, config, depthTolerance);
+}
+
+function constructionCandidateLegal(part, shift, placedWorld, placedBounds, config, depthTolerance, stats){
+	var world = shiftPolygon(part, shift);
+	var bounds = GeometryUtil.getPolygonBounds(world);
+	stats.candidateChecks++;
+	for(var i=0; i<placedWorld.length; i++){
+		if(!localRefinementBoundsOverlap(bounds, placedBounds[i], depthTolerance)){
+			continue;
+		}
+		stats.pairChecks++;
+		if(constructionMaterialOverlap(
+			world,
+			placedWorld[i],
+			config,
+			depthTolerance
+		)){
+			stats.rejected++;
+			return false;
+		}
+	}
+	return true;
+}
+
 function placeParts(sheets, parts, config, nestindex){
 
 	if(!sheets){
@@ -10191,6 +10264,12 @@ function placeParts(sheets, parts, config, nestindex){
 	var totalsheetarea = 0;
 	var placementMs = 0;
 	var placementIterations = 0;
+	var constructionValidation = {
+		candidateChecks: 0,
+		pairChecks: 0,
+		rejected: 0,
+		ms: 0
+	};
 	
 	// total length of merged lines
 	var totalMerged = 0;
@@ -10431,6 +10510,13 @@ function placeParts(sheets, parts, config, nestindex){
 			var mergeCandidateCap = config.mergeLines ? normalizeMergeCandidateCap(config) : 0;
 			var mergeCandidates = mergeCandidateCap > 0 ? [] : null;
 			var mergeCandidateOrdinal = 0;
+			var constructionPlacedWorld = [];
+			var constructionPlacedBounds = [];
+			for(m=0; m<placed.length; m++){
+				constructionPlacedWorld[m] = shiftPolygon(placed[m], placements[m]);
+				constructionPlacedBounds[m] = GeometryUtil.getPolygonBounds(constructionPlacedWorld[m]);
+			}
+			var constructionDepthTolerance = constructionPlacementTolerance(sheet, config);
 			if(config.mergeLines){
 				shiftedplaced = [];
 				for(m=0; m<placed.length; m++){
@@ -10526,6 +10612,20 @@ function placeParts(sheets, parts, config, nestindex){
 					//console.timeEnd('evalmerge');
 					
 					if(candidatePlacementIsBetter(minarea, minx, miny, score, shiftvector.x, shiftvector.y)){
+						var constructionValidationStartedAt = Date.now();
+						var constructionLegal = constructionCandidateLegal(
+							part,
+							shiftvector,
+							constructionPlacedWorld,
+							constructionPlacedBounds,
+							config,
+							constructionDepthTolerance,
+							constructionValidation
+						);
+						constructionValidation.ms += Date.now() - constructionValidationStartedAt;
+						if(!constructionLegal){
+							continue;
+						}
 						minarea = score;
 						minwidth = candidateBounds ? candidateBounds.width : 0;
 						position = shiftvector;
@@ -10551,6 +10651,20 @@ function placeParts(sheets, parts, config, nestindex){
 					area -= cappedMerged.totalLength*config.timeRatio;
 					score = improvedPlacementScore(area, candidateBounds, sheetboundsForScoring, config);
 					if(candidatePlacementIsBetter(minarea, minx, miny, score, shiftvector.x, shiftvector.y)){
+						var cappedValidationStartedAt = Date.now();
+						var cappedConstructionLegal = constructionCandidateLegal(
+							part,
+							shiftvector,
+							constructionPlacedWorld,
+							constructionPlacedBounds,
+							config,
+							constructionDepthTolerance,
+							constructionValidation
+						);
+						constructionValidation.ms += Date.now() - cappedValidationStartedAt;
+						if(!cappedConstructionLegal){
+							continue;
+						}
 						minarea = score;
 						minwidth = candidateBounds ? candidateBounds.width : 0;
 						position = shiftvector;
@@ -10679,7 +10793,11 @@ function placeParts(sheets, parts, config, nestindex){
 		timing: {
 			placementMs: placementMs,
 			parts: placedCount,
-			placementIterations: placementIterations
+			placementIterations: placementIterations,
+			exactCandidateChecks: constructionValidation.candidateChecks,
+			exactCandidatePairChecks: constructionValidation.pairChecks,
+			exactCandidateRejected: constructionValidation.rejected,
+			exactCandidateMs: constructionValidation.ms
 		}
 	};
 	if(fitnessBreakdown){
