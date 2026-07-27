@@ -86,8 +86,8 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): clean tracked tree after the SP-5
-import-polygon fidelity and refinement-reachability fix (`92c957f`); generated
+State (verified 2026-07-27 by Codex): dirty only for the active SP-5
+mixed-library fail-soft policy and its corpus-gate coverage; generated
 benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
@@ -98,7 +98,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 probes require the frozen 240-second budget. Export-proxy fidelity and the affected rotation gates are fixed in `92c957f`; full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
+| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 hard batch exposed a `gardeyn4` mixed-library regression; final fail-soft eligibility now preserves the canonical path for jobs with >2 active part sources. Clean full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
@@ -163,6 +163,37 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-27 - Superpart mixed-library fail-soft gate (Codex)
+
+- The clean 240-second hard Tier 2 slice was fully legal but failed efficacy:
+  mean median utilization dropped `1.2199 pp`. `gardeyn4` was the blocker,
+  falling `10.4526 pp` after 21 rigid pairs replaced most independent copies.
+  `gardeyn5`, `gardeyn6`, and `gardeyn7` improved by `0.6301`, `1.0698`, and
+  `0.2137 pp`; the failure was therefore global packing freedom, not collision
+  correctness.
+- Capping mixed jobs to one pair per eligible source reduced the focused
+  60-second `gardeyn4` regression from `-10.4526 pp` to `-3.8557 pp`, proving
+  excessive rigidity was causal but also proving that local pair gain cannot
+  safely authorize even one global substitution in a heterogeneous library.
+- Final policy: superpart clustering is admitted only for jobs with one or two
+  active non-sheet source geometries. Those are the homogeneous/repeated-part
+  jobs the mechanism can evaluate honestly; mixed libraries stay byte-identical
+  to the canonical placer until a future dual-path comparison can prove a
+  benefit.
+- Focused `gardeyn4` A/B after the final gate is exact across three seeds:
+  median delta `0 pp`, every utilization and placement digest identical,
+  80/80 parts legal, and candidate telemetry says `mixedSourceLibrary`.
+- Laurel remains fully active because the real job has two source geometries:
+  two pairs, four expanded originals, used width `394.306`, zero overlap, zero
+  sheet escape, and independent exported-SVG legality green.
+- The Tier 2 validator now accepts corpus-side activation or a separate laurel
+  smoke report, but the latter is not a waiver: it re-checks enabled/paired
+  telemetry, exact expansion, four-part completeness, the 410-unit width gate,
+  zero non-canonical NFP lookups, and independently audits the exported SVG.
+- Verification green: syntax checks, superpart unit tests, engine flag-off
+  equivalence, focused laurel smoke, independent export audit, and the
+  three-seed mixed-library parity probe.
 
 ### 2026-07-27 - Preserve imported cut silhouette in nesting proxy (Codex)
 

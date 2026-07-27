@@ -264,6 +264,29 @@ function assertPairAdmissionGate() {
 	);
 }
 
+function assertPairQuantityPolicy() {
+	assert.strictEqual(
+		Superpart.pairQuantityForJob(2, 2),
+		1,
+		'a two-copy laurel source must still form its complete pair'
+	);
+	assert.strictEqual(
+		Superpart.pairQuantityForJob(8, 1),
+		4,
+		'a homogeneous repeated-part job may cluster every pair'
+	);
+	assert.strictEqual(
+		Superpart.pairQuantityForJob(15, 5),
+		0,
+		'a mixed library must stay on the unchanged canonical placement path'
+	);
+	assert.strictEqual(
+		Superpart.pairQuantityForJob(1, 8),
+		0,
+		'a source with no complete pair must remain unchanged'
+	);
+}
+
 function assertConnectedEnvelopePreservesHoles() {
 	const fixed = framedSquare();
 	const moved = Superpart.translateRing(framedSquare(), {x: 10, y: 0});
@@ -428,6 +451,7 @@ function assertEnvelopeUnionFailureFallsBack() {
 assertDeterministic();
 assertCompatibilityGate();
 assertPairAdmissionGate();
+assertPairQuantityPolicy();
 assertConnectedEnvelopePreservesHoles();
 assertExpandedPlacementValidation();
 assertExpandedPlacementToleranceIsLinear();

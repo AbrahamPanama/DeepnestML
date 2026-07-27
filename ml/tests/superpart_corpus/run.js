@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const esicup = require('../../lib/esicup-convert.js');
+const exportedLayout = require('../exported_layout_legality/run.js');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const INSTANCES_DIR = path.join(ROOT, 'ml', 'benchmark', 'esicup', 'instances');
@@ -37,6 +38,50 @@ function instanceMap(report) {
 		result[instance.name] = instance;
 	}
 	return result;
+}
+
+function verifyActivationReport(report) {
+	assert(report && report.status === 'completed',
+		'activation fixture did not complete');
+	assert(report.outputFormat === 'svg',
+		'activation fixture must export SVG for independent inspection');
+	const details = report.details || {};
+	const telemetry = details.superpartClustering;
+	assert(telemetry && telemetry.enabled === true,
+		'activation fixture did not enable superpart clustering');
+	assert(Number(telemetry.sourcesPaired || 0) > 0,
+		'activation fixture did not pair a repeated source');
+	assert(Number(telemetry.clusterPlacements || 0) > 0,
+		'activation fixture did not place a rigid pair');
+	assert(telemetry.expansionValidated === true,
+		'activation fixture did not validate expanded members');
+	assert(details.localRefinement &&
+		Number(details.localRefinement.nonCanonicalNfpLookups || 0) === 0,
+		'activation fixture used a non-canonical NFP');
+	const expectedParts = Number(details.requestedPartInstances);
+	assert(expectedParts > 0 && Number(details.placedPartInstances) === expectedParts,
+		'activation fixture did not place every requested part');
+	assert(details.layout && Number(details.layout.usedSheetWidth) <= 410,
+		'activation fixture missed the laurel width gate');
+	const outputPath = path.resolve(report.outputPath || '');
+	assert(fs.existsSync(outputPath),
+		'activation fixture SVG is missing');
+	const legality = exportedLayout.inspect(fs.readFileSync(outputPath, 'utf8'), {
+		expectedParts: expectedParts,
+		tolerance: 0.3,
+		areaTolerance: 1e-6
+	});
+	assert(legality.legal === true,
+		'activation fixture failed independent exported-layout legality');
+	return {
+		scenarioName: report.scenarioName,
+		sourcesPaired: Number(telemetry.sourcesPaired),
+		clusterPlacements: Number(telemetry.clusterPlacements),
+		partsPlaced: Number(details.placedPartInstances),
+		usedSheetWidth: Number(details.layout.usedSheetWidth),
+		exportedGeometryLegal: true,
+		exportSha256: legality.exportSha256
+	};
 }
 
 function verifyStructuralNoOp() {
@@ -118,7 +163,7 @@ function verifyRunPair(name, baseline, candidate, options) {
 	}
 }
 
-function verifyBenchmarkPair(baseline, candidate, mode) {
+function verifyBenchmarkPair(baseline, candidate, mode, activationEvidence) {
 	const tier2 = mode === 'tier2';
 	const verificationOptions = {
 		requireComplete: tier2,
@@ -167,8 +212,8 @@ function verifyBenchmarkPair(baseline, candidate, mode) {
 		verifyRunPair(name, beforeByName[name], afterByName[name], verificationOptions);
 	}
 	if (tier2) {
-		assert(verificationOptions.featureActiveRuns > 0,
-			'Tier 2 did not exercise a single clustered run');
+		assert(verificationOptions.featureActiveRuns > 0 || activationEvidence,
+			'Tier 2 did not exercise a clustered run and has no fixture activation proof');
 	}
 
 	const baselineMean = Number(baseline.aggregate.meanMedianUtilization);
@@ -191,6 +236,7 @@ function verifyBenchmarkPair(baseline, candidate, mode) {
 	};
 	if (tier2) {
 		result.featureActiveRuns = verificationOptions.featureActiveRuns;
+		result.fixtureActivation = activationEvidence || null;
 	}
 	return result;
 }
@@ -199,12 +245,16 @@ function main() {
 	const args = parseArgs(process.argv);
 	if (!args.baseline || !args.candidate) {
 		throw new Error(
-			'usage: run.js --baseline <off.json> --candidate <on.json> [--report <gate.json>]'
+			'usage: run.js --baseline <off.json> --candidate <on.json> ' +
+			'[--activation-report <laurel-smoke.json>] [--report <gate.json>]'
 		);
 	}
 	const mode = String(args.mode || 'tier2');
 	assert(mode === 'tier2' || mode === 'standard-noop',
 		'--mode must be tier2 or standard-noop');
+	const activationEvidence = args['activation-report'] ?
+		verifyActivationReport(readJson(args['activation-report'])) :
+		null;
 	const result = {
 		status: mode === 'tier2' ? 'passed' : 'supporting-evidence',
 		mode: mode,
@@ -213,7 +263,8 @@ function main() {
 		executedParityProbe: verifyBenchmarkPair(
 			readJson(args.baseline),
 			readJson(args.candidate),
-			mode
+			mode,
+			activationEvidence
 		)
 	};
 	if (args.report) {
@@ -228,5 +279,6 @@ if (require.main === module) {
 
 module.exports = {
 	verifyStructuralNoOp,
+	verifyActivationReport,
 	verifyBenchmarkPair
 };

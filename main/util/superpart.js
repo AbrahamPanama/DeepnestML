@@ -1094,9 +1094,24 @@
 		return null;
 	}
 
+	function pairQuantityForJob(quantity, activePartSourceCount){
+		var availablePairs = Math.floor(Math.max(0, finite(quantity, 0)) / 2);
+		if(availablePairs < 1){
+			return 0;
+		}
+		// A local mating gain does not predict the global packing effect once
+		// several unrelated silhouettes compete for the remaining voids. Keep
+		// mixed libraries on the canonical placer until a dual-path comparison
+		// can prove that replacing their singles is beneficial.
+		return Math.max(0, Math.floor(finite(activePartSourceCount, 0))) <= 2 ?
+			availablePairs :
+			0;
+	}
+
 	return {
 		findBestPair: findBestPair,
 		pairAdmissionReason: pairAdmissionReason,
+		pairQuantityForJob: pairQuantityForJob,
 		exactIntersectionArea: exactIntersectionArea,
 		buildCollisionEnvelope: buildCollisionEnvelope,
 		composeMemberPlacement: composeMemberPlacement,

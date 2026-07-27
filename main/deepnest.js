@@ -239,7 +239,19 @@
 				var searchBudget = Math.max(50, Number(userConfig.superpartSearchMs) || 2000);
 				var jobBudget = searchBudget * 2;
 				var jobDeadline = Date.now() + jobBudget;
+				var activePartSourceCount = 0;
+				for(var sourceIndex=0; sourceIndex<originalSourceCount; sourceIndex++){
+					if(!parts[sourceIndex].sheet &&
+						Math.max(0, parseInt(parts[sourceIndex].quantity, 10) || 0) > 0){
+						activePartSourceCount++;
+					}
+				}
 				stats.jobBudgetMs = jobBudget;
+				stats.activePartSourceCount = activePartSourceCount;
+				if(activePartSourceCount > 2){
+					stats.reason = 'mixedSourceLibrary';
+					return stats;
+				}
 				for(var i=0; i<originalSourceCount; i++){
 					var part = parts[i];
 					var quantity = Math.max(0, parseInt(part.quantity, 10) || 0);
@@ -294,8 +306,10 @@
 						continue;
 					}
 
-					var pairQuantity = Math.floor(quantity / 2);
-					part.quantity = quantity % 2;
+					var pairQuantity = typeof Superpart.pairQuantityForJob === 'function' ?
+						Superpart.pairQuantityForJob(quantity, activePartSourceCount) :
+						Math.floor(quantity / 2);
+					part.quantity = quantity - (pairQuantity * 2);
 					var syntheticSource = parts.length;
 					var members = [];
 					for(var memberIndex=0; memberIndex<pairing.members.length; memberIndex++){
