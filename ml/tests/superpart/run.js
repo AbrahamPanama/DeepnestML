@@ -242,6 +242,28 @@ function assertCompatibilityGate() {
 		'Step & Repeat rejection must not mutate unrelated common-line state');
 }
 
+function assertPairAdmissionGate() {
+	assert.strictEqual(Superpart.pairAdmissionReason(null, 0.1), 'noPair');
+	assert.strictEqual(
+		Superpart.pairAdmissionReason({gain: 0.09, bboxGain: 0.2}, 0.1),
+		'insufficientObjectiveGain'
+	);
+	assert.strictEqual(
+		Superpart.pairAdmissionReason({gain: 0.2, bboxGain: -0.01}, 0.1),
+		'nonPositiveBoundingBoxGain',
+		'a rigid pair that enlarges its packing footprint must be rejected'
+	);
+	assert.strictEqual(
+		Superpart.pairAdmissionReason({gain: 0.2, bboxGain: 0}, 0.1),
+		'nonPositiveBoundingBoxGain',
+		'a pair needs measurable axis-aligned packing headroom'
+	);
+	assert.strictEqual(
+		Superpart.pairAdmissionReason({gain: 0.2, bboxGain: 0.01}, 0.1),
+		null
+	);
+}
+
 function assertConnectedEnvelopePreservesHoles() {
 	const fixed = framedSquare();
 	const moved = Superpart.translateRing(framedSquare(), {x: 10, y: 0});
@@ -405,10 +427,11 @@ function assertEnvelopeUnionFailureFallsBack() {
 
 assertDeterministic();
 assertCompatibilityGate();
-	assertConnectedEnvelopePreservesHoles();
-	assertExpandedPlacementValidation();
-	assertExpandedPlacementToleranceIsLinear();
-	assertEnvelopeUnionFailureFallsBack();
+assertPairAdmissionGate();
+assertConnectedEnvelopePreservesHoles();
+assertExpandedPlacementValidation();
+assertExpandedPlacementToleranceIsLinear();
+assertEnvelopeUnionFailureFallsBack();
 const report = assertLaurelPair();
 console.log(JSON.stringify(report, null, 2));
 console.log('superpart SP-1 tests passed');

@@ -210,6 +210,7 @@
 					sourcesChecked: 0,
 					sourcesSkippedNoHeadroom: 0,
 					sourcesSkippedJobBudget: 0,
+					sourcesSkippedPackingHeadroom: 0,
 					sourcesPaired: 0,
 					superpartInstances: 0,
 					memberInstances: 0,
@@ -275,7 +276,14 @@
 						stats.attempts = [];
 					}
 					stats.attempts.push(searchTrace);
-					if(!pairing || pairing.gain < minimumGain){
+					var admissionReason = typeof Superpart.pairAdmissionReason === 'function' ?
+						Superpart.pairAdmissionReason(pairing, minimumGain) :
+						(!pairing || pairing.gain < minimumGain ? 'insufficientObjectiveGain' : null);
+					searchTrace.admissionReason = admissionReason;
+					if(admissionReason){
+						if(admissionReason === 'nonPositiveBoundingBoxGain'){
+							stats.sourcesSkippedPackingHeadroom++;
+						}
 						continue;
 					}
 

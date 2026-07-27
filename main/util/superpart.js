@@ -1077,8 +1077,26 @@
 		}
 	}
 
+	function pairAdmissionReason(pairing, minimumGain){
+		if(!pairing){
+			return 'noPair';
+		}
+		var requiredGain = Math.max(0, finite(minimumGain, DEFAULT_MIN_GAIN));
+		if(!isFinite(Number(pairing.gain)) || Number(pairing.gain) < requiredGain){
+			return 'insufficientObjectiveGain';
+		}
+		// The synthetic pair is placed as one rigid object. A mating pose that
+		// enlarges its axis-aligned footprint can improve the internal hull while
+		// systematically making the sheet nest worse.
+		if(!isFinite(Number(pairing.bboxGain)) || Number(pairing.bboxGain) <= 0){
+			return 'nonPositiveBoundingBoxGain';
+		}
+		return null;
+	}
+
 	return {
 		findBestPair: findBestPair,
+		pairAdmissionReason: pairAdmissionReason,
 		exactIntersectionArea: exactIntersectionArea,
 		buildCollisionEnvelope: buildCollisionEnvelope,
 		composeMemberPlacement: composeMemberPlacement,

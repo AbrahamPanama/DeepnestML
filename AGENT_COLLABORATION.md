@@ -163,6 +163,36 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 
 Use newest notes at the top.
 
+### 2026-07-26 - Tier 2 native NFP crash containment + pair admission (Codex)
+
+- The clean Tier 2 A/B runs both terminated at `gardeyn2` with the same
+  baseline-engine SIGSEGV in Boost Polygon arbitrary-polygon reconstruction.
+  Exact traced inputs were valid, hole-free concave rings; JS `try/catch`
+  cannot contain a native process crash.
+- Two attempted Boost extraction paths were disproven:
+  `polygon_set_data::get()` crashed in `addHole`, and `get_trapezoids()` crashed
+  in `trapezoid_arbitrary_formation::getVerticalPair_`. The latter experiment
+  was removed rather than shipped.
+- `tryNativeOuterNfp` now admits only convex, hole-free rings to Boost. Concave
+  and processed-hole pairs return `null` before addon dispatch and use the
+  established exact JS fallbacks. NFP cache version is 4 so old native results
+  are not reused. A spy test proves risky pairs never invoke the addon.
+- Focused `gardeyn2` replay now completes legally: 50/50 parts, zero material
+  overlaps, placement 22.440 s under the 30 s gate, utilization 74.0702%.
+  `bash ml/tests/nfp_equivalence/run.sh` passes all four native/JS fixtures and
+  the engine equivalence suite remains green.
+- The first completed active corpus case (`swim`) exposed a separate admission
+  defect: its candidate improved convex-hull gain by 14.235% while worsening
+  axis-aligned pair footprint by 1.071%, then reduced median utilization by
+  roughly 2.50 pp. Pair admission now requires positive `bboxGain` in addition
+  to the configured objective gain.
+- Three post-guard `swim` seeds are legal with zero admitted pairs; each run
+  records `sourcesSkippedPackingHeadroom: 1` and
+  `admissionReason: nonPositiveBoundingBoxGain`. Laurel remains admitted with
+  36.009% bbox gain in the focused unit search.
+- Remaining gate: commit these two repairs, then rerun the clean 23-instance,
+  three-seed Tier 2 A/B before packaging and installed-app production parity.
+
 ### 2026-07-26 - Tier 2 numerical-contact audit correction (Codex)
 
 - The first clean 23-instance compact-demand A/B stopped identically on both
