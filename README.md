@@ -37,9 +37,9 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ### 0.9.0: Repeated-Part Interlocking
 
-Deepnest ML can now measure and pre-pair repeated concave parts before the normal NFP placement pass. The laurel validation job forms two visible interlocked pairs and reduces used sheet width from `477.98` to `394.26` units at defaults and about `406.2` under the saved user-settings profile. The search is capped and geometry-screened, keeps the proven four construction rotations, and expands every pair back to its original member paths before SVG, PDF, DXF, or TIFF export.
+Deepnest ML can now measure and pre-pair repeated concave parts before the normal NFP placement pass. The laurel validation job forms two visible interlocked pairs and reduces used sheet width from `477.98` to `395.75` units in the installed app with a fresh default profile, a `17.2%` reduction. The search is capped and geometry-screened, keeps the proven four construction rotations, and expands every pair back to its original member paths before SVG, PDF, DXF, or TIFF export.
 
-The feature is enabled by default with a conservative 10% mating-gain threshold for jobs containing one or two active part geometries. Mixed part libraries remain on the canonical independent-part path because corpus testing showed that rigid pairs can reduce global packing freedom even when every pair is locally efficient. Common-line merging is disabled while interlocking is active so no synthetic envelope can reach a cut file. Step & Repeat remains a separate fixed-grid mode and disables interlocking at runtime.
+The feature is enabled by default with a conservative 10% mating-gain threshold for jobs containing one or two active part geometries. Mixed part libraries remain on the canonical independent-part path because corpus testing showed that rigid pairs can reduce global packing freedom even when every pair is locally efficient. Common-line merging is disabled while interlocking is active so no synthetic envelope can reach a cut file. Step & Repeat remains a separate fixed-grid mode and disables interlocking at runtime. The installed-app export gate confirmed all four original parts, zero overlap, and zero sheet escape.
 
 ### 0.7.5: Final Legality Gate For Slide Local Refinement
 

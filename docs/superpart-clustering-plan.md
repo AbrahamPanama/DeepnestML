@@ -1,9 +1,8 @@
 # Superpart Clustering — Goals, Success Measures, Implementation Plan
 
-Status: IMPLEMENTED — Tier 0, Tier 1, and Tier 2 are green. Tier 3 packaged-app
-verification is in progress. The production policy is intentionally narrower than
-the original plan: clustering activates only when a job has at most two active
-non-sheet source geometries.
+Status: COMPLETE — Tier 0, Tier 1, Tier 2, and Tier 3 are green. The production
+policy is intentionally narrower than the original plan: clustering activates
+only when a job has at most two active non-sheet source geometries.
 
 Author: Claude-Code, 2026-07-25 (against commit `4a58885`, product 0.8.0).
 
@@ -93,7 +92,7 @@ Report every tier as a number, including when it fails.
 | Tier 0 | PASS — laurel mating gain `18.634%` |
 | Tier 1 | PASS — default fixture width `477.983 -> 394.258` (`17.516%` less sheet width), approximately `94%` of theoretical mating gain; three seeded runs were all `<= 410`; exported SVG visibly contains two interlocked pairs and independently audits legal |
 | Tier 2 | PASS — 23 ESICUP instances x 3 seeds x 240 seconds, native runtime: candidate mean-median utilization `0.6669373` vs baseline `0.6670608`, delta `-0.01235 pp` against the allowed `-0.25 pp`; all 69 runs complete/legal and `nonCanonicalNfpLookups == 0` |
-| Tier 3 | PENDING — arm64 DMG build, side-by-side install, and installed-app laurel export |
+| Tier 3 | PASS — installed arm64 0.9.0 app, fresh profile, zero config overrides: width `477.983 -> 395.754` (`17.203%` less sheet width), `92.32%` of theoretical mating gain captured; both sources paired into two visible interlocks, all four originals exported, exact overlap/outside counts `0` |
 
 The clean Tier 2 hard slice exposed an important scope boundary before the final
 corpus run: pairing many sources in a heterogeneous library made `gardeyn4`
@@ -208,9 +207,21 @@ cut file as a single merged outline is scrap material. Gate it hard:
 
 Run Tier 1, 2, 3 from §2. The implementation ships default-on only for the narrow
 one-/two-source eligibility class proven by the laurel fixture; mixed libraries
-remain behaviorally on the canonical path. The ML checkpoint, flag-off
-equivalence, exact export audit, and full Tier 2 corpus gate are complete. Tier 3
-remains the release gate.
+remain behaviorally on the canonical path. The required ML checkpoint attempt,
+flag-off equivalence, exact export audit, and full Tier 2 corpus gate are
+complete. The checkpoint attempt could not create an artifact because this
+checkout has no completed training run with a trained model.
+
+Tier 3 passed through `/Applications/Deepnest ML.app` version `0.9.0`, running a
+new user-data profile and `configOverrides: {}`. The runtime confirmed the actual
+production defaults: Gravity placement, four construction rotations, adaptive
+rotations off, `curveTolerance: 0.36`, improved scoring on, hole processing off,
+superpart clustering on, and common-line merging off. The 30-second seeded run
+placed two validated clusters/four expanded members at used width `395.754423`.
+An independent exported-SVG audit found all four parts, zero overlap, zero sheet
+escape, and maximum intersection/outside area `0`. The release DMG is ad-hoc
+signed, `hdiutil`-verified, arm64, and has SHA-256
+`4bc755cd81b828fcb93d1eadaed07f0a071d7819848c15fd298e6ebea03233bd`.
 
 ---
 
