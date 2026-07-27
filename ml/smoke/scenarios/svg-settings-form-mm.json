@@ -1,0 +1,26 @@
+{
+  "name": "svg-settings-form-mm",
+  "description": "A post-start engine config must preserve and canonicalize millimetre UI settings.",
+  "input": "ml/examples/app-smoke.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "isolatedUserData": true,
+  "configOverrides": {
+    "units": "millimeters",
+    "scale": 72,
+    "endpointTolerance": "",
+    "dxfImportScale": 2.834645,
+    "dxfExportScale": 25.4,
+    "placementType": "gravity",
+    "mergeLines": false,
+    "populationSize": 8,
+    "threads": 2
+  },
+  "expectedSettingsForm": {
+    "units": "mm",
+    "dxfImportScale": "2.83465",
+    "dxfExportScale": "25.4",
+    "undefinedTextCount": 0
+  }
+}

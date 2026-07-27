@@ -8,10 +8,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ## Current Local Release
 
-- **Version:** `0.9.0`
+- **Version:** `0.9.1`
 - **Product name:** `Deepnest ML`
 - **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
-- **macOS local build:** `dist/Deepnest ML-0.9.0-mac-arm64.dmg`
+- **macOS local build:** `dist/Deepnest ML-0.9.1-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
 
@@ -34,6 +34,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Run in a unified light workspace where the parts list remains visible while nesting runs in the main workspace pane.
 
 ## Recent Highlights
+
+### 0.9.1: Settings Display Repair
+
+The settings form now preserves its UI-only values when a nest switches to the smaller runtime engine configuration. Unit labels no longer become `undefined` after nesting starts, and SVG scale, endpoint tolerance, and both DXF unit selectors remain populated in inch and millimetre modes. Existing malformed or legacy values for these fields are normalized conservatively on startup.
 
 ### 0.9.0: Repeated-Part Interlocking
 

@@ -7,7 +7,7 @@ ARTIFACT_ROOT="${DEEPNEST_SMOKE_ARTIFACT_ROOT:-"$ROOT_DIR/ml/artifacts/smoke-bat
 if [ "$#" -gt 0 ]; then
   SCENARIOS=("$@")
 else
-  SCENARIOS=("svg-gravity" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-laurel-v4-contact" "svg-laurel-superpart-default" "svg-steprepeat" "svg-export-pdf")
+  SCENARIOS=("svg-gravity" "svg-settings-form-mm" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-laurel-v4-contact" "svg-laurel-superpart-default" "svg-steprepeat" "svg-export-pdf")
 fi
 
 mkdir -p "$ARTIFACT_ROOT"
@@ -125,6 +125,40 @@ if (scenario.expectedRuntimeConfig && typeof scenario.expectedRuntimeConfig === 
     const actual = runtimeConfig ? runtimeConfig[field] : undefined;
     if (actual !== expected) {
       console.error('[smoke-battery] runtime config mismatch:', field, expected, actual);
+      process.exit(1);
+    }
+  }
+}
+const settingsForm = report.details && report.details.settingsForm;
+if (!settingsForm) {
+  console.error('[smoke-battery] missing settings-form snapshot');
+  process.exit(1);
+}
+if (settingsForm.units !== 'inch' && settingsForm.units !== 'mm') {
+  console.error('[smoke-battery] invalid settings-form units:', settingsForm.units);
+  process.exit(1);
+}
+if (!Array.isArray(settingsForm.unitLabels) || settingsForm.unitLabels.length === 0 ||
+    settingsForm.unitLabels.some((label) => label !== settingsForm.units)) {
+  console.error('[smoke-battery] settings-form unit labels are stale:', settingsForm);
+  process.exit(1);
+}
+if (Number(settingsForm.scale) <= 0 ||
+    settingsForm.endpointTolerance === '' ||
+    !Number.isFinite(Number(settingsForm.endpointTolerance)) ||
+    Number(settingsForm.endpointTolerance) < 0 ||
+    settingsForm.dxfImportScale === '' ||
+    settingsForm.dxfExportScale === '' ||
+    settingsForm.undefinedTextCount !== 0) {
+  console.error('[smoke-battery] settings-form contains blank or undefined values:', settingsForm);
+  process.exit(1);
+}
+if (scenario.expectedSettingsForm && typeof scenario.expectedSettingsForm === 'object') {
+  for (const field of Object.keys(scenario.expectedSettingsForm)) {
+    const expected = scenario.expectedSettingsForm[field];
+    const actual = settingsForm[field];
+    if (actual !== expected) {
+      console.error('[smoke-battery] settings-form mismatch:', field, expected, actual);
       process.exit(1);
     }
   }

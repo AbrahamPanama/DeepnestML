@@ -2,7 +2,7 @@
 <html itemscope="" itemtype="http://schema.org/WebPage" lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Deepnest ML 0.9.0</title>
+		<title>Deepnest ML 0.9.1</title>
 
 		<link type="text/css" rel="stylesheet" media="all" href="font/latolatinfonts.css" />
 		<link rel="stylesheet" type="text/css" href="style.css" />
@@ -74,14 +74,18 @@
 				},
 				get: function(key){
 					try{
-						return Promise.resolve(settingsCall('getSync', key));
+						return Promise.resolve(arguments.length ?
+							settingsCall('getSync', key) :
+							settingsCall('getSync'));
 					}
 					catch(err){
 						return Promise.reject(err);
 					}
 				},
 				getSync: function(key){
-					return settingsCall('getSync', key);
+					return arguments.length ?
+						settingsCall('getSync', key) :
+						settingsCall('getSync');
 				},
 				set: function(key, value){
 					try{
@@ -495,6 +499,87 @@
 			  endpointTolerance: 0.36,
 			  conversionServer: 'http://convert.deepnest.io'
 			};
+
+			function copyDefinedConfig(target, source){
+				if(!source || typeof source !== 'object'){
+					return target;
+				}
+				Object.keys(source).forEach(function(key){
+					if(typeof source[key] !== 'undefined'){
+						target[key] = source[key];
+					}
+				});
+				return target;
+			}
+
+			function canonicalScaleChoice(value, choices, fallback){
+				var stringValue = value === null || typeof value === 'undefined' ? '' : String(value);
+				if(choices.indexOf(stringValue) >= 0){
+					return stringValue;
+				}
+				var numericValue = Number(value);
+				if(isFinite(numericValue)){
+					for(var i=0; i<choices.length; i++){
+						if(Math.abs(numericValue - Number(choices[i])) <= 0.0001){
+							return choices[i];
+						}
+					}
+				}
+				return fallback;
+			}
+
+			function normalizedSettingsFormConfig(runtimeConfig){
+				var merged = {};
+				copyDefinedConfig(merged, defaultconfig);
+				copyDefinedConfig(merged, config.getSync());
+				copyDefinedConfig(merged, runtimeConfig);
+
+				var unitValue = merged.units === null || typeof merged.units === 'undefined' ?
+					'' :
+					String(merged.units).toLowerCase();
+				if(unitValue === 'mm' || unitValue === 'millimeter' || unitValue === 'millimeters'){
+					merged.units = 'mm';
+				}
+				else if(unitValue === 'inch' || unitValue === 'in' || unitValue === 'inches'){
+					merged.units = 'inch';
+				}
+				else{
+					merged.units = defaultconfig.units;
+				}
+
+				var scaleValue = Number(merged.scale);
+				merged.scale = isFinite(scaleValue) && scaleValue > 0 ?
+					scaleValue :
+					defaultconfig.scale;
+
+				var endpointValue = merged.endpointTolerance === '' ?
+					NaN :
+					Number(merged.endpointTolerance);
+				merged.endpointTolerance = isFinite(endpointValue) && endpointValue >= 0 ?
+					endpointValue :
+					defaultconfig.endpointTolerance;
+
+				merged.dxfImportScale = canonicalScaleChoice(
+					merged.dxfImportScale,
+					['1', '12', '72', '2.83465', '28.3465'],
+					defaultconfig.dxfImportScale
+				);
+				merged.dxfExportScale = canonicalScaleChoice(
+					merged.dxfExportScale,
+					['72', '6', '1', '25.4', '2.54'],
+					defaultconfig.dxfExportScale
+				);
+				return merged;
+			}
+
+			function repairStoredSettingsFormValues(){
+				var repaired = normalizedSettingsFormConfig();
+				['units', 'scale', 'endpointTolerance', 'dxfImportScale', 'dxfExportScale'].forEach(function(key){
+					if(config.getSync(key) !== repaired[key]){
+						config.setSync(key, repaired[key]);
+					}
+				});
+			}
 			
 			config.defaults(defaultconfig);
 			if(previousSuperpartDefaultVersion < 1){
@@ -524,6 +609,7 @@
 			  	config.setSync(key, defaultconfig[key]);
 			  }
 			}
+			repairStoredSettingsFormValues();
 			config.setSync('rotations', 4);
 			enforceContinuousCompactionConfigGate(config.getSync('localRefinementContinuous') === true);
 			
@@ -604,6 +690,11 @@
 			}
 			
 				function updateForm(c){
+					// DeepNest.config() intentionally contains engine fields only. Merge those
+					// values over persisted UI settings so a running nest cannot blank controls
+					// such as units, endpoint tolerance, or DXF conversion scales.
+					c = normalizedSettingsFormConfig(c);
+
 					function updateStepRepeatOptions(currentConfig){
 						var active = currentConfig && currentConfig.placementType == 'steprepeat';
 						var disabledReason = 'Step & Repeat uses a fixed grid, so this setting does not apply.';
@@ -823,6 +914,30 @@
 
 			function cloneConfigObject(value){
 				return JSON.parse(JSON.stringify(value || {}));
+			}
+
+			function captureSettingsFormState(){
+				var checkedUnits = document.querySelector('#configform input[name="units"]:checked');
+				var unitLabels = Array.from(document.querySelectorAll('#configform .unit-label')).map(function(label){
+					return (label.textContent || '').trim();
+				});
+				var scaleControl = document.querySelector('#inputscale');
+				var endpointControl = document.querySelector('#configform [data-config="endpointTolerance"]');
+				var dxfImportControl = document.querySelector('#configform [data-config="dxfImportScale"]');
+				var dxfExportControl = document.querySelector('#configform [data-config="dxfExportScale"]');
+				var configText = document.querySelector('#configform');
+				var undefinedMatches = configText && configText.textContent ?
+					configText.textContent.match(/\bundefined\b/g) :
+					null;
+				return {
+					units: checkedUnits ? checkedUnits.value : '',
+					unitLabels: unitLabels,
+					scale: scaleControl ? scaleControl.value : '',
+					endpointTolerance: endpointControl ? endpointControl.value : '',
+					dxfImportScale: dxfImportControl ? dxfImportControl.value : '',
+					dxfExportScale: dxfExportControl ? dxfExportControl.value : '',
+					undefinedTextCount: undefinedMatches ? undefinedMatches.length : 0
+				};
 			}
 
 			function setMlRuntimeStatus(text, level){
@@ -2404,7 +2519,9 @@
 					return false;
 				}
 				window.DeepNestRuntimeConfig = cloneConfigObject(DeepNest.config());
-				updateForm(window.DeepNestRuntimeConfig);
+				var settingsFormConfig = normalizedSettingsFormConfig(normalizedConfig);
+				copyDefinedConfig(settingsFormConfig, window.DeepNestRuntimeConfig);
+				updateForm(settingsFormConfig);
 				return true;
 			}
 
@@ -3822,6 +3939,7 @@
 							} : null,
 							runtimePlacementType: window.DeepNestRuntimeConfig && window.DeepNestRuntimeConfig.placementType ? window.DeepNestRuntimeConfig.placementType : null,
 							runtimeConfig: cloneConfigObject(window.DeepNestRuntimeConfig || {}),
+							settingsForm: captureSettingsFormState(),
 							mlMode: smokeMlMode || config.getSync('mlMode') || 'off',
 							mlRecommendation: window.DeepNestLastMLRecommendation || null,
 							mlDiagnostic: window.DeepNestLastMLDiagnostic || null
