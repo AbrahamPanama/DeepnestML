@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.9.1` (source; arm64 patch packaging in progress)
+- Current version: `0.9.1` (source and installed arm64 release)
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.9.1-mac-arm64.dmg` (pending build)
+- Local DMG artifact: `dist/Deepnest ML-0.9.1-mac-arm64.dmg` (built and verified)
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -86,8 +86,8 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): dirty for active settings-form hydration
-fix; generated benchmark-result JSONs remain untracked by convention.
+State (verified 2026-07-27 by Codex): tracked files clean after the settings-form
+repair release; generated benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -97,7 +97,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | Settings form undefined/blank value repair | `main/index.html` runtime-to-form hydration, smoke UI-state regression, `AGENT_COLLABORATION.md` | In progress. Root cause confirmed: post-start `DeepNest.config()` is engine-only and was incorrectly used as the complete settings-form model | 2026-07-27 |
+| Codex | Settings form undefined/blank value repair | `main/index.html` runtime-to-form hydration, smoke UI-state regression, packaging/install, `AGENT_COLLABORATION.md` | Completed in 0.9.1. Full UI settings survive post-start engine hydration; malformed legacy unit/scale values repair to canonical options; installed inch/mm production gates green | 2026-07-27 |
 | Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, packaging, installed app, `AGENT_COLLABORATION.md` | Completed. All four tiers green: exact mating gain 18.634%; visible/legal fixture interlock; 23-instance x 3-seed corpus delta -0.01235 pp; installed 0.9.0 fresh-default result 477.983 -> 395.754 width with zero overlap/outside | 2026-07-27 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
@@ -163,6 +163,36 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-27 - Settings form hydration repair and 0.9.1 release complete (Codex)
+
+- Fixed the post-start settings corruption. `DeepNest.config()` intentionally
+  returns engine-only values, but the renderer had reused that partial object as
+  the entire form model. UI-only values (`units`, `endpointTolerance`,
+  `dxfImportScale`, and `dxfExportScale`) consequently became blank or literal
+  `undefined` after nesting.
+- The form now merges defaults, complete persisted UI settings, and current
+  engine values. Legacy unit aliases and approximate DXF scale values are
+  canonicalized, and malformed/blank stored values are repaired fail-soft.
+- Endpoint tolerance and both DXF selectors remain in the UI because all three
+  still feed active import/export paths; they are not deprecated controls.
+- Added a deterministic millimeter smoke scenario and made every smoke report
+  reject blank fields, stale unit labels, or visible `undefined` text.
+- Verification: boot invariants, engine equivalence, inch smoke, millimeter
+  smoke, and a combined 0.9.1 smoke run all passed. The installed app's exact
+  millimeter post-nest snapshot reported five `mm` labels, canonical DXF values
+  `2.83465` / `25.4`, a populated endpoint tolerance, and
+  `undefinedTextCount: 0`. A fresh installed profile with deliberately malformed
+  legacy values repaired to the same visible state on reload.
+- Built and installed the native arm64 `Deepnest ML 0.9.1` app at
+  `/Applications/Deepnest ML.app`. Strict deep `codesign` and `hdiutil verify`
+  passed; `/Applications/Deepnest ML 0.8.0.app` remains untouched.
+- DMG SHA-256:
+  `b6620bb5b6e04fc691a3eb7e647c55bc3e9b04a7d36156247491eb8e1cfa6eed`.
+- Packaged QA artifacts:
+  `/tmp/deepnest-091-packaged-smoke.Bbx7cl/report.json`,
+  `/tmp/deepnest-091-packaged-smoke.Bbx7cl/export.svg`, and
+  `/tmp/deepnest-091-packaged-settings.png`.
 
 ### 2026-07-27 - Superpart Tier 3 production gate and 0.9.0 release complete (Codex)
 
