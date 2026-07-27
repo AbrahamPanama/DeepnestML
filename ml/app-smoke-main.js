@@ -6,13 +6,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const url = require('url');
-const electronSettings = require('electron-settings');
 const backgroundDispatcherModule = require('../main/background-dispatcher');
 const nestGeometryBrokerModule = require('../main/nest-geometry-broker');
 
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const ipcMain = electron.ipcMain;
+var electronSettings = null;
 const createBackgroundDispatcher = backgroundDispatcherModule.createBackgroundDispatcher;
 const nestGeometryBroker = nestGeometryBrokerModule.createNestGeometryBroker(2);
 
@@ -499,6 +499,9 @@ if (startupCliArgs.isolatedUserData || startupCliArgs['isolated-user-data'] ||
 	startupScenario.isolatedUserData === true) {
 	app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'deepnest-app-smoke-userdata-')));
 }
+// electron-settings resolves its backing file when the module is loaded. Load it
+// only after an isolated smoke profile has replaced Electron's userData path.
+electronSettings = require('electron-settings');
 
 app.on('ready', function () {
 	var cliArgs = startupCliArgs;

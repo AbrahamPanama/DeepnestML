@@ -234,6 +234,8 @@ function collectInvariantsInRenderer() {
 		placementTypeMarkupDefault: selectedMarkupOptionOf('placementType'),
 		dxfImportScaleMarkupDefault: selectedMarkupOptionOf('dxfImportScale'),
 		dxfExportScaleMarkupDefault: selectedMarkupOptionOf('dxfExportScale'),
+		deepNestConfig: (typeof window.DeepNest !== 'undefined' &&
+			typeof window.DeepNest.config === 'function') ? window.DeepNest.config() : null,
 		anyOptionsHaveDefaultAttr: anyOptionsHaveDefaultAttr(),
 		readyStateSnapshot: document.readyState,
 		startNestLabel: textOfId('startnest'),
@@ -290,6 +292,14 @@ function evaluateInvariants(snapshot) {
 	// The three former `default` attribute fixes
 	assert('placementType markup default is Gravity',
 		snapshot.placementTypeMarkupDefault && snapshot.placementTypeMarkupDefault.value === 'gravity');
+	assert('fresh runtime default uses Gravity',
+		snapshot.deepNestConfig && snapshot.deepNestConfig.placementType === 'gravity');
+	assert('fresh runtime default uses 0.005 inch curve tolerance',
+		snapshot.deepNestConfig && Math.abs(snapshot.deepNestConfig.curveTolerance - 0.36) <= 1e-9);
+	assert('fresh runtime default enables improved placement scoring',
+		snapshot.deepNestConfig && snapshot.deepNestConfig.improvedPlacementScoring === true);
+	assert('fresh runtime default leaves part-hole processing opt-in',
+		snapshot.deepNestConfig && snapshot.deepNestConfig.processHoles === false);
 	assert('dxfImportScale markup default is Points (value=1)',
 		snapshot.dxfImportScaleMarkupDefault && snapshot.dxfImportScaleMarkupDefault.value === '1');
 	assert('dxfExportScale markup default is Points (value=72)',

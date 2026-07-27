@@ -407,7 +407,7 @@
 			  scale: 72, // actual stored value will be in units/inch
 			  spacing: 0,
 			  sheetMargin: 0, // inset from the sheet edge; parts never nest inside the margin
-			  curveTolerance: 0.72, // store distances in native units
+			  curveTolerance: 0.36, // 0.005 inch at the default 72 units/inch
 			  rotations: 4,
 			  adaptiveRotations: false,
 			  adaptiveRotationMaxAngles: 6,
@@ -420,7 +420,7 @@
 			  threads: 4,
 			  populationSize: 10,
 			  mutationRate: 10,
-			  placementType: 'box', // how to place each part (possible values gravity, box, convexhull)
+			  placementType: 'gravity', // how to place each part (possible values gravity, box, convexhull)
 			  stepRepeatAlternate180: true,
 			  stepRepeatFillDirection: 'columns',
 			  stepRepeatHorizontalDensity: 100,
@@ -428,7 +428,7 @@
 			  stepRepeatStagger: 'off',
 			  stepRepeatHorizontalAlignment: 'tight',
 			  stepRepeatVerticalAlignment: 'tight',
-			  improvedPlacementScoring: false,
+			  improvedPlacementScoring: true,
 			  fitnessVersion: 1,
 			  localRefinement: false,
 			  localRefinementEngine: 'smart',
@@ -472,7 +472,7 @@
 			  fineRotationMaxTargets: 8,
 			  fineRotationPivot: 'centroid',
 			  fineRotationMinBudgetMs: 300,
-			  processHoles: true, // hole-bearing parts remain fixed during continuous refinement
+			  processHoles: false, // opt in only when interior cutouts should participate in NFP
 			  exportSheetOutline: false, // when true, exports include the sheet boundary with the nested parts
 			  exportFormat: 'svg',
 			  exportOutlineMode: 'everything',

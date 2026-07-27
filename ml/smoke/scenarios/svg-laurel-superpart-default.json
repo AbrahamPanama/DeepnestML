@@ -7,6 +7,7 @@
   "isolatedUserData": true,
   "timeoutMs": 90000,
   "timeBudgetSec": 30,
+  "randomSeed": 0,
   "partQuantities": [2, 2],
   "expectedPartsPlaced": 4,
   "expectedNonCanonicalNfpLookups": 0,
@@ -21,18 +22,15 @@
   },
   "expectedRuntimeConfig": {
     "superpartClustering": true,
-    "mergeLines": false
-  },
-  "configOverrides": {
+    "mergeLines": false,
     "placementType": "gravity",
     "rotations": 4,
     "adaptiveRotations": false,
     "improvedPlacementScoring": true,
-    "localRefinement": false,
+    "localRefinement": true,
+    "localRefinementContinuous": true,
     "processHoles": false,
-    "populationSize": 10,
-    "mutationRate": 10,
-    "threads": 4,
-    "curveTolerance": 0.3
-  }
+    "curveTolerance": 0.36
+  },
+  "configOverrides": {}
 }

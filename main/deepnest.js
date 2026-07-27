@@ -26,7 +26,7 @@
 		
 		var config = {
 			clipperScale: 10000000,
-			curveTolerance: 0.3, 
+			curveTolerance: 0.36,
 			spacing: 0,
 			sheetMargin: 0,
 			rotations: 4,
@@ -48,7 +48,7 @@
 			stepRepeatStagger: 'off',
 			stepRepeatHorizontalAlignment: 'tight',
 			stepRepeatVerticalAlignment: 'tight',
-			improvedPlacementScoring: false,
+			improvedPlacementScoring: true,
 			fitnessVersion: 1,
 			localRefinement: false,
 			localRefinementEngine: 'smart',
@@ -109,7 +109,7 @@
 			fineRotationMaxTargets: 8,
 			fineRotationPivot: 'centroid',
 			fineRotationMinBudgetMs: 300,
-			processHoles: true,
+			processHoles: false,
 			mergeLines: true,
 			mergeCandidateCap: 0,
 			timeRatio: 0.5,
