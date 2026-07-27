@@ -284,7 +284,7 @@
 		return exactClipArea(left, right, scale, ClipperLib.ClipType.ctIntersection);
 	}
 
-	function exactClipArea(left, right, scale, clipType){
+	function exactClipResult(left, right, scale, clipType){
 		var subject = [];
 		var clip = [];
 		appendClipperPaths(left, scale, subject);
@@ -299,13 +299,59 @@
 			ClipperLib.PolyFillType.pftEvenOdd,
 			ClipperLib.PolyFillType.pftEvenOdd
 		)){
-			return Infinity;
+			return {
+				ok: false,
+				paths: solution,
+				area: Infinity
+			};
 		}
 		var signedArea = 0;
 		for(var i=0; i<solution.length; i++){
 			signedArea += ClipperLib.Clipper.Area(solution[i]);
 		}
-		return Math.abs(signedArea) / (scale * scale);
+		return {
+			ok: true,
+			paths: solution,
+			area: Math.abs(signedArea) / (scale * scale)
+		};
+	}
+
+	function exactClipArea(left, right, scale, clipType){
+		return exactClipResult(left, right, scale, clipType).area;
+	}
+
+	function clipperPathsHaveMaterialDepth(paths, scale, depthEpsilon){
+		if(!paths || paths.length === 0){
+			return false;
+		}
+		var epsilon = Math.max(0, finite(depthEpsilon, 0));
+		if(epsilon === 0){
+			for(var pathIndex=0; pathIndex<paths.length; pathIndex++){
+				if(Math.abs(ClipperLib.Clipper.Area(paths[pathIndex])) > 0){
+					return true;
+				}
+			}
+			return false;
+		}
+		try{
+			var eroded = new ClipperLib.Paths();
+			var offset = new ClipperLib.ClipperOffset(2, epsilon * scale);
+			offset.AddPaths(
+				paths,
+				ClipperLib.JoinType.jtMiter,
+				ClipperLib.EndType.etClosedPolygon
+			);
+			offset.Execute(eroded, -epsilon * scale);
+			for(var erodedIndex=0; erodedIndex<eroded.length; erodedIndex++){
+				if(Math.abs(ClipperLib.Clipper.Area(eroded[erodedIndex])) > 0){
+					return true;
+				}
+			}
+			return false;
+		}
+		catch(error){
+			return true;
+		}
 	}
 
 	function exactPose(context, angle, offset){
@@ -919,12 +965,24 @@
 		var areaEpsilon = Math.max(0, finite(options.areaEpsilon, 0));
 		var maxIntersectionArea = 0;
 		var maxOutsideArea = 0;
+		var numericalContactCount = 0;
+		var maxDepthEpsilon = 0;
 		for(var sheetIndex=0; sheetIndex<placementSheets.length; sheetIndex++){
 			var sheetPlacement = placementSheets[sheetIndex];
 			var sheetPart = parts && parts[sheetPlacement.sheet];
 			if(!sheetPart || !sheetPart.polygontree || sheetPart.polygontree.length < 3){
 				return {valid: false, reason: 'missingSheetGeometry'};
 			}
+			var sheetBounds = boundsForRing(sheetPart.polygontree);
+			var defaultDepthEpsilon = Math.max(
+				1 / scale,
+				Math.min(sheetBounds.width, sheetBounds.height) * 1e-7
+			);
+			var depthEpsilon = Math.max(
+				1 / scale,
+				finite(options.depthEpsilon, defaultDepthEpsilon)
+			);
+			maxDepthEpsilon = Math.max(maxDepthEpsilon, depthEpsilon);
 			var transformed = [];
 			var placements = sheetPlacement.sheetplacements || [];
 			for(var placementIndex=0; placementIndex<placements.length; placementIndex++){
@@ -942,36 +1000,59 @@
 					y: y,
 					rotation: rotation
 				});
-				var outsideArea = exactClipArea(
+				var outside = exactClipResult(
 					ring,
 					sheetPart.polygontree,
 					scale,
 					ClipperLib.ClipType.ctDifference
 				);
+				if(!outside.ok){
+					return {valid: false, reason: 'clipperValidationFailed'};
+				}
+				var outsideArea = outside.area;
 				maxOutsideArea = Math.max(maxOutsideArea, outsideArea);
-				if(outsideArea > areaEpsilon){
+				if(outsideArea > areaEpsilon &&
+					clipperPathsHaveMaterialDepth(outside.paths, scale, depthEpsilon)){
 					return {
 						valid: false,
 						reason: 'memberOutsideSheet',
-						maxOutsideArea: maxOutsideArea
+						maxOutsideArea: maxOutsideArea,
+						depthEpsilon: depthEpsilon
 					};
+				}
+				if(outsideArea > areaEpsilon){
+					numericalContactCount++;
 				}
 				for(var previousIndex=0; previousIndex<transformed.length; previousIndex++){
 					if(boundsDisjoint(ring, transformed[previousIndex])){
 						continue;
 					}
-					var intersectionArea = exactIntersectionArea(
+					var intersection = exactClipResult(
 						ring,
 						transformed[previousIndex],
-						scale
+						scale,
+						ClipperLib.ClipType.ctIntersection
 					);
+					if(!intersection.ok){
+						return {valid: false, reason: 'clipperValidationFailed'};
+					}
+					var intersectionArea = intersection.area;
 					maxIntersectionArea = Math.max(maxIntersectionArea, intersectionArea);
-					if(intersectionArea > areaEpsilon){
+					if(intersectionArea > areaEpsilon &&
+						clipperPathsHaveMaterialDepth(
+							intersection.paths,
+							scale,
+							depthEpsilon
+						)){
 						return {
 							valid: false,
 							reason: 'expandedMembersOverlap',
-							maxIntersectionArea: maxIntersectionArea
+							maxIntersectionArea: maxIntersectionArea,
+							depthEpsilon: depthEpsilon
 						};
+					}
+					if(intersectionArea > areaEpsilon){
+						numericalContactCount++;
 					}
 				}
 				transformed.push(ring);
@@ -981,7 +1062,9 @@
 			valid: true,
 			reason: null,
 			maxIntersectionArea: maxIntersectionArea,
-			maxOutsideArea: maxOutsideArea
+			maxOutsideArea: maxOutsideArea,
+			numericalContactCount: numericalContactCount,
+			depthEpsilon: maxDepthEpsilon
 		};
 	}
 

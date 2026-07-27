@@ -205,6 +205,15 @@ Use newest notes at the top.
   candidate checks and 50-66 pair checks for only 0-2 ms total. The laurel
   efficacy replay remains exactly at `394.25818` used width, with two validated
   pairs, four expanded members, zero exact overlap, and 1 ms validation cost.
+- The clean corpus restart reached `swim` before finding the next gate defect:
+  expanded-member validation rejected a `5e-15` transform-rounding contact
+  because it required literal zero intersection area. Validation now uses a
+  sheet-scaled linear penetration tolerance and inward erosion, while preserving
+  raw areas and numerical-contact telemetry. Adversarial tests accept a
+  `2e-7` contact sliver but reject `0.001` penetration and `0.001` sheet escape.
+- The exact `swim` replay now completes with all 48 parts, one cluster, and
+  independent legality green. Maximum audited penetration is `0.00009386`
+  against a `0.0005752` tolerance; overlap and outside counts are both zero.
 
 ### 2026-07-26 - SP-1..SP-5 candidate reaches Tier 1 (Codex)
 

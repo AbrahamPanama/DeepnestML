@@ -21,6 +21,15 @@ function lShape() {
 	];
 }
 
+function rectangle(width, height) {
+	return [
+		{x: 0, y: 0},
+		{x: width, y: 0},
+		{x: width, y: height},
+		{x: 0, y: height}
+	];
+}
+
 function framedSquare() {
 	const ring = [
 		{x: 0, y: 0},
@@ -253,12 +262,7 @@ function assertConnectedEnvelopePreservesHoles() {
 }
 
 function assertExpandedPlacementValidation() {
-	const sheet = [
-		{x: 0, y: 0},
-		{x: 100, y: 0},
-		{x: 100, y: 100},
-		{x: 0, y: 100}
-	];
+	const sheet = rectangle(100, 100);
 	const parts = [
 		{polygontree: sheet},
 		{polygontree: lShape()}
@@ -290,6 +294,61 @@ function assertExpandedPlacementValidation() {
 		),
 		null
 	);
+}
+
+function assertExpandedPlacementToleranceIsLinear() {
+	const parts = [
+		{polygontree: rectangle(100, 100)},
+		{polygontree: rectangle(10, 10)}
+	];
+	const numericalContact = Superpart.validateExpandedPlacements([{
+		sheet: 0,
+		sheetplacements: [
+			{source: 1, x: 10, y: 10, rotation: 0},
+			{source: 1, x: 19.9999998, y: 10, rotation: 0}
+		]
+	}], parts);
+	assert.strictEqual(
+		numericalContact.valid,
+		true,
+		'a sub-tolerance transform sliver must remain legal'
+	);
+	assert.strictEqual(numericalContact.numericalContactCount, 1);
+
+	const shallowButMaterial = Superpart.validateExpandedPlacements([{
+		sheet: 0,
+		sheetplacements: [
+			{source: 1, x: 10, y: 10, rotation: 0},
+			{source: 1, x: 19.999, y: 10, rotation: 0}
+		]
+	}], parts);
+	assert.strictEqual(
+		shallowButMaterial.valid,
+		false,
+		'a low-area overlap with material penetration must fail closed'
+	);
+	assert.strictEqual(shallowButMaterial.reason, 'expandedMembersOverlap');
+
+	const numericalSheetContact = Superpart.validateExpandedPlacements([{
+		sheet: 0,
+		sheetplacements: [
+			{source: 1, x: -0.0000002, y: 10, rotation: 0}
+		]
+	}], parts);
+	assert.strictEqual(
+		numericalSheetContact.valid,
+		true,
+		'a sub-tolerance sheet-boundary transform sliver must remain legal'
+	);
+
+	const outsideSheet = Superpart.validateExpandedPlacements([{
+		sheet: 0,
+		sheetplacements: [
+			{source: 1, x: -0.001, y: 10, rotation: 0}
+		]
+	}], parts);
+	assert.strictEqual(outsideSheet.valid, false);
+	assert.strictEqual(outsideSheet.reason, 'memberOutsideSheet');
 }
 
 function assertEnvelopeUnionFailureFallsBack() {
@@ -346,9 +405,10 @@ function assertEnvelopeUnionFailureFallsBack() {
 
 assertDeterministic();
 assertCompatibilityGate();
-assertConnectedEnvelopePreservesHoles();
-assertExpandedPlacementValidation();
-assertEnvelopeUnionFailureFallsBack();
+	assertConnectedEnvelopePreservesHoles();
+	assertExpandedPlacementValidation();
+	assertExpandedPlacementToleranceIsLinear();
+	assertEnvelopeUnionFailureFallsBack();
 const report = assertLaurelPair();
 console.log(JSON.stringify(report, null, 2));
 console.log('superpart SP-1 tests passed');
