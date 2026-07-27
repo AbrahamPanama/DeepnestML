@@ -7300,17 +7300,61 @@ function localRefinementTryWholeClusterRebuild(sheet, placed, placements, config
 	return {moved: true, score: best.score, components: best.components};
 }
 
+function localRefinementSampleClosedRing(part, count){
+	if(!part || part.length === 0 || count <= 0){
+		return [];
+	}
+	if(count >= part.length){
+		return part.map(function(point){
+			return {x: point.x, y: point.y, exact: point.exact};
+		});
+	}
+	var segments = [];
+	var perimeter = 0;
+	for(var i=0; i<part.length; i++){
+		var next = (i + 1) % part.length;
+		var dx = part[next].x - part[i].x;
+		var dy = part[next].y - part[i].y;
+		var length = Math.sqrt(dx * dx + dy * dy);
+		if(length > 1e-12){
+			segments.push({
+				from: part[i],
+				to: part[next],
+				start: perimeter,
+				length: length
+			});
+			perimeter += length;
+		}
+	}
+	if(segments.length === 0 || perimeter <= 1e-12){
+		return [{x: part[0].x, y: part[0].y, exact: part[0].exact}];
+	}
+	var result = [];
+	var segmentIndex = 0;
+	for(i=0; i<count; i++){
+		var distance = perimeter * i / count;
+		while(segmentIndex + 1 < segments.length &&
+			distance >= segments[segmentIndex].start + segments[segmentIndex].length){
+			segmentIndex++;
+		}
+		var segment = segments[segmentIndex];
+		var ratio = Math.max(0, Math.min(1, (distance - segment.start) / segment.length));
+		result.push({
+			x: segment.from.x + (segment.to.x - segment.from.x) * ratio,
+			y: segment.from.y + (segment.to.y - segment.from.y) * ratio,
+			exact: ratio <= 1e-12 ? segment.from.exact : false
+		});
+	}
+	return result;
+}
+
 function localRefinementContinuousDecimatePart(part, maxPoints, processHoles){
 	maxPoints = Math.max(8, parseInt(maxPoints, 10) || 16);
-	var result = [];
 	if(!part || part.length === 0){
-		return result;
+		return [];
 	}
 	var count = Math.min(part.length, maxPoints);
-	for(var i=0; i<count; i++){
-		var index = count === part.length ? i : Math.floor(i * part.length / count);
-		result.push({x: part[index].x, y: part[index].y, exact: part[index].exact});
-	}
+	var result = localRefinementSampleClosedRing(part, count);
 	result.source = part.source;
 	result.id = part.id;
 	result.rotation = part.rotation;
@@ -8129,7 +8173,10 @@ function localRefinementRunContinuousStage(sheet, placed, placements, config, de
 	// too large for a whole-layout rebuild; it must not replace the small path.
 	if(placed.length >= 4 && placed.length <= 6 && Date.now() < deadline){
 		var rebuildRemaining = Math.max(0, deadline - Date.now());
-		var rebuildDeadline = Math.min(deadline, Date.now() + Math.max(500, Math.floor(rebuildRemaining * 0.72)));
+		// A whole-layout rebuild is the only continuous operator that can move
+		// every member cooperatively. Give it priority while keeping the
+		// existing stage deadline and total user budget unchanged.
+		var rebuildDeadline = Math.min(deadline, Date.now() + Math.max(500, Math.floor(rebuildRemaining * 0.9)));
 		var rebuilt = localRefinementTryWholeClusterRebuild(sheet, placed, placements, config, rebuildDeadline, stats);
 		if(rebuilt.moved){
 			moved = true;

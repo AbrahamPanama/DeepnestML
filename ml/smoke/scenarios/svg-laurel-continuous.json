@@ -19,8 +19,8 @@
     "continuousMaxAngleDeltaDeg": 45.000001
   },
   "continuousOracle": {
-    "scoreBefore": 0.40127203628939684,
-    "scoreAfter": 0.283810489586938,
+    "scoreBefore": 0.40127887821811953,
+    "scoreAfter": 0.2908322432420952,
     "minimumRecovery": 0.6
   },
   "configOverrides": {

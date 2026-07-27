@@ -86,9 +86,8 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): clean tracked tree after the claimed SP-5
-Tier 2 legality-auditor correction; generated benchmark-result JSONs remain
-untracked by convention.
+State (verified 2026-07-27 by Codex): dirty by the claimed SP-5 import-polygon
+fidelity fix; generated benchmark-result JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -98,7 +97,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, `ml/tests/benchmark_legality/`, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 budget probes found `gardeyn3` needs the frozen 240-second corpus budget (first best at 156.54 s); `gardeyn5` exposed a false sheet-contact rejection now under a targeted auditor regression. Clean full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
+| Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, `AGENT_COLLABORATION.md` | In progress. Tier 1 passed at defaults: used width 477.983 -> 394.258, 17.516% reduction, legal visible interlock. Tier 2 probes require the frozen 240-second budget. `gardeyn8` exposed an exported-overlap cause: curve-tolerance import cleanup shrank the nesting proxy below the original cut silhouette; integer-grid-only cleanup and a shallow-feature regression are in progress. Clean full-corpus A/B, packaging, and installed-app parity remain | 2026-07-27 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
 | Codex | Local Refinement v4 end-to-end | contact acceptance, fast legality/scoring, scaled coverage, windowed rebuild, gating review, tests/benchmarks/docs | Completed behind default-off flags; visual/equivalence/smoke gates green, but throughput, predicate-agreement, and full-corpus efficacy gates did not pass, so defaults remain unchanged | 2026-07-25 |
 | Claude-Code | Quantity column: live placed-vs-requested badges | `main/index.html` (parts table + displayNest; no teacher-hook changes), `main/style.css`, `AGENT_COLLABORATION.md` | Completed: badge tallies from displayNest, clears via resetNestComputation; boot + focused smoke green | 2026-07-16 |
@@ -163,6 +162,48 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-27 - Preserve imported cut silhouette in nesting proxy (Codex)
+
+- The fidelity correction changed vertex count and exposed a brittle local
+  refinement proxy: it sampled by vertex index, so preserving one shallow
+  feature changed nearly every contact candidate. Continuous proxies now
+  sample uniformly by perimeter distance; a redundant-vertex regression proves
+  tessellation-density invariance.
+- The four-part whole-cluster rebuild keeps its total 7.5-second allocation but
+  now receives 90% of that stage budget. Across seeds 1..5 it completed every
+  depth, found four exact-legal layouts each time, and exported two parts at
+  `30°` plus two at `315°` with `24.48%..24.78%` continuous-score improvement.
+- The three-part blocker fixture was re-gated at the smallest measured stable
+  proxy (`20` points): seeds 1..3 each moved all three parts, rotated `36.75°`,
+  improved `5.526%`, and completed in `1.47..1.53 s`.
+- The independent export auditor now checks ordinary placement groups as well
+  as expanded superpart members and understands path/rect/polygon geometry.
+  Both restored rotation fixtures report all parts present, zero overlap, and
+  zero sheet escape.
+- The post-fix smoke tail (three-part, four-part, v4 contact, default
+  superpart, step-repeat, PDF) is green.
+- Tier 2 hard probe result: `gardeyn6` was legal at 240 seconds; `gardeyn8`
+  placed 112/112 but the independent source-geometry audit found one exported
+  overlap (`0.002567` depth versus the `0.002` numerical tolerance).
+- Live renderer extraction identified the mismatch: source 52 had 105 source
+  vertices but only 103 nesting vertices. `DeepNest.cleanPolygon` used
+  `0.01 * curveTolerance` and erased a shallow exported feature, allowing the
+  collision proxy to be smaller than the cut silhouette.
+- Import cleanup now uses Clipper's integer-grid distance (`1.415`) only. The
+  live polygon retains 104 vertices (only an exact redundant collinear vertex
+  is removed), and the former colliding placements fail the exact construction
+  predicate.
+- Focused 120-second `gardeyn8` replay: 112/112 placed, zero overlaps, zero
+  outside; max numerical penetration `0.0001597`; first best 98.271 s versus
+  99.885 s before.
+- Added `ml/tests/import_polygon_fidelity/run.js`, which proves the old cleanup
+  erased a `0.0025`-unit outward feature and the active cleanup preserves it.
+- Re-captured the geometry-dependent continuous-refinement oracle:
+  `0.4012788782 -> 0.2908322432`; the production pass recovers 66.03% of that
+  gain (gate 60%).
+- ML checkpoint was attempted before the active-engine edit and failed because
+  no completed training run with a trained model exists.
 
 ### 2026-07-27 - Tier 2 sheet-contact audit correction (Codex)
 

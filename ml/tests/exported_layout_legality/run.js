@@ -142,10 +142,73 @@ function descendantElements(node, tagName) {
 	return result;
 }
 
+function descendantGeometryElements(node) {
+	const result = [];
+	const children = node.childNodes || [];
+	for (let i = 0; i < children.length; i++) {
+		const child = children[i];
+		if (child.nodeType !== 1) {
+			continue;
+		}
+		const tagName = String(child.tagName).toLowerCase();
+		if (tagName === 'path' || tagName === 'rect' || tagName === 'polygon') {
+			result.push(child);
+		}
+		result.push.apply(result, descendantGeometryElements(child));
+	}
+	return result;
+}
+
 function taggedMemberGroups(root) {
 	return descendantElements(root, 'g').filter((group) =>
 		group.getAttribute('data-deepnest-expanded-member') === 'true'
 	);
+}
+
+function ordinaryPlacementGroups(root) {
+	return descendantElements(root, 'g').filter((group) => {
+		if (descendantGeometryElements(group).length === 0) {
+			return false;
+		}
+		return !descendantElements(group, 'g').some((child) =>
+			descendantGeometryElements(child).length > 0
+		);
+	});
+}
+
+function geometryRing(node, tolerance) {
+	const tagName = String(node.tagName).toLowerCase();
+	if (tagName === 'path') {
+		return laurelPathPolygon(node.getAttribute('d'), tolerance);
+	}
+	if (tagName === 'rect') {
+		const x = Number(node.getAttribute('x')) || 0;
+		const y = Number(node.getAttribute('y')) || 0;
+		const width = Number(node.getAttribute('width'));
+		const height = Number(node.getAttribute('height'));
+		if (!(width > 0) || !(height > 0) ||
+			Number(node.getAttribute('rx')) > 0 || Number(node.getAttribute('ry')) > 0) {
+			throw new Error('export contains an unsupported rectangle');
+		}
+		return [
+			{x: x, y: y},
+			{x: x + width, y: y},
+			{x: x + width, y: y + height},
+			{x: x, y: y + height}
+		];
+	}
+	if (tagName === 'polygon') {
+		const values = parseNumbers(node.getAttribute('points'));
+		if (values.length < 6 || values.length % 2 !== 0) {
+			throw new Error('export contains an invalid polygon');
+		}
+		const ring = [];
+		for (let i = 0; i < values.length; i += 2) {
+			ring.push({x: values[i], y: values[i + 1]});
+		}
+		return ring;
+	}
+	throw new Error('export contains unsupported geometry: ' + tagName);
 }
 
 function parseExport(svgText, tolerance) {
@@ -154,15 +217,16 @@ function parseExport(svgText, tolerance) {
 	if (!root || String(root.tagName).toLowerCase() !== 'svg') {
 		throw new Error('export is not an SVG document');
 	}
-	const groups = taggedMemberGroups(root);
+	const taggedGroups = taggedMemberGroups(root);
+	const groups = taggedGroups.length > 0 ? taggedGroups : ordinaryPlacementGroups(root);
 	const instances = groups.map((group) => {
-		const paths = descendantElements(group, 'path');
-		if (!paths.length) {
-			throw new Error('expanded member group has no path geometry');
+		const geometry = descendantGeometryElements(group);
+		if (!geometry.length) {
+			throw new Error('placement group has no path geometry');
 		}
-		const rings = paths.map((pathNode) => {
-			const polygon = laurelPathPolygon(pathNode.getAttribute('d'), tolerance);
-			return transformRing(polygon, worldTransform(pathNode, root));
+		const rings = geometry.map((geometryNode) => {
+			const polygon = geometryRing(geometryNode, tolerance);
+			return transformRing(polygon, worldTransform(geometryNode, root));
 		});
 		return {
 			source: group.getAttribute('data-deepnest-source'),

@@ -217,7 +217,50 @@ function testWholeClusterRebuildStaysBoundedAndExact(){
 	assert.ok(rebuild.includes('localRefinementFinalLayoutLegalExact'), 'whole-cluster acceptance should use the full-resolution legality gate');
 	assert.ok(!rebuild.includes('getOuterNfp('), 'arbitrary-angle rebuilds should not populate the persistent NFP cache');
 	assert.ok(stage.includes('localRefinementTryWholeClusterRebuild'), 'continuous compaction should run the whole-cluster operator before pair exploitation');
+	assert.match(stage, /rebuildRemaining \* 0\.9/, 'small-cluster rebuild should receive most of the fixed continuous budget');
 	assert.match(background, /placed\.length >= 4 && placed\.length <= 6[\s\S]*?Math\.floor\(budget \* 0\.5\)/, 'four-to-six-part sheets should receive half of the visible refinement budget');
+}
+
+function testContinuousProxyIsVertexDensityInvariant(){
+	const background = fs.readFileSync(path.join(ROOT, 'main', 'background.js'), 'utf8');
+	const context = {Math, parseInt};
+	vm.createContext(context);
+	vm.runInContext(
+		functionSource(background, 'localRefinementSampleClosedRing') + '\n' +
+		functionSource(background, 'localRefinementContinuousDecimatePart'),
+		context
+	);
+	const sparse = [
+		{x: 0, y: 0},
+		{x: 1, y: 0},
+		{x: 10, y: 0},
+		{x: 10, y: 1},
+		{x: 10, y: 10},
+		{x: 9, y: 10},
+		{x: 0, y: 10},
+		{x: 0, y: 9},
+		{x: 0, y: 4}
+	];
+	const dense = [
+		{x: 0, y: 0},
+		{x: 2, y: 0},
+		{x: 5, y: 0},
+		{x: 10, y: 0},
+		{x: 10, y: 4},
+		{x: 10, y: 10},
+		{x: 3, y: 10},
+		{x: 0, y: 10},
+		{x: 0, y: 6}
+	];
+	const sparseProxy = context.localRefinementSampleClosedRing(sparse, 8);
+	const denseProxy = context.localRefinementSampleClosedRing(dense, 8);
+	assert.deepStrictEqual(
+		JSON.parse(JSON.stringify(denseProxy.map((point) => [point.x, point.y]))),
+		JSON.parse(JSON.stringify(sparseProxy.map((point) => [point.x, point.y]))),
+		'proxy contacts should not change when a contour gains redundant vertices'
+	);
+	const decimated = context.localRefinementContinuousDecimatePart(dense, 8, false);
+	assert.strictEqual(decimated.length, 8, 'continuous proxy must preserve its configured point cap');
 }
 
 testSweepAngles();
@@ -229,4 +272,5 @@ testCriticalTargetsReceiveNearestAnchors();
 testMergeCreditGuard();
 testContinuousCompactionCompatibilityGate();
 testWholeClusterRebuildStaysBoundedAndExact();
+testContinuousProxyIsVertexDensityInvariant();
 console.log('continuous refinement tests passed');

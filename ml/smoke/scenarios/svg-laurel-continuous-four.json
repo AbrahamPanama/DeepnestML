@@ -8,6 +8,7 @@
   "partQuantities": [2, 2],
   "expectedPartsPlaced": 4,
   "expectedSvgPathCount": 4,
+  "expectedIndependentLegality": true,
   "expectedRotations": [30, 315],
   "expectedNonCanonicalNfpLookups": 0,
   "expectedLocalRefinementMinimums": {

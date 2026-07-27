@@ -5,6 +5,13 @@
  
 (function(root){
 	'use strict';
+
+	function nestingPolygonCleanDistance(){
+		// Clean only integer-grid noise. Tying this to curveTolerance can erase
+		// shallow source features while export keeps them, making a legal proxy
+		// nest overlap in the cut geometry.
+		return 1.415;
+	}
 	
 	const { ipcRenderer } = require('electron');
 	const path = require('path')
@@ -2241,8 +2248,8 @@
 				}
 			}
 
-			// clean up singularities, coincident points and edges
-			var clean = ClipperLib.Clipper.CleanPolygon(biggest, 0.01*config.curveTolerance*config.clipperScale);
+			// Keep the nesting proxy faithful to the source/export silhouette.
+			var clean = ClipperLib.Clipper.CleanPolygon(biggest, nestingPolygonCleanDistance());
 			
 			if(!clean || clean.length == 0){
 				return null;
