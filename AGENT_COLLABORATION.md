@@ -86,9 +86,9 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): dirty only for the completed 0.9.3
-rolling-refinement release pending its final commit; generated benchmark-result
-JSONs remain untracked by convention.
+State (verified 2026-07-27 by Codex): clean for tracked files after the completed
+0.9.3 rolling-refinement release; generated benchmark-result JSONs remain
+untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
