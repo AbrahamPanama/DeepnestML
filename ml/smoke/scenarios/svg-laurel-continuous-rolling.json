@@ -1,0 +1,49 @@
+{
+  "name": "svg-laurel-continuous-rolling",
+  "description": "Seven crossed-laurel parts exercise opt-in rolling cluster refinement beyond the six-part whole-layout limit.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 120000,
+  "partQuantities": [4, 3],
+  "expectedPartsPlaced": 7,
+  "expectedSvgPathCount": 7,
+  "expectedIndependentLegality": true,
+  "expectedRuntimeConfig": {
+    "v4WindowedRebuild": true
+  },
+  "expectedLocalRefinementMinimums": {
+    "windowedRebuildAccepted": 1,
+    "windowedRebuildWindowsVisited": 2,
+    "windowedRebuildPartsCovered": 7,
+    "windowedRebuildEligibleParts": 7
+  },
+  "expectedLocalRefinementMaximums": {
+    "windowedRebuildBudgetExhausted": 0,
+    "continuousElapsedMs": 10000
+  },
+  "configOverrides": {
+    "superpartClustering": false,
+    "placementType": "gravity",
+    "rotations": 1,
+    "adaptiveRotations": false,
+    "improvedPlacementScoring": true,
+    "mergeLines": false,
+    "processHoles": false,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "localRefinement": true,
+    "localRefinementEngine": "smart",
+    "localRefinementBudgetMs": 15000,
+    "localRefinementContinuous": true,
+    "localRefinementContactAcceptance": true,
+    "v4MaxPlateauAccepts": 8,
+    "v4IncrementalScoring": true,
+    "v4WindowedRebuild": true,
+    "v4WindowSize": 5,
+    "continuousRefinementBudgetMs": 9000,
+    "continuousRefinementMaxTargets": 8,
+    "continuousRefinementMaxNeighbors": 3
+  }
+}

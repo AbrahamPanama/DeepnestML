@@ -8,10 +8,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ## Current Local Release
 
-- **Version:** `0.9.2`
+- **Version:** `0.9.3`
 - **Product name:** `Deepnest ML`
 - **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
-- **macOS local build:** `dist/Deepnest ML-0.9.2-mac-arm64.dmg`
+- **macOS local build:** `dist/Deepnest ML-0.9.3-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
 
@@ -29,11 +29,16 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Export TIFFs for print/RIP workflows with artwork-only outline filtering, optional top-edge indicator marks, optional sheet numbering, DPI presets/custom DPI, RGB/CMYK color handling, ICC profile embedding/conversion, transparent RGB output, and TIFF compression choices.
 - Use the standard compact nesting modes or the deterministic **Step & Repeat** optimization mode for print/template layouts.
 - Pre-pair profitable repeated concave parts into conservative rigid clusters, then expand every member back to its exact cut path for export.
+- Optionally roll exact continuous-compaction rebuilds across overlapping clusters on layouts larger than six parts.
 - Route outer NFP generation through the native Boost addon first, with JS fallbacks and an optional hole-processing toggle.
 - Run opt-in local-refinement experiments and engine benchmark checks from the included `ml/` harnesses.
 - Run in a unified light workspace where the parts list remains visible while nesting runs in the main workspace pane.
 
 ## Recent Highlights
+
+### 0.9.3: Rolling Large-Layout Refinement
+
+Continuous compaction can now be extended beyond the proven four-to-six-part whole-layout rebuild. The new **Large-layout rolling refinement** setting visits unique overlapping clusters until the configured refinement budget expires, continues after accepted moves, and keeps every commit behind the existing full-resolution whole-layout legality gate. It has no fixed total-part limit, reports how many parts it scanned in the refinement badge, and remains disabled by default because larger searches intentionally trade additional processing time for more refinement coverage.
 
 ### 0.9.2: Live Refinement Canvas Refresh
 

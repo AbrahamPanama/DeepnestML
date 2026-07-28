@@ -486,6 +486,15 @@ Generalise it from "the whole sheet, if tiny" to "any k-part spatial window":
 Remove the `placed.length <= 6` restriction as part of this WP. Keep the
 rectangular-sheet restriction until someone tests non-rectangular sheets.
 
+**2026-07-27 rolling-scheduler completion.** The default-off production path now
+continues after accepted windows, re-ranks the remaining unique overlapping
+windows after every commit, and gives each window a bounded share of the
+remaining deadline so one failed rebuild cannot consume the entire stage. New
+telemetry reports visited windows and total parts covered. The seven-part
+laurel smoke gate visited three windows, covered 7/7 parts, accepted an
+improvement, and exported with zero overlap or sheet escape. Default-off engine
+equivalence remains unchanged.
+
 Gate (this is the one that must show real numbers):
 1. ≥ **1.5 pp** mean median utilisation vs refinement-off at equal wall clock, over
    the ESICUP corpus, ≥3 seeds/instance.

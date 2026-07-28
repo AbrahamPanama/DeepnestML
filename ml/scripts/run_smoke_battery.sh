@@ -7,7 +7,7 @@ ARTIFACT_ROOT="${DEEPNEST_SMOKE_ARTIFACT_ROOT:-"$ROOT_DIR/ml/artifacts/smoke-bat
 if [ "$#" -gt 0 ]; then
   SCENARIOS=("$@")
 else
-  SCENARIOS=("svg-gravity" "svg-settings-form-mm" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-laurel-v4-contact" "svg-laurel-superpart-default" "svg-steprepeat" "svg-export-pdf")
+  SCENARIOS=("svg-gravity" "svg-settings-form-mm" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-laurel-continuous-rolling" "svg-laurel-v4-contact" "svg-laurel-superpart-default" "svg-steprepeat" "svg-export-pdf")
 fi
 
 mkdir -p "$ARTIFACT_ROOT"

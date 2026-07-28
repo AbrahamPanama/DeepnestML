@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.9.1` (source and installed arm64 release)
+- Current version: `0.9.3` (source and installed arm64 release)
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.9.1-mac-arm64.dmg` (built and verified)
+- Local DMG artifact: `dist/Deepnest ML-0.9.3-mac-arm64.dmg` (built and verified)
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -86,9 +86,9 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): tracked files clean after the 0.9.2
-live-canvas refresh release; generated benchmark-result JSONs remain untracked
-by convention.
+State (verified 2026-07-27 by Codex): dirty only for the completed 0.9.3
+rolling-refinement release pending its final commit; generated benchmark-result
+JSONs remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -98,6 +98,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | Default-off rolling large-layout refinement | `main/background.js`, existing `v4WindowedRebuild` config/UI, focused tests/smoke, release docs | Completed in 0.9.3. Opt-in scheduler continues across fair-budgeted overlapping windows; seven-part production smoke covered 7/7 parts across three windows, accepted an exact-legal improvement, and preserved default-off equivalence | 2026-07-27 |
 | Codex | Refined selected-nest live canvas refresh | `main/index.html` display callback/current render identity, smoke regression, `AGENT_COLLABORATION.md` | Completed in 0.9.2. Production and installed callbacks repaint the selected replacement automatically: 0-degree construction -> 315/315/30/30-degree refined canvas, 32.1% compacted | 2026-07-27 |
 | Codex | Settings form undefined/blank value repair | `main/index.html` runtime-to-form hydration, smoke UI-state regression, packaging/install, `AGENT_COLLABORATION.md` | Completed in 0.9.1. Full UI settings survive post-start engine hydration; malformed legacy unit/scale values repair to canonical options; installed inch/mm production gates green | 2026-07-27 |
 | Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, packaging, installed app, `AGENT_COLLABORATION.md` | Completed. All four tiers green: exact mating gain 18.634%; visible/legal fixture interlock; 23-instance x 3-seed corpus delta -0.01235 pp; installed 0.9.0 fresh-default result 477.983 -> 395.754 width with zero overlap/outside | 2026-07-27 |
@@ -165,6 +166,44 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-27 - Rolling large-layout refinement and 0.9.3 release complete (Codex)
+
+- Reused the existing default-off `v4WindowedRebuild` flag and renamed its
+  visible setting to **Large-layout rolling refinement**. No second refinement
+  mode or default change was introduced.
+- The scheduler now continues after accepted cluster rebuilds, re-ranks unique
+  overlapping windows after every commit, and gives each window a bounded fair
+  share of the remaining deadline. A failed fallback can no longer consume the
+  whole stage.
+- The underlying cluster transaction was intentionally unchanged: candidates
+  still use exact containment/material checks and every accepted cluster still
+  passes the exact whole-layout legality gate before commit.
+- Added visited-window, covered-part, eligible-part, and budget-exhaustion
+  telemetry. The main status badge reports rolling coverage such as
+  `7/7 parts scanned`.
+- Added scheduler tests for ten-part rolling coverage, continue-after-success,
+  fair fallback deadlines, and default-off behavior. Added the seven-part
+  laurel production smoke scenario to the default battery.
+- Verification passed: syntax checks; focused continuous/contact/coverage/
+  scoring/spatial/engine-bugfix tests; nine-scenario default-off engine
+  equivalence; full 16-scenario smoke battery; and independent exported-SVG
+  legality (`7/7` parts, zero overlap, zero outside-sheet area).
+- The measured seven-part run visited three windows, covered all seven parts,
+  accepted one improvement, completed refinement in 3.2 s and the end-to-end
+  smoke in 8.4 s, without exhausting its configured budget.
+- Built and installed native arm64 `Deepnest ML 0.9.3` at
+  `/Applications/Deepnest ML.app`; strict deep `codesign`, packaged-ASAR
+  inspection, and `hdiutil verify` passed. The installed app launched as fresh
+  PID 13626. `/Applications/Deepnest ML 0.8.0.app` remains untouched.
+- DMG SHA-256:
+  `c3f4c9a0124c8a6125fad81dbdd632a5bee4ecc768df80110d6e77f7c7fb3e56`.
+- Previous 0.9.2 bundle backup:
+  `/tmp/Deepnest ML 0.9.2-backup-20260727-213525.app`.
+- No ML checkpoint or bakeoff was run: this path remains default-off and the
+  committed default-path equivalence gate passed unchanged.
+- Visual installed-app inspection was not possible after launch because macOS
+  locked; source and packaged DOM contents were inspected instead.
 
 ### 2026-07-27 - Live refined-nest canvas refresh and 0.9.2 release complete (Codex)
 

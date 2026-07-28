@@ -2,7 +2,7 @@
 <html itemscope="" itemtype="http://schema.org/WebPage" lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Deepnest ML 0.9.2</title>
+		<title>Deepnest ML 0.9.3</title>
 
 		<link type="text/css" rel="stylesheet" media="all" href="font/latolatinfonts.css" />
 		<link rel="stylesheet" type="text/css" href="style.css" />
@@ -4744,6 +4744,11 @@
 							return 'rotation unavailable';
 						}
 						var moves = Number(meta.movesAccepted) || 0;
+						var rollingCovered = Number(meta.windowedRebuildPartsCovered) || 0;
+						var rollingEligible = Number(meta.windowedRebuildEligibleParts) || 0;
+						var rollingCoverage = rollingEligible > 0 ?
+							Math.min(rollingCovered, rollingEligible) + '/' + rollingEligible + ' parts scanned' :
+							null;
 						if(moves > 0){
 							var details = [];
 							var angleDelta = Number(meta.continuousMaxAngleDeltaDeg) || 0;
@@ -4754,10 +4759,13 @@
 							if(continuousGain >= 0.0005){
 								details.push((100 * continuousGain).toFixed(1) + '% compacted');
 							}
+							if(rollingCoverage){
+								details.push(rollingCoverage);
+							}
 							return 'improved - ' + moves + ' ' + (moves === 1 ? 'move' : 'moves') +
 								(details.length > 0 ? ', ' + details.join(', ') : '');
 						}
-						return 'checked - 0 moves';
+						return 'checked - 0 moves' + (rollingCoverage ? ', ' + rollingCoverage : '');
 					},
 					getLocalRefinementLabel: function(){
 						var statusFunction = this.get('getLocalRefinementStatus');
@@ -5507,9 +5515,9 @@
 								<input type="checkbox" data-config="v4ScaledCoverage" /> <span class="radiolabel">Refine a proportional set of parts</span>
 							</dd>
 
-							<dt class="steprepeat-disabled">Windowed cluster rebuild</dt>
-							<dd class="steprepeat-disabled">
-								<input type="checkbox" data-config="v4WindowedRebuild" /> <span class="radiolabel">Rebuild dense local groups on larger sheets</span>
+							<dt class="steprepeat-disabled" title="Optional: roll exact local rebuilds across layouts with more than six parts.">Large-layout rolling refinement</dt>
+							<dd class="steprepeat-disabled" title="Optional: roll exact local rebuilds across layouts with more than six parts.">
+								<input type="checkbox" data-config="v4WindowedRebuild" /> <span class="radiolabel">Refine overlapping clusters beyond six parts</span>
 							</dd>
 
 							<dt class="steprepeat-disabled">Refinement engine</dt>
@@ -5988,6 +5996,11 @@
 				<div class="config_explain" id="explain_localRefinementContinuous">
 					<h1>Continuous compaction</h1>
 					Keeps the main nest on its four-angle grid, then searches fine local rotations and nearby positions in a bounded post-process. Only strict improvements that pass full-resolution containment and overlap checks are committed.
+				</div>
+
+				<div class="config_explain" id="explain_v4WindowedRebuild">
+					<h1>Large-layout rolling refinement</h1>
+					When enabled, continuous compaction visits overlapping local clusters across layouts with more than six parts until the refinement budget expires. There is no fixed total-part limit: each accepted cluster is committed only after a full-resolution legality check, then refinement rolls onward. This costs additional processing time and is disabled by default.
 				</div>
 
 				<div class="config_explain" id="explain_processHoles">

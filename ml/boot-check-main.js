@@ -33,6 +33,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const url = require('url');
+const packageVersion = require('../package.json').version;
 
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
@@ -272,7 +273,10 @@ function evaluateInvariants(snapshot) {
 	}
 
 	// Core boot invariants
-	assert('title matches 0.9.2', snapshot.title === 'Deepnest ML 0.9.2');
+	assert(
+		'title matches package version ' + packageVersion,
+		snapshot.title === 'Deepnest ML ' + packageVersion
+	);
 	assert('DeepNest global present', snapshot.hasDeepNest);
 	assert('DeepNestAutomation hook present', snapshot.hasAutomation);
 	assert('DeepNestAutomation exposes runAppSmokeTest',
