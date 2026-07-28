@@ -86,8 +86,9 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): dirty for active refined-nest canvas refresh
-fix; generated benchmark-result JSONs remain untracked by convention.
+State (verified 2026-07-27 by Codex): tracked files clean after the 0.9.2
+live-canvas refresh release; generated benchmark-result JSONs remain untracked
+by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -97,7 +98,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
-| Codex | Refined selected-nest live canvas refresh | `main/index.html` display callback/current render identity, smoke regression, `AGENT_COLLABORATION.md` | Implementation verified; 0.9.2 packaging/install in progress. Production callback repainted the selected replacement automatically: 0-degree construction -> 315/315/30/30-degree refined canvas, 32.1% compacted | 2026-07-27 |
+| Codex | Refined selected-nest live canvas refresh | `main/index.html` display callback/current render identity, smoke regression, `AGENT_COLLABORATION.md` | Completed in 0.9.2. Production and installed callbacks repaint the selected replacement automatically: 0-degree construction -> 315/315/30/30-degree refined canvas, 32.1% compacted | 2026-07-27 |
 | Codex | Settings form undefined/blank value repair | `main/index.html` runtime-to-form hydration, smoke UI-state regression, packaging/install, `AGENT_COLLABORATION.md` | Completed in 0.9.1. Full UI settings survive post-start engine hydration; malformed legacy unit/scale values repair to canonical options; installed inch/mm production gates green | 2026-07-27 |
 | Codex | SP-1..SP-5 superpart clustering end to end | `main/util/superpart.js`, `main/deepnest.js`, config/UI/export-by-expansion path, superpart tests/smoke/benchmarks, `ml/lib/esicup-convert.js`, benchmark/import-fidelity tests, docs, packaging, installed app, `AGENT_COLLABORATION.md` | Completed. All four tiers green: exact mating gain 18.634%; visible/legal fixture interlock; 23-instance x 3-seed corpus delta -0.01235 pp; installed 0.9.0 fresh-default result 477.983 -> 395.754 width with zero overlap/outside | 2026-07-27 |
 | Codex | RC-1 raster collision module | `main/util/raster-collision.js`, renderer/background script loading, `ml/tests/raster_collision/`, `docs/raster-collision-plan.md`, `AGENT_COLLABORATION.md` | Completed measurement WP: 5,000-pair soundness green (0 unsafe); divisor-64 laurel ambiguity 55.8% fails off-ramp, so RC-2 blocked. Divisor 192 diagnostic passes at 32.52% but is not adopted without an explicit policy amendment | 2026-07-25 |
@@ -164,6 +165,34 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-27 - Live refined-nest canvas refresh and 0.9.2 release complete (Codex)
+
+- Confirmed the user's exact symptom: local refinement replaced the selected
+  nest object and updated the status badge, but the renderer only repainted when
+  thumbnail selection changed. The active canvas therefore kept the construction
+  transforms until the user clicked a nest thumbnail.
+- `getNestDisplayCallback()` now tracks the object actually painted and redraws
+  whenever the selected object is replaced. Unchanged callback updates do not
+  trigger redundant paints, and manual historical-nest selection is preserved.
+- Added a focused lifecycle regression proving construction -> selected refined
+  replacement -> unchanged refined update behavior.
+- Verification passed: continuous-refinement tests, boot invariants, engine
+  equivalence, the four-laurel smoke scenario, strict exported-SVG legality,
+  source production-callback UI, and installed production-callback UI.
+- Installed UI proof required no thumbnail click: construction rotations
+  `[0, 0, 0, 0]` automatically became `[315, 315, 30, 30]`; the badge reported
+  `5 MOVES, 45 DEG, 32.1% COMPACTED`, and selected/displayed object identity
+  remained equal.
+- Built and installed the native arm64 `Deepnest ML 0.9.2` app at
+  `/Applications/Deepnest ML.app`. Strict deep `codesign` and `hdiutil verify`
+  passed; `/Applications/Deepnest ML 0.8.0.app` remains untouched.
+- DMG SHA-256:
+  `37a8ad02b58545395d545625cc4145afb8fa45b40a603efc445111f3bc9b1227`.
+- Installed QA screenshot:
+  `/tmp/deepnest-092-installed-refresh.png`.
+- Previous 0.9.1 bundle backup:
+  `/tmp/Deepnest ML 0.9.1-backup-20260727-200052.app`.
 
 ### 2026-07-27 - Settings form hydration repair and 0.9.1 release complete (Codex)
 
