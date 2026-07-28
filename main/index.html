@@ -2,7 +2,7 @@
 <html itemscope="" itemtype="http://schema.org/WebPage" lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Deepnest ML 0.9.1</title>
+		<title>Deepnest ML 0.9.2</title>
 
 		<link type="text/css" rel="stylesheet" media="all" href="font/latolatinfonts.css" />
 		<link rel="stylesheet" type="text/css" href="style.css" />
@@ -997,6 +997,7 @@
 			window.DeepNestLastMLRecommendation = null;
 			window.DeepNestLastMLDiagnostic = null;
 			window.__deepnestDisplayCallbackOverride = null;
+			window.__deepnestDisplayedNest = null;
 
 			function restoreConfiguredRuntimeState(){
 				window.DeepNestRuntimeConfig = null;
@@ -2302,6 +2303,7 @@
 				if(nestScroll){
 					nestScroll.innerHTML = '';
 				}
+				window.__deepnestDisplayedNest = null;
 				if(window.NestZoom && typeof window.NestZoom.reset === 'function'){
 					window.NestZoom.reset();
 				}
@@ -2466,13 +2468,24 @@
 					var selected = this.DeepNest.nests.filter(function(n){
 						return n.selected;
 					});
+					var nestToDisplay = null;
 
 					if(selected.length === 0 || (this.DeepNest.nests.length > 1 && this.DeepNest.nests[1].selected)){
 						this.DeepNest.nests.forEach(function(n){
 							n.selected = false;
 						});
-						displayNest(this.DeepNest.nests[0]);
 						this.DeepNest.nests[0].selected = true;
+						nestToDisplay = this.DeepNest.nests[0];
+					}
+					else if(selected[selected.length - 1] !== window.__deepnestDisplayedNest){
+						// Refinement replaces the selected nest object while preserving
+						// its selected flag. Repaint that replacement immediately so the
+						// canvas and its refinement badge describe the same placements.
+						nestToDisplay = selected[selected.length - 1];
+					}
+
+					if(nestToDisplay){
+						displayNest(nestToDisplay);
 					}
 
 					this.nest.update('nests');
@@ -4666,6 +4679,7 @@
 				if(window.NestZoom && typeof window.NestZoom.applyToSvg === 'function'){
 					window.NestZoom.applyToSvg(svg);
 				}
+				window.__deepnestDisplayedNest = n;
 			}
 			
 			window.nest = new Ractive({

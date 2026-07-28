@@ -272,7 +272,7 @@ function evaluateInvariants(snapshot) {
 	}
 
 	// Core boot invariants
-	assert('title matches 0.9.1', snapshot.title === 'Deepnest ML 0.9.1');
+	assert('title matches 0.9.2', snapshot.title === 'Deepnest ML 0.9.2');
 	assert('DeepNest global present', snapshot.hasDeepNest);
 	assert('DeepNestAutomation hook present', snapshot.hasAutomation);
 	assert('DeepNestAutomation exposes runAppSmokeTest',

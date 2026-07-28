@@ -8,10 +8,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ## Current Local Release
 
-- **Version:** `0.9.1`
+- **Version:** `0.9.2`
 - **Product name:** `Deepnest ML`
 - **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
-- **macOS local build:** `dist/Deepnest ML-0.9.1-mac-arm64.dmg`
+- **macOS local build:** `dist/Deepnest ML-0.9.2-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
 
@@ -34,6 +34,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Run in a unified light workspace where the parts list remains visible while nesting runs in the main workspace pane.
 
 ## Recent Highlights
+
+### 0.9.2: Live Refinement Canvas Refresh
+
+The active canvas now redraws immediately when local refinement replaces the selected construction nest. Refinement badges, placement data, and the visible SVG therefore advance together; users no longer need to click a previous-nest thumbnail to reveal accepted angular refinement.
 
 ### 0.9.1: Settings Display Repair
 

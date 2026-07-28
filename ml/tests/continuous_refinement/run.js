@@ -64,6 +64,51 @@ function testConstructionAndRefinementStaySeparate(){
 	assert.ok(smart.includes('localRefinementRunContinuousStage('), 'Smart should run the unified continuous stage');
 }
 
+function testSelectedRefinementReplacementRefreshesCanvas(){
+	const index = fs.readFileSync(path.join(ROOT, 'main', 'index.html'), 'utf8');
+	const rendered = [];
+	const exportWrapper = {};
+	const exportButton = {};
+	const context = {
+		displayNest: (nest) => {
+			rendered.push(nest);
+			context.window.__deepnestDisplayedNest = nest;
+		},
+		document: {
+			querySelector: (selector) => selector === '#export_wrapper' ? exportWrapper : exportButton
+		},
+		updateWorkspaceState: () => {}
+	};
+	const original = {selected: true, revision: 'construction'};
+	context.window = {
+		__deepnestDisplayCallbackOverride: null,
+		__deepnestDisplayedNest: original,
+		DeepNest: {
+			nests: [original],
+			working: true
+		},
+		nest: {
+			update: () => {}
+		}
+	};
+	vm.createContext(context);
+	vm.runInContext(functionSource(index, 'getNestDisplayCallback'), context);
+
+	const callback = context.getNestDisplayCallback();
+	callback.call(context.window);
+	assert.strictEqual(rendered.length, 0, 'an unchanged selected nest should not be repainted');
+
+	const refined = {selected: true, revision: 'refined'};
+	context.window.DeepNest.nests[0] = refined;
+	callback.call(context.window);
+	assert.deepStrictEqual(rendered, [refined], 'a selected refinement replacement must repaint immediately');
+	assert.strictEqual(context.window.__deepnestDisplayedNest, refined, 'the canvas identity should track the refined nest');
+
+	callback.call(context.window);
+	assert.strictEqual(rendered.length, 1, 'later callbacks should not repaint an unchanged refined nest');
+	assert.match(index, /window\.__deepnestDisplayedNest\s*=\s*n;/, 'displayNest should record the object actually painted');
+}
+
 function testConfiguredAngleWindowIsEnforced(){
 	const seen = {};
 	const base = 0;
@@ -267,6 +312,7 @@ testSweepAngles();
 testBestResultsKeepsDistinctBasins();
 testPostScoreRewardsCompactness();
 testConstructionAndRefinementStaySeparate();
+testSelectedRefinementReplacementRefreshesCanvas();
 testConfiguredAngleWindowIsEnforced();
 testCriticalTargetsReceiveNearestAnchors();
 testMergeCreditGuard();
