@@ -91,6 +91,39 @@ if (Array.isArray(scenario.expectedRotations) && scenario.expectedRotations.leng
     process.exit(1);
   }
 }
+if (scenario.expectedDisplayMatchesSelected === true) {
+  const display = report.details && report.details.display;
+  if (!display || display.displayedNestMatchesSelected !== true ||
+      !display.displayedNestDigest ||
+      display.displayedNestDigest !== display.selectedNestDigest) {
+    console.error('[smoke-battery] displayed nest is stale:', display);
+    process.exit(1);
+  }
+}
+if (typeof scenario.expectedDisplayedPartCount === 'number') {
+  const display = report.details && report.details.display;
+  const actual = display && typeof display.displayedPartCount === 'number' ? display.displayedPartCount : null;
+  if (actual !== scenario.expectedDisplayedPartCount) {
+    console.error('[smoke-battery] displayed part count mismatch:', scenario.expectedDisplayedPartCount, actual);
+    process.exit(1);
+  }
+}
+if (Array.isArray(scenario.expectedDisplayedRotations) && scenario.expectedDisplayedRotations.length > 0) {
+  const display = report.details && report.details.display;
+  const rotations = display && Array.isArray(display.displayedRotations) ? display.displayedRotations : [];
+  if (!rotations.some((rotation) => scenario.expectedDisplayedRotations.some((expected) => Math.abs(rotation - expected) <= 1e-6))) {
+    console.error('[smoke-battery] expected displayed rotations missing:', scenario.expectedDisplayedRotations, rotations);
+    process.exit(1);
+  }
+}
+if (typeof scenario.expectedStatusLabelContains === 'string') {
+  const display = report.details && report.details.display;
+  const label = display && typeof display.statusLabel === 'string' ? display.statusLabel : '';
+  if (label.indexOf(scenario.expectedStatusLabelContains) < 0) {
+    console.error('[smoke-battery] refinement status label mismatch:', scenario.expectedStatusLabelContains, label);
+    process.exit(1);
+  }
+}
 if (typeof scenario.expectedNonCanonicalNfpLookups === 'number') {
   const local = report.details && report.details.localRefinement;
   const actual = local && typeof local.nonCanonicalNfpLookups === 'number' ? local.nonCanonicalNfpLookups : null;

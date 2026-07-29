@@ -5,11 +5,16 @@
   "sourceFormat": "svg",
   "outputFormat": "svg",
   "timeoutMs": 90000,
+  "randomSeed": 0,
   "partQuantities": [2, 2],
   "expectedPartsPlaced": 4,
   "expectedSvgPathCount": 4,
   "expectedIndependentLegality": true,
   "expectedRotations": [30, 315],
+  "expectedDisplayMatchesSelected": true,
+  "expectedDisplayedPartCount": 4,
+  "expectedDisplayedRotations": [30, 315],
+  "expectedStatusLabelContains": "improved",
   "expectedNonCanonicalNfpLookups": 0,
   "expectedLocalRefinementMinimums": {
     "wholeClusterAccepted": 1,
@@ -20,7 +25,7 @@
     "continuousRelativeImprovement": 0.15
   },
   "expectedLocalRefinementMaximums": {
-    "continuousElapsedMs": 8000
+    "continuousElapsedMs": 16000
   },
   "configOverrides": {
     "superpartClustering": false,
@@ -35,9 +40,9 @@
     "threads": 1,
     "localRefinement": true,
     "localRefinementEngine": "smart",
-    "localRefinementBudgetMs": 15000,
+    "localRefinementBudgetMs": 30000,
     "localRefinementContinuous": true,
-    "continuousRefinementBudgetMs": 2000,
+    "continuousRefinementBudgetMs": 15000,
     "continuousRefinementMaxTargets": 8,
     "continuousRefinementMaxNeighbors": 3
   }

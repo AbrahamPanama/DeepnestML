@@ -7352,6 +7352,203 @@ function localRefinementTryWholeClusterRebuild(sheet, placed, placements, config
 	return {moved: true, score: best.score, components: best.components};
 }
 
+function localRefinementTryRepeatedMotifRebuild(sheet, placed, placements, config, currentMetric, deadline, stats){
+	if(!placed || placed.length < 7 || Date.now() >= deadline ||
+		config.v4WindowedRebuild !== true || config.processHoles !== false ||
+		!localRefinementRectangleSheet(sheet) || !isFinite(currentMetric)){
+		return {eligible: false, moved: false, metric: currentMetric};
+	}
+
+	var source = placed[0] && placed[0].source;
+	if(source === null || typeof source === 'undefined'){
+		return {eligible: false, moved: false, metric: currentMetric};
+	}
+	if(stats){
+		stats.repeatedMotifAttempts = (stats.repeatedMotifAttempts || 0) + 1;
+	}
+	for(var sourceIndex=1; sourceIndex<placed.length; sourceIndex++){
+		if(!placed[sourceIndex] || placed[sourceIndex].source !== source){
+			if(stats){
+				stats.repeatedMotifSourceMismatches =
+					(stats.repeatedMotifSourceMismatches || 0) + 1;
+			}
+			return {eligible: false, moved: false, metric: currentMetric};
+		}
+	}
+
+	// Reuse the exact small-cluster beam search to discover one profitable
+	// continuous-angle motif, then replicate that rigid motif across all copies.
+	var motifSize = Math.min(4, placed.length);
+	var motifPlaced = [];
+	var motifPlacements = [];
+	for(var motifIndex=0; motifIndex<motifSize; motifIndex++){
+		motifPlaced.push(localRefinementClonePart(placed[motifIndex]));
+		motifPlacements.push(clonePlacementPosition(placements[motifIndex]));
+	}
+	var motifConfig = {};
+	for(var key in config){
+		if(Object.prototype.hasOwnProperty.call(config, key) &&
+			key !== '_localRefinementSpatialIndex' &&
+			key !== '_localRefinementStats'){
+			motifConfig[key] = config[key];
+		}
+	}
+	motifConfig.localRefinementContactAcceptance = false;
+	var searchRemaining = Math.max(0, deadline - Date.now());
+	var motifSearchDeadline = Math.min(
+		deadline,
+		Date.now() + Math.max(250, Math.floor(searchRemaining * 0.9))
+	);
+	var motif = localRefinementTryWholeClusterRebuild(
+		sheet,
+		motifPlaced,
+		motifPlacements,
+		motifConfig,
+		motifSearchDeadline,
+		null
+	);
+	if(!motif.moved || Date.now() >= deadline){
+		if(stats){
+			stats.repeatedMotifSearchFailures =
+				(stats.repeatedMotifSearchFailures || 0) + 1;
+		}
+		return {eligible: true, moved: false, metric: currentMetric};
+	}
+
+	var motifPoints = collectWorldPoints(motifPlaced, motifPlacements);
+	var motifBounds = GeometryUtil.getPolygonBounds(motifPoints);
+	var sheetBounds = GeometryUtil.getPolygonBounds(sheet);
+	if(!motifBounds || !sheetBounds || motifBounds.width <= 0 || motifBounds.height <= 0){
+		return {eligible: true, moved: false, metric: currentMetric};
+	}
+
+	var snapshotPlaced = localRefinementCopyPlaced(placed);
+	var snapshotPlacements = localRefinementCopyPlacements(placements);
+	var beforeMergedLength = localRefinementMergedLengthTotal(
+		snapshotPlaced,
+		snapshotPlacements,
+		config
+	);
+	var groupCount = Math.ceil(placed.length / motifSize);
+	var clearance = Math.max(1e-7, 0.1 * (Number(config.curveTolerance) || 0));
+	var best = null;
+
+	for(var columns=1; columns<=groupCount && Date.now() < deadline; columns++){
+		var rows = Math.ceil(groupCount / columns);
+		if(columns * motifBounds.width + Math.max(0, columns - 1) * clearance >
+				sheetBounds.width + 1e-7 ||
+			rows * motifBounds.height + Math.max(0, rows - 1) * clearance >
+				sheetBounds.height + 1e-7){
+			continue;
+		}
+
+		var candidatePlaced = new Array(placed.length);
+		var candidatePlacements = new Array(placed.length);
+		for(var partIndex=0; partIndex<placed.length; partIndex++){
+			var groupIndex = Math.floor(partIndex / motifSize);
+			var templateIndex = partIndex % motifSize;
+			var column = groupIndex % columns;
+			var row = Math.floor(groupIndex / columns);
+			var templatePart = motifPlaced[templateIndex];
+			var templatePlacement = motifPlacements[templateIndex];
+			var candidatePart = localRefinementClonePart(templatePart);
+			candidatePart.source = snapshotPlaced[partIndex].source;
+			candidatePart.id = snapshotPlaced[partIndex].id;
+			var candidatePlacement = clonePlacementPosition(templatePlacement);
+			candidatePlacement.x =
+				sheetBounds.x + column * (motifBounds.width + clearance) +
+				(templatePlacement.x - motifBounds.x);
+			candidatePlacement.y =
+				sheetBounds.y + row * (motifBounds.height + clearance) +
+				(templatePlacement.y - motifBounds.y);
+			candidatePlacement.source = snapshotPlacements[partIndex].source;
+			candidatePlacement.id = snapshotPlacements[partIndex].id;
+			candidatePlaced[partIndex] = candidatePart;
+			candidatePlacements[partIndex] = candidatePlacement;
+		}
+
+		if(!localRefinementFinalLayoutLegalExact(
+			sheet,
+			candidatePlaced,
+			candidatePlacements,
+			config
+		)){
+			continue;
+		}
+		var mergedLength = localRefinementMergedLengthTotal(
+			candidatePlaced,
+			candidatePlacements,
+			config
+		);
+		if(!localRefinementMergeCreditAccepts(
+			beforeMergedLength,
+			mergedLength,
+			config,
+			stats
+		)){
+			continue;
+		}
+		var scored = localRefinementContinuousScore(
+			sheet,
+			candidatePlaced,
+			candidatePlacements,
+			config
+		);
+		if(!scored || !ContinuousRefinement.improves(scored.score, currentMetric)){
+			continue;
+		}
+		if(!best || scored.score < best.score){
+			best = {
+				placed: candidatePlaced,
+				placements: candidatePlacements,
+				score: scored.score,
+				components: scored.components
+			};
+		}
+	}
+
+	if(!best){
+		if(stats){
+			stats.repeatedMotifLegalButNotImproved =
+				(stats.repeatedMotifLegalButNotImproved || 0) + 1;
+		}
+		return {eligible: true, moved: false, metric: currentMetric};
+	}
+
+	var movedIndices = localRefinementChangedIndices(
+		snapshotPlaced,
+		snapshotPlacements,
+		best.placed,
+		best.placements
+	);
+	localRefinementRestorePlaced(placed, best.placed);
+	localRefinementRestorePlacements(placements, best.placements);
+	localRefinementRefreshSpatialIndex(config, placed, placements);
+	if(stats){
+		stats.repeatedMotifAccepted = (stats.repeatedMotifAccepted || 0) + 1;
+		stats.repeatedMotifPartsMoved =
+			(stats.repeatedMotifPartsMoved || 0) + movedIndices.length;
+		stats.movesAccepted = (stats.movesAccepted || 0) + movedIndices.length;
+		stats.continuousMovesAccepted = (stats.continuousMovesAccepted || 0) + 1;
+		for(var movedIndex=0; movedIndex<movedIndices.length; movedIndex++){
+			var index = movedIndices[movedIndex];
+			stats.continuousMaxAngleDeltaDeg = Math.max(
+				stats.continuousMaxAngleDeltaDeg || 0,
+				ContinuousRefinement.angularDistance(
+					snapshotPlacements[index].rotation || snapshotPlaced[index].rotation || 0,
+					best.placements[index].rotation || best.placed[index].rotation || 0
+				)
+			);
+		}
+	}
+	return {
+		eligible: true,
+		moved: true,
+		metric: best.score,
+		components: best.components
+	};
+}
+
 function localRefinementSampleClosedRing(part, count){
 	if(!part || part.length === 0 || count <= 0){
 		return [];
@@ -8236,21 +8433,42 @@ function localRefinementRunContinuousStage(sheet, placed, placements, config, de
 		}
 	}
 	else if(config.v4WindowedRebuild === true && placed.length > 6 && Date.now() < deadline){
-		var windowRemaining = Math.max(0, deadline - Date.now());
-		var windowDeadline = Math.min(deadline, Date.now() + Math.max(500, Math.floor(windowRemaining * 0.9)));
 		var primaryMetric = localRefinementAcceptanceMetric(sheet, placed, placements, config);
-		var windowed = localRefinementRunWindowedRebuild(
+		var repeatedMotif = localRefinementTryRepeatedMotifRebuild(
 			sheet,
 			placed,
 			placements,
 			config,
-			primaryMetric,
-			windowDeadline,
+			score ? score.score : null,
+			deadline,
 			stats
 		);
-		if(windowed.moved){
+		if(repeatedMotif.moved){
 			moved = true;
-			score = localRefinementContinuousScore(sheet, placed, placements, config);
+			score = {
+				score: repeatedMotif.metric,
+				components: repeatedMotif.components
+			};
+		}
+		else if(Date.now() < deadline){
+			var windowRemaining = Math.max(0, deadline - Date.now());
+			var windowDeadline = Math.min(
+				deadline,
+				Date.now() + Math.max(500, Math.floor(windowRemaining * 0.9))
+			);
+			var windowed = localRefinementRunWindowedRebuild(
+				sheet,
+				placed,
+				placements,
+				config,
+				primaryMetric,
+				windowDeadline,
+				stats
+			);
+			if(windowed.moved){
+				moved = true;
+				score = localRefinementContinuousScore(sheet, placed, placements, config);
+			}
 		}
 	}
 	var tasks;
@@ -9171,6 +9389,12 @@ function refineSmartPlacements(sheet, placed, placements, config, sheetboundsFor
 	stats.windowedRebuildPartsCovered = 0;
 	stats.windowedRebuildEligibleParts = 0;
 	stats.windowedRebuildBudgetExhausted = 0;
+	stats.repeatedMotifAttempts = 0;
+	stats.repeatedMotifSourceMismatches = 0;
+	stats.repeatedMotifSearchFailures = 0;
+	stats.repeatedMotifLegalButNotImproved = 0;
+	stats.repeatedMotifAccepted = 0;
+	stats.repeatedMotifPartsMoved = 0;
 	stats.contactBefore = 0;
 	stats.contactAfter = 0;
 	stats.contactRelativeImprovement = 0;
@@ -9507,6 +9731,20 @@ function mergeLocalRefinementStats(total, stats){
 	}
 	for(var i=0; i<additiveStats.length; i++){
 		var field = additiveStats[i];
+		if(typeof stats[field] === 'number'){
+			total[field] = (total[field] || 0) + stats[field];
+		}
+	}
+	var repeatedMotifStats = [
+		'repeatedMotifAttempts',
+		'repeatedMotifSourceMismatches',
+		'repeatedMotifSearchFailures',
+		'repeatedMotifLegalButNotImproved',
+		'repeatedMotifAccepted',
+		'repeatedMotifPartsMoved'
+	];
+	for(i=0; i<repeatedMotifStats.length; i++){
+		field = repeatedMotifStats[i];
 		if(typeof stats[field] === 'number'){
 			total[field] = (total[field] || 0) + stats[field];
 		}

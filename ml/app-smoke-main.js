@@ -192,6 +192,8 @@ function createBackgroundWindows() {
 
 function createMainWindow() {
 	mainWindow = new BrowserWindow({
+		width: 1600,
+		height: 1000,
 		show: false,
 		webPreferences: createWindowPreferences()
 	});
@@ -513,9 +515,11 @@ app.on('ready', function () {
 	var inputValue = cliArgs.input || scenario.inputPath || scenario.input;
 	var outputValue = cliArgs.output || scenario.outputPath || scenario.output;
 	var reportValue = cliArgs.report || scenario.reportPath || scenario.report;
+	var captureUiValue = cliArgs.captureUi || cliArgs['capture-ui'] || scenario.captureUiPath || scenario.captureUi || '';
 	var inputPath = inputValue ? (scenario.__path && !cliArgs.input ? resolveProjectPath(inputValue) : resolveInputPath(inputValue, process.cwd())) : '';
 	var outputPath = outputValue ? resolveInputPath(outputValue, scenarioBaseDir) : defaultScenarioOutputPath(scenarioName, outputFormat);
 	var reportPath = reportValue ? resolveInputPath(reportValue, scenarioBaseDir) : defaultScenarioReportPath(scenarioName);
+	var captureUiPath = captureUiValue ? resolveInputPath(captureUiValue, scenarioBaseDir) : '';
 	var sourceFormat = normalizeFormat(cliArgs.sourceFormat || scenario.sourceFormat, inputPath ? path.extname(inputPath).replace(/^\./, '') : 'svg');
 	var benchmarkMetaValue = cliArgs.benchmarkMetaPath || scenario.benchmarkMetaPath || scenario.benchmarkMeta || '';
 	var benchmarkMetaPath = benchmarkMetaValue ? resolveInputPath(benchmarkMetaValue, scenarioBaseDir) : '';
@@ -531,6 +535,7 @@ app.on('ready', function () {
 		inputPath: inputPath,
 		outputPath: outputPath,
 		reportPath: reportPath || '',
+		captureUiPath: captureUiPath,
 		sourceFormat: sourceFormat,
 		outputFormat: outputFormat,
 		configOverrides: scenario.configOverrides || {},
@@ -857,6 +862,42 @@ ipcMain.on('minkowski-calculate-nfp-sync', function (event, payload) {
 });
 
 ipcMain.on('app-smoke-test-finished', function (event, payload) {
-	destroyAllWindows();
-	app.exit(payload && payload.status === 'completed' ? 0 : 1);
+	var exitCode = payload && payload.status === 'completed' ? 0 : 1;
+	var captureUiPath = smokePayload && smokePayload.captureUiPath ? String(smokePayload.captureUiPath) : '';
+
+	function finishSmokeProcess() {
+		destroyAllWindows();
+		app.exit(exitCode);
+	}
+
+	if (!captureUiPath || !mainWindow || mainWindow.isDestroyed()) {
+		finishSmokeProcess();
+		return;
+	}
+
+	ensureDirectory(path.dirname(captureUiPath));
+	var electronMajor = parseInt(String(process.versions.electron || '0').split('.')[0], 10) || 0;
+	if (electronMajor < 5 && typeof mainWindow.capturePage === 'function') {
+		mainWindow.capturePage(function (image) {
+			try {
+				fs.writeFileSync(captureUiPath, image.toPNG());
+			}
+			catch (err) {
+				console.error('[app-smoke][capture] ' + (err && err.message ? err.message : String(err)));
+				exitCode = 1;
+			}
+			finishSmokeProcess();
+		});
+		return;
+	}
+
+	mainWindow.webContents.capturePage(undefined, {
+		stayHidden: true,
+		stayAwake: true
+	}).then(function (image) {
+		fs.writeFileSync(captureUiPath, image.toPNG());
+	}).catch(function (err) {
+		console.error('[app-smoke][capture] ' + (err && err.message ? err.message : String(err)));
+		exitCode = 1;
+	}).then(finishSmokeProcess);
 });

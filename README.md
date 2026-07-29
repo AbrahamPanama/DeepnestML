@@ -8,10 +8,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ## Current Local Release
 
-- **Version:** `0.9.3`
+- **Version:** `0.9.4`
 - **Product name:** `Deepnest ML`
 - **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
-- **macOS local build:** `dist/Deepnest ML-0.9.3-mac-arm64.dmg`
+- **macOS local build:** `dist/Deepnest ML-0.9.4-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
 
@@ -35,6 +35,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Run in a unified light workspace where the parts list remains visible while nesting runs in the main workspace pane.
 
 ## Recent Highlights
+
+### 0.9.4: Repeated-Motif Continuous Compaction
+
+The opt-in **Large-layout rolling refinement** mode now has a production-scale path for seven or more copies of one source shape. It first discovers a compact four-part motif using the proven continuous-angle whole-cluster search, tiles that rigid motif across every repeated copy, and commits only a strict global compaction improvement that passes full-resolution sheet containment, pair-overlap, and merge-credit checks. Mixed-shape layouts continue through the existing rolling-window scheduler. On the supplied 15-copy `6273-674333.svg` job, the measured result rotated every part by 45 degrees, improved the continuous score by 9.7%, raised bounding-box utilization to 60.6%, and exported all 15 parts with zero overlap or sheet escape.
 
 ### 0.9.3: Rolling Large-Layout Refinement
 

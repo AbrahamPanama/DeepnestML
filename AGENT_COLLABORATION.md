@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.9.3` (source and installed arm64 release)
+- Current version: `0.9.4` (source and installed arm64 release)
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.9.3-mac-arm64.dmg` (built and verified)
+- Local DMG artifact: `dist/Deepnest ML-0.9.4-mac-arm64.dmg` (built and verified)
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -86,9 +86,9 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-27 by Codex): clean for tracked files after the completed
-0.9.3 rolling-refinement release; generated benchmark-result JSONs remain
-untracked by convention.
+State (verified 2026-07-28 by Codex): clean for tracked files after the
+completed 0.9.4 repeated-motif release; generated benchmark-result JSONs
+remain untracked by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -98,6 +98,7 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | Production angular-refinement efficacy for supplied 6273 shape | `main/background.js`, renderer display/smoke verification, exact local production fixture, focused tests/smoke, release docs | Completed in 0.9.4. Opt-in repeated-motif rebuild rotates all 15 supplied production parts to 45 degrees, improves continuous score 9.71%, visibly refreshes the selected canvas, and exports with zero overlap/outside | 2026-07-28 |
 | Codex | Default-off rolling large-layout refinement | `main/background.js`, existing `v4WindowedRebuild` config/UI, focused tests/smoke, release docs | Completed in 0.9.3. Opt-in scheduler continues across fair-budgeted overlapping windows; seven-part production smoke covered 7/7 parts across three windows, accepted an exact-legal improvement, and preserved default-off equivalence | 2026-07-27 |
 | Codex | Refined selected-nest live canvas refresh | `main/index.html` display callback/current render identity, smoke regression, `AGENT_COLLABORATION.md` | Completed in 0.9.2. Production and installed callbacks repaint the selected replacement automatically: 0-degree construction -> 315/315/30/30-degree refined canvas, 32.1% compacted | 2026-07-27 |
 | Codex | Settings form undefined/blank value repair | `main/index.html` runtime-to-form hydration, smoke UI-state regression, packaging/install, `AGENT_COLLABORATION.md` | Completed in 0.9.1. Full UI settings survive post-start engine hydration; malformed legacy unit/scale values repair to canonical options; installed inch/mm production gates green | 2026-07-27 |
@@ -166,6 +167,36 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-07-28 - Production repeated-motif compaction and 0.9.4 release complete (Codex)
+
+- Added an exact repeated-motif rebuild before the existing rolling-window
+  fallback. It applies only to seven or more copies of one source while
+  **Large-layout rolling refinement** is enabled, discovers a compact
+  four-part arbitrary-angle motif with the proven whole-cluster search, then
+  tiles that motif across every copy.
+- Every candidate still passes full-resolution sheet containment and pairwise
+  material-overlap checks, preserves required merge credit, and must strictly
+  improve the continuous score. Mixed-source layouts fail out immediately to
+  the existing rolling scheduler; construction rotations remain unchanged.
+- Exact production gate on the supplied `6273-674333.svg`: 15/15 displayed and
+  exported, every displayed transform at 45 degrees, score
+  `0.3773587548 -> 0.3407139394` (9.7109%), bounding-box utilization 60.5708%,
+  zero overlaps, zero sheet escapes, export SHA-256
+  `29a598c711319b33126a84ac2581939cd3bdc082b5ba899ede2782b0076cf5f7`.
+- Closed the renderer-test blind spot: smoke now executes the production
+  selected-nest display callback and records the displayed digest, part count,
+  transforms, and badge. The exact production UI proof showed all 15 current
+  canvas transforms at 45 degrees and the badge
+  `Local refinement: improved - 30 moves, 45 deg, 9.7% compacted`.
+- Verification: focused repeated-motif test, engine syntax/equivalence checks,
+  boot check, and the complete 16-scenario smoke battery all passed; all
+  independent angular-layout audits reported zero overlap/outside. No ML
+  bakeoff was run because this remains an explicit opt-in post-process and no
+  bakeoff manifest/model/output inputs were supplied.
+- Built the arm64 0.9.4 app and DMG. Strict deep code-signing and `hdiutil
+  verify` passed; the DMG SHA-256 is
+  `c57a51a6fda9e30797ec9b4cb1e64f502e28dd6ad3ac8626585674db67d2e8eb`.
 
 ### 2026-07-27 - Rolling large-layout refinement and 0.9.3 release complete (Codex)
 

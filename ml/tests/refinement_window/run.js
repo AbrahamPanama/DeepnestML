@@ -177,6 +177,180 @@ var disabledResult = schedulerContext.localRefinementRunWindowedRebuild(
 assert.strictEqual(disabledResult.moved, false);
 assert.strictEqual(fallbackDeadlines.length, callsBeforeDisabled);
 
+var motifSearchCalls = 0;
+var motifExactChecks = 0;
+var motifSpatialRefreshes = 0;
+function motifBounds(points){
+	var minX = Infinity;
+	var minY = Infinity;
+	var maxX = -Infinity;
+	var maxY = -Infinity;
+	for(var pointIndex=0; pointIndex<points.length; pointIndex++){
+		minX = Math.min(minX, points[pointIndex].x);
+		minY = Math.min(minY, points[pointIndex].y);
+		maxX = Math.max(maxX, points[pointIndex].x);
+		maxY = Math.max(maxY, points[pointIndex].y);
+	}
+	return {
+		x: minX,
+		y: minY,
+		width: maxX - minX,
+		height: maxY - minY
+	};
+}
+function motifClonePart(part){
+	var copy = part.map(function(point){
+		return {x: point.x, y: point.y};
+	});
+	copy.source = part.source;
+	copy.id = part.id;
+	copy.rotation = part.rotation;
+	return copy;
+}
+function motifClonePlacement(placement){
+	return {
+		x: placement.x,
+		y: placement.y,
+		id: placement.id,
+		source: placement.source,
+		rotation: placement.rotation
+	};
+}
+function motifWorldPoints(items, itemPlacements){
+	var points = [];
+	for(var itemIndex=0; itemIndex<items.length; itemIndex++){
+		for(var itemPoint=0; itemPoint<items[itemIndex].length; itemPoint++){
+			points.push({
+				x: items[itemIndex][itemPoint].x + itemPlacements[itemIndex].x,
+				y: items[itemIndex][itemPoint].y + itemPlacements[itemIndex].y
+			});
+		}
+	}
+	return points;
+}
+var motifContext = {
+	Math: Math,
+	Number: Number,
+	Object: Object,
+	isFinite: isFinite,
+	Date: {now: function(){ return 0; }},
+	GeometryUtil: {getPolygonBounds: motifBounds},
+	ContinuousRefinement: {
+		improves: function(candidate, current){ return candidate < current; },
+		angularDistance: function(left, right){ return Math.abs(left - right); }
+	},
+	localRefinementRectangleSheet: function(){ return true; },
+	localRefinementClonePart: motifClonePart,
+	clonePlacementPosition: motifClonePlacement,
+	localRefinementCopyPlaced: function(items){ return items.map(motifClonePart); },
+	localRefinementCopyPlacements: function(items){ return items.map(motifClonePlacement); },
+	localRefinementTryWholeClusterRebuild: function(
+		unusedSheet,
+		motifPlaced,
+		motifPlacements
+	){
+		motifSearchCalls++;
+		for(var motifIndex=0; motifIndex<motifPlaced.length; motifIndex++){
+			motifPlaced[motifIndex].rotation = 45;
+			motifPlacements[motifIndex].x = (motifIndex % 2) * 1.1;
+			motifPlacements[motifIndex].y = Math.floor(motifIndex / 2) * 1.1;
+			motifPlacements[motifIndex].rotation = 45;
+		}
+		return {moved: true, score: 4};
+	},
+	collectWorldPoints: motifWorldPoints,
+	localRefinementMergedLengthTotal: function(){ return 0; },
+	localRefinementFinalLayoutLegalExact: function(){
+		motifExactChecks++;
+		return true;
+	},
+	localRefinementMergeCreditAccepts: function(){ return true; },
+	localRefinementContinuousScore: function(
+		unusedSheet,
+		candidatePlaced,
+		candidatePlacements
+	){
+		var bounds = motifBounds(motifWorldPoints(candidatePlaced, candidatePlacements));
+		return {score: bounds.width * bounds.height, components: bounds};
+	},
+	localRefinementChangedIndices: function(beforePlaced){
+		return beforePlaced.map(function(unusedPart, index){ return index; });
+	},
+	localRefinementRestorePlaced: function(target, replacement){
+		target.length = 0;
+		replacement.forEach(function(part){ target.push(motifClonePart(part)); });
+	},
+	localRefinementRestorePlacements: function(target, replacement){
+		target.length = 0;
+		replacement.forEach(function(placement){ target.push(motifClonePlacement(placement)); });
+	},
+	localRefinementRefreshSpatialIndex: function(){ motifSpatialRefreshes++; }
+};
+vm.runInNewContext(
+	extract(
+		'function localRefinementTryRepeatedMotifRebuild',
+		'\nfunction localRefinementSampleClosedRing'
+	),
+	motifContext
+);
+
+var motifSheet = [
+	{x: 0, y: 0},
+	{x: 100, y: 0},
+	{x: 100, y: 100},
+	{x: 0, y: 100}
+];
+var motifPlaced = Array.from({length: 8}, function(unused, index){
+	var part = [
+		{x: 0, y: 0},
+		{x: 1, y: 0},
+		{x: 1, y: 1},
+		{x: 0, y: 1}
+	];
+	part.source = 7;
+	part.id = index;
+	part.rotation = 0;
+	return part;
+});
+var motifPlacements = motifPlaced.map(function(part, index){
+	return {x: index * 10, y: 0, source: part.source, id: part.id, rotation: 0};
+});
+var motifStats = {movesAccepted: 0, continuousMovesAccepted: 0};
+var motifResult = motifContext.localRefinementTryRepeatedMotifRebuild(
+	motifSheet,
+	motifPlaced,
+	motifPlacements,
+	{
+		v4WindowedRebuild: true,
+		processHoles: false,
+		curveTolerance: 0.005
+	},
+	1000,
+	10000,
+	motifStats
+);
+assert.strictEqual(motifResult.moved, true);
+assert.strictEqual(motifSearchCalls, 1);
+assert(motifExactChecks > 0, 'repeated motifs must pass the exact full-layout legality gate');
+assert.strictEqual(motifSpatialRefreshes, 1);
+assert.strictEqual(motifStats.repeatedMotifAccepted, 1);
+assert.strictEqual(motifStats.repeatedMotifPartsMoved, 8);
+assert(motifPlacements.every(function(placement){ return placement.rotation === 45; }));
+
+var mixedPlaced = motifPlaced.map(motifClonePart);
+mixedPlaced[7].source = 8;
+var mixedResult = motifContext.localRefinementTryRepeatedMotifRebuild(
+	motifSheet,
+	mixedPlaced,
+	motifPlacements.map(motifClonePlacement),
+	{v4WindowedRebuild: true, processHoles: false},
+	1000,
+	10000,
+	{}
+);
+assert.strictEqual(mixedResult.eligible, false);
+assert.strictEqual(motifSearchCalls, 1, 'mixed-source layouts must fall through to rolling refinement');
+
 assert(
 	source.indexOf('config.v4WindowedRebuild === true && placed.length > 6') >= 0,
 	'windowed rebuild must run on production-size sheets'

@@ -5,6 +5,7 @@
   "sourceFormat": "svg",
   "outputFormat": "svg",
   "timeoutMs": 120000,
+  "randomSeed": 0,
   "partQuantities": [4, 3],
   "expectedPartsPlaced": 7,
   "expectedSvgPathCount": 7,

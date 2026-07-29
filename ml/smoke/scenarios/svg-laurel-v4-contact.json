@@ -1,20 +1,19 @@
 {
   "name": "svg-laurel-v4-contact",
-  "description": "Four-laurel contact-aware acceptance must preserve exact legality while admitting a real rotated refinement move.",
+  "description": "Four-laurel contact-aware acceptance must preserve exact legality while admitting a denser score-plateau move.",
   "input": "ml/examples/laurel-two-crossed.svg",
   "sourceFormat": "svg",
   "outputFormat": "svg",
   "timeoutMs": 120000,
   "timeBudgetSec": 18,
+  "randomSeed": 0,
   "partQuantities": [2, 2],
   "expectedPartsPlaced": 4,
   "expectedSvgPathCount": 4,
+  "expectedIndependentLegality": true,
   "expectedNonCanonicalNfpLookups": 0,
   "expectedLocalRefinementMinimums": {
-    "wholeClusterAccepted": 1,
-    "continuousMovesAccepted": 1,
-    "continuousMaxAngleDeltaDeg": 30,
-    "continuousRelativeImprovement": 0.15
+    "plateauAccepted": 1
   },
   "expectedLocalRefinementMaximums": {
     "continuousElapsedMs": 8000
