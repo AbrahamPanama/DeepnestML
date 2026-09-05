@@ -21,6 +21,8 @@
 //   5. `recreateBackgroundWindows` clears currentPayload before destroying
 //      the window so a teardown-induced render-process-gone does not
 //      double-report an orphan for work the user explicitly cancelled.
+//   6. A solver handoff can suspend the pool without immediately recreating
+//      hidden workers; the next enqueue resumes the pool automatically.
 //
 // Run: node ml/tests/parallel_ga/repro.js
 
@@ -95,6 +97,7 @@ function createHarness(){
 	harness.renderProcessGone = function(win, details){ harness.dispatcher.handleRendererGone(win, details); };
 	harness.backgroundResponse = function(senderWin, payload){ harness.dispatcher.handleResponse(senderWin.webContents, payload); };
 	harness.recreateBackgroundWindows = function(){ harness.dispatcher.recreate(); };
+	harness.suspendBackgroundWindows = function(){ harness.dispatcher.suspend(); };
 
 	return harness;
 }
@@ -246,10 +249,40 @@ console.log('Case 5: idle render-process-gone replaces worker capacity');
 	});
 }
 
-// --- Case 6: recreateBackgroundWindows does not orphan-report ---------------
+// --- Case 6: Sparrow handoff suspends and lazily resumes --------------------
 
 console.log('');
-console.log('Case 6: recreateBackgroundWindows clears currentPayload before destroy');
+console.log('Case 6: solver handoff suspends and lazily resumes worker pool');
+{
+	const h = createHarness();
+	h.dispatcher.createWindows();
+	const oldWindows = h.backgroundWindows.slice();
+	h.backgroundQueue.push(mkPayload(70));
+	h.suspendBackgroundWindows();
+
+	check('suspend destroys every worker without immediate replacement', function(){
+		assert.strictEqual(h.poolCount, 0);
+		assert.strictEqual(h.backgroundWindows.filter(Boolean).length, 0);
+		assert.ok(oldWindows.every(function(win){ return win.destroyed; }));
+	});
+	check('suspend clears queued work', function(){
+		assert.strictEqual(h.backgroundQueue.length, 0);
+	});
+
+	h.dispatcher.enqueue(mkPayload(71));
+	check('next enqueue recreates the bounded pool and dispatches work', function(){
+		assert.strictEqual(h.poolCount, MAX_BACKGROUND_WINDOWS);
+		const dispatched = h.backgroundWindows.filter(Boolean).filter(function(win){
+			return win.currentPayload && win.currentPayload.index === 71;
+		});
+		assert.strictEqual(dispatched.length, 1);
+	});
+}
+
+// --- Case 7: recreateBackgroundWindows does not orphan-report ---------------
+
+console.log('');
+console.log('Case 7: recreateBackgroundWindows clears currentPayload before destroy');
 {
 	const h = createHarness();
 	for (let i = 0; i < 4; i++) { h.backgroundQueue.push(mkPayload(i)); }
@@ -281,10 +314,10 @@ console.log('Case 6: recreateBackgroundWindows clears currentPayload before dest
 	});
 }
 
-// --- Case 7: crash during teardown still advances workers later -------------
+// --- Case 8: crash during teardown still advances workers later -------------
 
 console.log('');
-console.log('Case 7: crash after teardown does not block future dispatches');
+console.log('Case 8: crash after teardown does not block future dispatches');
 {
 	const h = createHarness();
 	h.backgroundQueue.push(mkPayload(100));

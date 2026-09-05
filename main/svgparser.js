@@ -1493,8 +1493,12 @@
 		
 		element = element || this.svgRoot;
 		
-		for(var i=0; i<element.children.length; i++){
-			this.filter(whitelist, element.children[i]);
+		// Children can remove themselves during recursion. Iterate a snapshot so
+		// adjacent unsupported nodes (notably Corel <defs>/<style> blocks) are not
+		// skipped and left able to override the normalized vector presentation.
+		var children = Array.prototype.slice.call(element.children);
+		for(var i=0; i<children.length; i++){
+			this.filter(whitelist, children[i]);
 		}
 		
 		if(element.children.length == 0 && whitelist.indexOf(element.tagName) < 0){

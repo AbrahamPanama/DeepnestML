@@ -7,7 +7,7 @@ ARTIFACT_ROOT="${DEEPNEST_SMOKE_ARTIFACT_ROOT:-"$ROOT_DIR/ml/artifacts/smoke-bat
 if [ "$#" -gt 0 ]; then
   SCENARIOS=("$@")
 else
-  SCENARIOS=("svg-gravity" "svg-settings-form-mm" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-laurel-continuous-rolling" "svg-laurel-v4-contact" "svg-laurel-superpart-default" "svg-steprepeat" "svg-export-pdf")
+  SCENARIOS=("svg-gravity" "svg-settings-form-mm" "svg-gravity-improved-scoring" "svg-gravity-sheet-margin-outline" "svg-gravity-adaptive-rotation-forced-fit" "svg-gravity-adaptive-slotted-oval" "svg-hull" "svg-corel-magenta-hole" "svg-hull-settle-floaters" "svg-laurel-continuous" "svg-laurel-continuous-cluster" "svg-laurel-continuous-four" "svg-laurel-continuous-rolling" "svg-laurel-v4-contact" "svg-laurel-superpart-default" "svg-steprepeat" "svg-export-pdf" "svg-sparrow-pure" "svg-sparrow-hybrid" "svg-sparrow-hybrid-incomplete")
 fi
 
 mkdir -p "$ARTIFACT_ROOT"
@@ -50,10 +50,38 @@ if (!stat.size) {
   console.error('[smoke-battery] empty output:', outputPath);
   process.exit(1);
 }
+if (typeof scenario.expectedPartCount === 'number') {
+  const actual = report.details && typeof report.details.partCount === 'number' ? report.details.partCount : null;
+  if (actual !== scenario.expectedPartCount) {
+    console.error('[smoke-battery] imported part count mismatch:', scenario.expectedPartCount, actual);
+    process.exit(1);
+  }
+}
+if (Array.isArray(scenario.expectedTopologyHoleCounts)) {
+  const actual = report.details && report.details.topologyHoleCounts;
+  if (!Array.isArray(actual) || JSON.stringify(actual) !== JSON.stringify(scenario.expectedTopologyHoleCounts)) {
+    console.error('[smoke-battery] topology hole counts mismatch:', scenario.expectedTopologyHoleCounts, actual);
+    process.exit(1);
+  }
+}
 if (typeof scenario.expectedPartsPlaced === 'number') {
   const actual = report.details && typeof report.details.placedPartInstances === 'number' ? report.details.placedPartInstances : null;
   if (actual !== scenario.expectedPartsPlaced) {
     console.error('[smoke-battery] expected placed part count mismatch:', scenario.expectedPartsPlaced, actual);
+    process.exit(1);
+  }
+}
+if (typeof scenario.minimumPartsPlaced === 'number') {
+  const actual = report.details && typeof report.details.placedPartInstances === 'number' ? report.details.placedPartInstances : null;
+  if (actual === null || actual < scenario.minimumPartsPlaced) {
+    console.error('[smoke-battery] minimum placed part count not met:', scenario.minimumPartsPlaced, actual);
+    process.exit(1);
+  }
+}
+if (typeof scenario.expectedRequestedPartInstances === 'number') {
+  const actual = report.details && typeof report.details.requestedPartInstances === 'number' ? report.details.requestedPartInstances : null;
+  if (actual !== scenario.expectedRequestedPartInstances) {
+    console.error('[smoke-battery] requested part count mismatch:', scenario.expectedRequestedPartInstances, actual);
     process.exit(1);
   }
 }
@@ -63,6 +91,42 @@ if (typeof scenario.expectedSvgPathCount === 'number' && report.outputFormat ===
   if (actual !== scenario.expectedSvgPathCount) {
     console.error('[smoke-battery] expected SVG path count mismatch:', scenario.expectedSvgPathCount, actual);
     process.exit(1);
+  }
+}
+if (report.outputFormat === 'svg' && (
+    scenario.expectedNoAuthorStyleNodes === true ||
+    typeof scenario.expectedMaxStrokeWidth === 'number' ||
+    scenario.expectedOnlyNoFill === true ||
+    Array.isArray(scenario.expectedRequiredFills)
+)) {
+  const output = fs.readFileSync(outputPath, 'utf8');
+  if (scenario.expectedNoAuthorStyleNodes === true && /<(?:defs|style)\b/i.test(output)) {
+    console.error('[smoke-battery] authored SVG style node survived cleanup');
+    process.exit(1);
+  }
+  if (typeof scenario.expectedMaxStrokeWidth === 'number') {
+    const widths = Array.from(output.matchAll(/stroke-width=["']([^"']+)["']/gi), (match) => Number(match[1]));
+    if (widths.some((width) => !Number.isFinite(width) || width > scenario.expectedMaxStrokeWidth)) {
+      console.error('[smoke-battery] SVG stroke width exceeds limit:', scenario.expectedMaxStrokeWidth, widths);
+      process.exit(1);
+    }
+  }
+  if (scenario.expectedOnlyNoFill === true) {
+    const fills = Array.from(output.matchAll(/\bfill=["']([^"']+)["']/gi), (match) => String(match[1]).trim().toLowerCase());
+    if (fills.some((fill) => fill !== 'none')) {
+      console.error('[smoke-battery] filled SVG geometry survived normalization:', fills);
+      process.exit(1);
+    }
+  }
+  if (Array.isArray(scenario.expectedRequiredFills)) {
+    const fills = Array.from(output.matchAll(/\bfill=["']([^"']+)["']/gi), (match) => String(match[1]).trim().toLowerCase());
+    const missing = scenario.expectedRequiredFills
+      .map((fill) => String(fill).trim().toLowerCase())
+      .filter((fill) => !fills.includes(fill));
+    if (missing.length) {
+      console.error('[smoke-battery] required SVG fills missing:', missing, fills);
+      process.exit(1);
+    }
   }
 }
 if (typeof scenario.expectedRotation === 'number') {
@@ -108,6 +172,27 @@ if (typeof scenario.expectedDisplayedPartCount === 'number') {
     process.exit(1);
   }
 }
+if (scenario.expectedDisplayedPartsInsideSheet === true) {
+  const display = report.details && report.details.display;
+  const parts = display && Array.isArray(display.displayedPartBounds) ? display.displayedPartBounds : [];
+  const sheets = display && Array.isArray(display.displayedSheetBounds) ? display.displayedSheetBounds : [];
+  const tolerance = Number.isFinite(Number(scenario.displayBoundsTolerancePx)) ?
+    Math.max(0, Number(scenario.displayBoundsTolerancePx)) : 1;
+  if (!parts.length || !sheets.length) {
+    console.error('[smoke-battery] missing displayed bounds for containment check:', display);
+    process.exit(1);
+  }
+  const outside = parts.filter((part) => !sheets.some((sheet) =>
+    part.x >= sheet.x - tolerance &&
+    part.y >= sheet.y - tolerance &&
+    part.right <= sheet.right + tolerance &&
+    part.bottom <= sheet.bottom + tolerance
+  ));
+  if (outside.length) {
+    console.error('[smoke-battery] displayed part extends outside every visible sheet:', { tolerance, outside, sheets });
+    process.exit(1);
+  }
+}
 if (Array.isArray(scenario.expectedDisplayedRotations) && scenario.expectedDisplayedRotations.length > 0) {
   const display = report.details && report.details.display;
   const rotations = display && Array.isArray(display.displayedRotations) ? display.displayedRotations : [];
@@ -121,6 +206,56 @@ if (typeof scenario.expectedStatusLabelContains === 'string') {
   const label = display && typeof display.statusLabel === 'string' ? display.statusLabel : '';
   if (label.indexOf(scenario.expectedStatusLabelContains) < 0) {
     console.error('[smoke-battery] refinement status label mismatch:', scenario.expectedStatusLabelContains, label);
+    process.exit(1);
+  }
+}
+if (typeof scenario.expectedSolverStatusLabelContains === 'string') {
+  const display = report.details && report.details.display;
+  const label = display && typeof display.solverStatusLabel === 'string' ? display.solverStatusLabel : '';
+  if (label.indexOf(scenario.expectedSolverStatusLabelContains) < 0) {
+    console.error('[smoke-battery] solver status label mismatch:', scenario.expectedSolverStatusLabelContains, label);
+    process.exit(1);
+  }
+}
+if (typeof scenario.expectedSolverMode === 'string') {
+  const solver = report.details && report.details.solver;
+  const actual = solver && solver.mode;
+  if (actual !== scenario.expectedSolverMode) {
+    console.error('[smoke-battery] solver mode mismatch:', scenario.expectedSolverMode, actual);
+    process.exit(1);
+  }
+}
+if (scenario.expectedSolverValues && typeof scenario.expectedSolverValues === 'object') {
+  const solver = report.details && report.details.solver;
+  for (const field of Object.keys(scenario.expectedSolverValues)) {
+    const expected = scenario.expectedSolverValues[field];
+    const actual = solver ? solver[field] : undefined;
+    if (actual !== expected) {
+      console.error('[smoke-battery] solver value mismatch:', field, expected, actual);
+      process.exit(1);
+    }
+  }
+}
+if (scenario.expectedSolverMinimums && typeof scenario.expectedSolverMinimums === 'object') {
+  const solver = report.details && report.details.solver;
+  for (const field of Object.keys(scenario.expectedSolverMinimums)) {
+    const expected = Number(scenario.expectedSolverMinimums[field]);
+    const actual = solver && typeof solver[field] === 'number' ? solver[field] : null;
+    if (actual === null || actual < expected) {
+      console.error('[smoke-battery] solver minimum not met:', field, expected, actual);
+      process.exit(1);
+    }
+  }
+}
+if (typeof scenario.minimumOffGridAngles === 'number') {
+  const display = report.details && report.details.display;
+  const rotations = display && Array.isArray(display.displayedRotations) ? display.displayedRotations : [];
+  const offGrid = rotations.filter((rotation) => {
+    const normalized = Math.abs(Number(rotation) || 0) % 90;
+    return Math.min(normalized, 90 - normalized) > 0.05;
+  }).length;
+  if (offGrid < scenario.minimumOffGridAngles) {
+    console.error('[smoke-battery] too few off-grid Sparrow angles:', scenario.minimumOffGridAngles, offGrid, rotations);
     process.exit(1);
   }
 }
@@ -255,7 +390,7 @@ NODE
 
   independent_legality="$(node -e "const s=require(process.argv[1]); console.log(s.expectedIndependentLegality === true ? 'true' : 'false')" "$scenario_path")"
   if [ "$independent_legality" = "true" ]; then
-    expected_parts="$(node -e "const s=require(process.argv[1]); console.log(Number(s.expectedPartsPlaced || 0))" "$scenario_path")"
+    expected_parts="$(node -e "const s=require(process.argv[1]); const r=require(process.argv[2]); const exact=Number(s.expectedPartsPlaced); console.log(Number.isFinite(exact) ? exact : Number(r.details && r.details.placedPartInstances || 0))" "$scenario_path" "$report_path")"
     node "$ROOT_DIR/ml/tests/exported_layout_legality/run.js" \
       --export "$output_path" \
       --expected-parts "$expected_parts" \

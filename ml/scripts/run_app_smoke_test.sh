@@ -9,4 +9,9 @@ if [ ! -x "$ELECTRON_BINARY" ]; then
   exit 1
 fi
 
+SPARROW_BINARY="$ROOT_DIR/vendor/sparrow/bin/darwin-arm64/sparrow"
+if [ -x "$SPARROW_BINARY" ] && [ -z "${DEEPNEST_SPARROW_BIN:-}" ]; then
+  export DEEPNEST_SPARROW_BIN="$SPARROW_BINARY"
+fi
+
 arch -x86_64 "$ELECTRON_BINARY" "$ROOT_DIR/ml/app-smoke-main.js" "$@"

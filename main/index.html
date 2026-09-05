@@ -2,7 +2,7 @@
 <html itemscope="" itemtype="http://schema.org/WebPage" lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Deepnest ML 0.9.4</title>
+		<title>Deepnest ML 0.10.0</title>
 
 		<link type="text/css" rel="stylesheet" media="all" href="font/latolatinfonts.css" />
 		<link rel="stylesheet" type="text/css" href="style.css" />
@@ -424,6 +424,9 @@
 			  threads: 4,
 			  populationSize: 10,
 			  mutationRate: 10,
+			  solverMode: 'deepnest',
+			  sparrowTimeSec: 15,
+			  sparrowSeed: 1,
 			  placementType: 'gravity', // how to place each part (possible values gravity, box, convexhull)
 			  stepRepeatAlternate180: true,
 			  stepRepeatFillDirection: 'columns',
@@ -634,6 +637,12 @@
 					else if(key == 'localRefinementEngine' && val != 'smart'){
 						config.setSync('localRefinementContinuous', false);
 					}
+					else if(key == 'solverMode' && val != 'deepnest' && config.getSync('placementType') == 'steprepeat'){
+						config.setSync('placementType', 'gravity');
+					}
+					else if(key == 'placementType' && val == 'steprepeat' && config.getSync('solverMode') != 'deepnest'){
+						config.setSync('solverMode', 'deepnest');
+					}
 					
 					if(key == 'scale'){					
 						if(config.getSync('units') == 'mm'){
@@ -694,6 +703,79 @@
 					// values over persisted UI settings so a running nest cannot blank controls
 					// such as units, endpoint tolerance, or DXF conversion scales.
 					c = normalizedSettingsFormConfig(c);
+
+					function clearSparrowOptionState(){
+						var marked = document.querySelectorAll('#config [data-sparrow-disabled="true"]');
+						Array.from(marked).forEach(function(node){
+							node.removeAttribute('data-sparrow-disabled');
+							node.classList.remove('config-incompatible');
+							node.removeAttribute('data-disabled-reason');
+							node.removeAttribute('title');
+							node.removeAttribute('tabindex');
+							node.removeAttribute('aria-disabled');
+							if((node.tagName === 'INPUT' || node.tagName === 'SELECT' || node.tagName === 'TEXTAREA') &&
+								node.getAttribute('data-config') !== 'v4FastLegality'){
+								node.disabled = false;
+							}
+						});
+					}
+
+					function disableSparrowOption(key, reason){
+						var control = document.querySelector('#config [data-config="' + key + '"]');
+						if(!control || !control.parentNode){
+							return;
+						}
+						var valueCell = control.parentNode;
+						var labelCell = valueCell.previousElementSibling;
+						var nodes = labelCell ? [labelCell, valueCell, control] : [valueCell, control];
+						for(var nodeIndex=0; nodeIndex<nodes.length; nodeIndex++){
+							var node = nodes[nodeIndex];
+							node.setAttribute('data-sparrow-disabled', 'true');
+							node.setAttribute('title', reason);
+							if(node !== control){
+								node.classList.add('config-incompatible');
+								node.setAttribute('data-disabled-reason', reason);
+							}
+						}
+						valueCell.setAttribute('tabindex', '0');
+						valueCell.setAttribute('aria-disabled', 'true');
+						control.disabled = true;
+					}
+
+					function updateSparrowOptions(currentConfig){
+						var mode = currentConfig && (currentConfig.solverMode === 'sparrow' || currentConfig.solverMode === 'hybrid') ?
+							currentConfig.solverMode : 'deepnest';
+						var active = mode !== 'deepnest';
+						var budgetRows = document.querySelectorAll('.sparrow-only');
+						Array.from(budgetRows).forEach(function(node){
+							node.style.display = active ? '' : 'none';
+						});
+						if(!active){
+							return;
+						}
+						var solverReason = mode === 'sparrow' ?
+							'Pure Sparrow performs its own continuous-angle placement, so this Deepnest search setting does not apply.' :
+							'Hybrid mode uses this only for its Deepnest seed; Sparrow replaces incompatible post-processing after the seed is placed.';
+						var postReason = 'Sparrow performs continuous-angle optimization itself, so this Deepnest post-processing setting is disabled.';
+						var holeReason = 'This Sparrow integration treats interior holes as solid collision geometry for conservative placement.';
+						var commonLineReason = 'Sparrow does not return common-line metadata, so common-line merging is unavailable in Sparrow modes.';
+						['superpartClustering', 'localRefinement', 'localRefinementContinuous',
+							'localRefinementContactAcceptance', 'v4IncrementalScoring',
+							'v4ScaledCoverage', 'v4WindowedRebuild', 'localRefinementEngine',
+							'localRefinementBudgetMs'].forEach(function(key){
+							disableSparrowOption(key, postReason);
+						});
+						disableSparrowOption('processHoles', holeReason);
+						disableSparrowOption('mergeLines', commonLineReason);
+						if(mode === 'sparrow'){
+							['rotations', 'placementType', 'simplify', 'improvedPlacementScoring',
+								'populationSize', 'mutationRate', 'timeRatio'].forEach(function(key){
+								disableSparrowOption(key, solverReason);
+							});
+						}
+					}
+
+					clearSparrowOptionState();
 
 					function updateStepRepeatOptions(currentConfig){
 						var active = currentConfig && currentConfig.placementType == 'steprepeat';
@@ -858,6 +940,7 @@
 				updateStepRepeatOptions(c);
 				updateContinuousCompactionOptions(c);
 				updateSuperpartClusteringOptions(c);
+				updateSparrowOptions(c);
 				refreshModelArtifactChoices(c);
 				refreshMlRuntimeStatus(c);
 			}
@@ -2496,6 +2579,31 @@
 				};
 			}
 
+			function applySparrowRuntimeConfig(runtimeConfig){
+				var mode = runtimeConfig && (runtimeConfig.solverMode === 'sparrow' || runtimeConfig.solverMode === 'hybrid') ?
+					runtimeConfig.solverMode : 'deepnest';
+				runtimeConfig.solverMode = mode;
+				if(mode === 'deepnest'){
+					return runtimeConfig;
+				}
+				runtimeConfig.superpartClustering = false;
+				runtimeConfig.mergeLines = false;
+				runtimeConfig.processHoles = false;
+				runtimeConfig.localRefinement = false;
+				runtimeConfig.localRefinementContinuous = false;
+				runtimeConfig.localRefinementContactAcceptance = false;
+				runtimeConfig.v4FastLegality = false;
+				runtimeConfig.v4LegalityShadow = false;
+				runtimeConfig.v4IncrementalScoring = false;
+				runtimeConfig.v4ScaledCoverage = false;
+				runtimeConfig.v4EnableSwap = false;
+				runtimeConfig.v4WindowedRebuild = false;
+				if(mode === 'sparrow'){
+					runtimeConfig.placementType = 'gravity';
+				}
+				return runtimeConfig;
+			}
+
 			function beginNestWithConfig(runtimeConfig, recommendation){
 				var readinessError = getNestReadinessError();
 				if(readinessError){
@@ -2507,6 +2615,14 @@
 					if(typeof ConfigCompatibility !== 'undefined'){
 						ConfigCompatibility.applyActiveContinuousCompaction(normalizedConfig);
 						ConfigCompatibility.applySuperpartClustering(normalizedConfig);
+					}
+					applySparrowRuntimeConfig(normalizedConfig);
+					if(normalizedConfig.solverMode !== 'deepnest'){
+						var sparrowStatus = ipcRenderer.sendSync('sparrow-status-sync');
+						if(!sparrowStatus || sparrowStatus.available !== true){
+							message('The Sparrow solver is not available for this operating system and processor.', true);
+							return false;
+						}
 					}
 					prepareFreshNestRun();
 					window.DeepNestRuntimeConfig = normalizedConfig;
@@ -3665,13 +3781,131 @@
 					function captureDisplayedNestState(selectedNest){
 						var displayedNest = window.__deepnestDisplayedNest;
 						var displayedParts = Array.prototype.slice.call(document.querySelectorAll('#nestsvg .part.active'));
+						var displayedSheets = Array.prototype.slice.call(document.querySelectorAll('#nestsvg .sheet.active'));
 						var displayedRotations = [];
+						var displayedPartBounds = [];
+						var displayedPartGroupBounds = [];
+						var displayedPartGeometry = [];
+						function roundedRect(rect){
+							return {
+								x: roundedPlacementNumber(typeof rect.x === 'number' ? rect.x : rect.left),
+								y: roundedPlacementNumber(typeof rect.y === 'number' ? rect.y : rect.top),
+								width: roundedPlacementNumber(rect.width),
+								height: roundedPlacementNumber(rect.height),
+								right: roundedPlacementNumber(rect.right),
+								bottom: roundedPlacementNumber(rect.bottom)
+							};
+						}
+						function roundedClientBounds(element){
+							return roundedRect(element.getBoundingClientRect());
+						}
+						function paintedClientBounds(root){
+							var selector = 'path,polygon,polyline,rect,circle,ellipse,line,image,text,use';
+							var elements = Array.prototype.slice.call(root.querySelectorAll(selector));
+							var left = Infinity;
+							var top = Infinity;
+							var right = -Infinity;
+							var bottom = -Infinity;
+							for(var boundsIndex=0; boundsIndex<elements.length; boundsIndex++){
+								var element = elements[boundsIndex];
+								var computed = window.getComputedStyle(element);
+								if(computed.display === 'none' || computed.visibility === 'hidden' || Number(computed.opacity) === 0){
+									continue;
+								}
+								var fillVisible = computed.fill && computed.fill !== 'none' && computed.fill !== 'transparent';
+								var strokeVisible = computed.stroke && computed.stroke !== 'none' && computed.stroke !== 'transparent';
+								if(!fillVisible && !strokeVisible && element.tagName !== 'image' && element.tagName !== 'text'){
+									continue;
+								}
+								var box;
+								var matrix;
+								try{
+									box = element.getBBox();
+									matrix = element.getScreenCTM();
+								}
+								catch(boundsError){
+									continue;
+								}
+								if(!box || !matrix || !isFinite(box.x) || !isFinite(box.y) || !isFinite(box.width) || !isFinite(box.height)){
+									continue;
+								}
+								var corners = [
+									{x: box.x, y: box.y},
+									{x: box.x+box.width, y: box.y},
+									{x: box.x+box.width, y: box.y+box.height},
+									{x: box.x, y: box.y+box.height}
+								];
+								var elementLeft = Infinity;
+								var elementTop = Infinity;
+								var elementRight = -Infinity;
+								var elementBottom = -Infinity;
+								for(var cornerIndex=0; cornerIndex<corners.length; cornerIndex++){
+									var corner = corners[cornerIndex];
+									var screenX = matrix.a*corner.x + matrix.c*corner.y + matrix.e;
+									var screenY = matrix.b*corner.x + matrix.d*corner.y + matrix.f;
+									elementLeft = Math.min(elementLeft, screenX);
+									elementTop = Math.min(elementTop, screenY);
+									elementRight = Math.max(elementRight, screenX);
+									elementBottom = Math.max(elementBottom, screenY);
+								}
+								if(strokeVisible){
+									var strokeWidth = Math.max(0, parseFloat(computed.strokeWidth) || 0);
+									var scaleX = Math.sqrt(matrix.a*matrix.a + matrix.b*matrix.b);
+									var scaleY = Math.sqrt(matrix.c*matrix.c + matrix.d*matrix.d);
+									var nonScaling = element.getAttribute('vector-effect') === 'non-scaling-stroke' ||
+										computed.vectorEffect === 'non-scaling-stroke';
+									var strokePad = 0.5*strokeWidth*(nonScaling ? 1 : Math.max(scaleX, scaleY));
+									elementLeft -= strokePad;
+									elementTop -= strokePad;
+									elementRight += strokePad;
+									elementBottom += strokePad;
+								}
+								left = Math.min(left, elementLeft);
+								top = Math.min(top, elementTop);
+								right = Math.max(right, elementRight);
+								bottom = Math.max(bottom, elementBottom);
+							}
+							if(left === Infinity){
+								return roundedClientBounds(root);
+							}
+							return roundedRect({
+								x: left,
+								y: top,
+								left: left,
+								top: top,
+								width: right-left,
+								height: bottom-top,
+								right: right,
+								bottom: bottom
+							});
+						}
 						for(var i=0; i<displayedParts.length; i++){
-							var style = displayedParts[i].getAttribute('style') || '';
-							var match = /rotate\(([-+0-9.eE]+)deg\)/.exec(style);
+							var displayTransform = displayedParts[i].getAttribute('transform') ||
+								displayedParts[i].getAttribute('style') || '';
+							var match = /rotate\(([-+0-9.eE]+)(?:deg)?\)/.exec(displayTransform);
 							if(match){
 								displayedRotations.push(roundedPlacementNumber(match[1]));
 							}
+							displayedPartBounds.push(paintedClientBounds(displayedParts[i]));
+							displayedPartGroupBounds.push(roundedClientBounds(displayedParts[i]));
+							var geometryBox = displayedParts[i].getBBox();
+							var geometryMatrix = displayedParts[i].getCTM();
+							displayedPartGeometry.push({
+								bbox: {
+									x: roundedPlacementNumber(geometryBox.x),
+									y: roundedPlacementNumber(geometryBox.y),
+									width: roundedPlacementNumber(geometryBox.width),
+									height: roundedPlacementNumber(geometryBox.height)
+								},
+								matrix: geometryMatrix ? {
+									a: roundedPlacementNumber(geometryMatrix.a),
+									b: roundedPlacementNumber(geometryMatrix.b),
+									c: roundedPlacementNumber(geometryMatrix.c),
+									d: roundedPlacementNumber(geometryMatrix.d),
+									e: roundedPlacementNumber(geometryMatrix.e),
+									f: roundedPlacementNumber(geometryMatrix.f)
+								} : null
+							});
 						}
 						return {
 							displayedNestMatchesSelected: displayedNest === selectedNest,
@@ -3681,6 +3915,10 @@
 								placementsDigest(selectedNest.placements) : null,
 							displayedPartCount: displayedParts.length,
 							displayedRotations: displayedRotations,
+							displayedPartBounds: displayedPartBounds,
+							displayedPartGroupBounds: displayedPartGroupBounds,
+							displayedPartGeometry: displayedPartGeometry,
+							displayedSheetBounds: displayedSheets.map(roundedClientBounds),
 							statusLabel: ((document.querySelector('#localrefinementstatus') || {}).textContent || '').trim()
 						};
 					}
@@ -3939,18 +4177,26 @@
 								requestedPartInstances += Math.max(0, Number(DeepNest.parts[requestedIndex].quantity) || 0);
 							}
 						}
-						var placedPartInstances = 0;
-						if(selectedNest && Array.isArray(selectedNest.placements)){
-							for(var placementSheetIndex=0; placementSheetIndex<selectedNest.placements.length; placementSheetIndex++){
-								var placementSheet = selectedNest.placements[placementSheetIndex];
-								placedPartInstances += placementSheet && Array.isArray(placementSheet.sheetplacements) ? placementSheet.sheetplacements.length : 0;
+							var placedPartInstances = 0;
+							if(selectedNest && Array.isArray(selectedNest.placements)){
+								for(var placementSheetIndex=0; placementSheetIndex<selectedNest.placements.length; placementSheetIndex++){
+									var placementSheet = selectedNest.placements[placementSheetIndex];
+									placedPartInstances += placementSheet && Array.isArray(placementSheet.sheetplacements) ? placementSheet.sheetplacements.length : 0;
+								}
 							}
-						}
-						var details = {
-							scenarioName: scenarioName,
-							outputFormat: outputFormat,
-							outputBytes: outputBytes,
-							partCount: DeepNest.parts.length,
+							var topologyHoleCounts = [];
+							for(var topologyIndex=0; topologyIndex<DeepNest.parts.length; topologyIndex++){
+								var topologyPart = DeepNest.parts[topologyIndex];
+								if(!topologyPart.sheet){
+									topologyHoleCounts.push(topologyPart.polygontree && Array.isArray(topologyPart.polygontree.children) ? topologyPart.polygontree.children.length : 0);
+								}
+							}
+							var details = {
+								scenarioName: scenarioName,
+								outputFormat: outputFormat,
+								outputBytes: outputBytes,
+								partCount: DeepNest.parts.length,
+								topologyHoleCounts: topologyHoleCounts,
 							requestedPartInstances: requestedPartInstances,
 							placedPartInstances: placedPartInstances,
 							sheetIndex: selectedNest && selectedNest.placements && selectedNest.placements.length > 0 ? selectedNest.placements[0].sheet : null,
@@ -3966,6 +4212,7 @@
 								selectedNest.superpartClustering :
 								(DeepNest.lastSuperpartStats || null),
 							localRefinement: localRefinement,
+							solver: selectedNest && selectedNest.solver ? selectedNest.solver : {mode: 'deepnest', status: 'accepted'},
 							localRefinementSummary: localRefinement ? {
 								enabled: !!localRefinement.enabled,
 								pending: !!localRefinement.pending,
@@ -3981,6 +4228,7 @@
 							mlDiagnostic: window.DeepNestLastMLDiagnostic || null
 						};
 						details.display = captureDisplayedNestState(selectedNest);
+						details.display.solverStatusLabel = ((document.querySelector('#solverstatus') || {}).textContent || '').trim();
 						details.layout = placementLayoutMetrics(selectedNest);
 						if(isFinite(randomSeed) && randomSeed >= 0){
 							details.randomSeed = randomSeed;
@@ -4032,7 +4280,10 @@
 							return;
 						}
 						var selectedNest = DeepNest.nests[0];
-						if(selectedNest && selectedNest.localRefinement && selectedNest.localRefinement.pending){
+						if(selectedNest && (
+							(selectedNest.localRefinement && selectedNest.localRefinement.pending) ||
+							(selectedNest.solver && selectedNest.solver.status === 'optimizing')
+						)){
 							budgetHandle = setTimeout(function(){
 								exportBestAvailable(timeoutHandle);
 							}, 250);
@@ -4154,7 +4405,10 @@
 									return;
 								}
 								var selectedNest = DeepNest.nests[0];
-								if(selectedNest && selectedNest.localRefinement && selectedNest.localRefinement.pending){
+								if(selectedNest && (
+									(selectedNest.localRefinement && selectedNest.localRefinement.pending) ||
+									(selectedNest.solver && selectedNest.solver.status === 'optimizing')
+								)){
 									return;
 								}
 								exporting = true;
@@ -4666,8 +4920,11 @@
 						// reset class (make visible)
 						partelement.setAttribute('class', 'part active');
 						
-						// position part
-						partelement.setAttribute('style','transform: translate('+(p.x-sheetbounds.x)+'px, '+(p.y+svgheight-sheetbounds.y)+'px) rotate('+p.rotation+'deg)');
+						// Match the exact SVG transform used by placement and export. CSS
+						// transforms can rotate SVG groups around their rendered box instead
+						// of the geometry origin, making legal rotated parts appear outside.
+						partelement.removeAttribute('style');
+						partelement.setAttribute('transform','translate('+(p.x-sheetbounds.x)+' '+(p.y+svgheight-sheetbounds.y)+') rotate('+p.rotation+')');
 						
 						// add merge lines
 						if(p.mergedSegments && p.mergedSegments.length > 0){
@@ -4739,6 +4996,73 @@
 							return n.selected;
 						});
 						return selected.length > 0 ? selected.pop() : null;
+					},
+					getSolverStatus: function(){
+						var selectedFunction = this.get('getSelectedNest');
+						var selected = typeof selectedFunction === 'function' ? selectedFunction.call(this) : null;
+						var meta = selected && selected.solver ? selected.solver : null;
+						if(!meta || !meta.mode || meta.mode === 'deepnest'){
+							return 'Deepnest';
+						}
+						if(meta.status === 'optimizing'){
+							return 'Hybrid: Sparrow optimizing';
+						}
+						if(meta.status === 'fallback'){
+							return 'Hybrid: Deepnest kept';
+						}
+						if(meta.status === 'no-improvement'){
+							if(meta.seedIncomplete && Number(meta.requestedParts) > 0){
+								return 'Hybrid: Deepnest kept after testing all ' + meta.requestedParts + ' parts';
+							}
+							return 'Hybrid: no Sparrow gain';
+						}
+						var offGrid = 0;
+						if(selected && Array.isArray(selected.placements)){
+							for(var sheetIndex=0; sheetIndex<selected.placements.length; sheetIndex++){
+								var placements = selected.placements[sheetIndex].sheetplacements || [];
+								for(var placementIndex=0; placementIndex<placements.length; placementIndex++){
+									var angle = Math.abs(Number(placements[placementIndex].rotation) || 0) % 90;
+									var distanceToGrid = Math.min(angle, 90-angle);
+									if(distanceToGrid > 0.05){
+										offGrid++;
+									}
+								}
+							}
+						}
+						var angleDetail = offGrid > 0 ? ', ' + offGrid + ' off-grid ' + (offGrid === 1 ? 'angle' : 'angles') : '';
+						var requestedParts = Math.max(0, Number(meta.requestedParts) || 0);
+						var placedParts = Math.max(0, Number(meta.placedParts) || 0);
+						var countDetail = requestedParts > 0 ? placedParts + '/' + requestedParts + ' placed' : '';
+						if(meta.mode === 'sparrow'){
+							return 'Sparrow: ' + (countDetail || 'continuous placement') + angleDetail;
+						}
+						var gain = Number(meta.relativeImprovement) || 0;
+						if(Number(meta.placementGain) > 0){
+							return 'Hybrid: ' + countDetail +
+								(gain > 0.000001 ? ', ' + (100*gain).toFixed(gain < 0.1 ? 1 : 0) + '% tighter' : '') +
+								angleDetail;
+						}
+						return 'Hybrid: ' + (100*gain).toFixed(gain < 0.1 ? 1 : 0) + '% tighter' + angleDetail;
+					},
+					getSolverLabel: function(){
+						var statusFunction = this.get('getSolverStatus');
+						var status = typeof statusFunction === 'function' ? statusFunction.call(this) : 'Deepnest';
+						return 'Solver: ' + status;
+					},
+					getSolverClass: function(){
+						var selectedFunction = this.get('getSelectedNest');
+						var selected = typeof selectedFunction === 'function' ? selectedFunction.call(this) : null;
+						var meta = selected && selected.solver ? selected.solver : null;
+						if(!meta || !meta.mode || meta.mode === 'deepnest'){
+							return 'is-default';
+						}
+						if(meta.status === 'optimizing'){
+							return 'is-running';
+						}
+						if(meta.status === 'fallback' || meta.status === 'no-improvement'){
+							return 'is-fallback';
+						}
+						return 'is-improved';
 					},
 					getLocalRefinementStatus: function(){
 						var ne = this.get('nests') || [];
@@ -5388,6 +5712,9 @@
 					<div class="group"><h1>{{ getSelected().length > 0 ? getSelected()[0].placements.length : '-' }}</h1><span class="label">{{ getSelected().length > 0 ? (getSelected()[0].placements.length > 1 ? 'sheets used' : 'sheet used') : '' }}</span></div>
 					<div class="group"><h1>{{ getPartsPlaced() }}</h1><span class="label">parts placed</span></div>
 					<div class="group"><h1>{{ getTimeSaved() }}</h1><span class="label">laser time saved</span></div>
+					<div id="solverstatus" class="{{ getSolverClass() }}">
+						<strong>{{ getSolverLabel() }}</strong>
+					</div>
 					<div id="localrefinementstatus" class="{{ getLocalRefinementClass() }}">
 						<strong>{{ getLocalRefinementLabel() }}</strong>
 					</div>
@@ -5431,6 +5758,20 @@
 					<dt>Curve tolerance</dt>
 					<dd>
 						<input type="number" value="0.3" min="0" step="any" data-config="curveTolerance" data-conversion="true" required /> <i><span class="unit-label">inch</span></i>
+					</dd>
+
+					<dt>Solver</dt>
+					<dd>
+						<select name="solverMode" data-config="solverMode">
+							<option value="deepnest" selected>Deepnest</option>
+							<option value="sparrow">Sparrow (pure)</option>
+							<option value="hybrid">Hybrid (Deepnest + Sparrow)</option>
+						</select>
+					</dd>
+
+					<dt class="sparrow-only" style="display:none;">Sparrow budget</dt>
+					<dd class="sparrow-only" style="display:none;">
+						<input type="number" value="15" min="1" max="300" step="1" data-config="sparrowTimeSec" required /> <i>seconds/sheet</i>
 					</dd>
 					
 						<dt class="steprepeat-disabled">Construction rotations</dt>
@@ -6007,6 +6348,16 @@
 				<h1>Use rough approximation</h1>
 				Certain geometries can be very time consuming to compute, eg. several hundred unique snowflakes. You may wish to use a simple polygon approximation to speed up the process, at the cost of greater material use.<br /><br />
 				If your vector not unique (ie. several hundred identical snowflakes) using the "quantity" field is another way to speed up the process dramatically.
+				</div>
+
+				<div class="config_explain" id="explain_solverMode">
+					<h1>Solver</h1>
+					Deepnest uses the established four-angle genetic search. Pure Sparrow places every part with continuous rotation on the first selected rectangular sheet. Hybrid first creates a legal Deepnest layout, then gives each occupied sheet to Sparrow for continuous-angle compaction. Every Sparrow result is checked against the full-resolution part and sheet geometry before it can replace a Deepnest result.
+				</div>
+
+				<div class="config_explain" id="explain_sparrowTimeSec">
+					<h1>Sparrow budget</h1>
+					Sets how long Sparrow may optimize each occupied sheet. More time can improve dense or highly concave jobs. The default is 15 seconds per sheet.
 				</div>
 
 				<div class="config_explain" id="explain_improvedPlacementScoring">

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="190" viewBox="0 0 540 190">
+  <defs>
+    <style type="text/css"><![CDATA[
+      .cut { fill:none; stroke:black; stroke-width:48; }
+      .art { fill:blue; }
+      .hole-stroke { fill:none; stroke:magenta; stroke-width:32; }
+      .hole-fill { fill:#ff00ff; stroke:none; }
+    ]]></style>
+  </defs>
+  <metadata>Corel-style regression fixture</metadata>
+  <rect class="cut" x="10" y="20" width="150" height="150" />
+  <circle class="art" cx="85" cy="95" r="52" />
+  <circle class="hole-stroke" cx="55" cy="95" r="12" />
+  <circle class="hole-fill" cx="115" cy="95" r="12" />
+  <rect class="cut" x="200" y="10" width="330" height="170" />
+</svg>

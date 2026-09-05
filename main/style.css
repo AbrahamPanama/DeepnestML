@@ -1996,10 +1996,6 @@ vector-effect: non-scaling-stroke !important;
 stroke-linejoin: round !important;
 }
 
-#nestdisplay svg g.part{
-filter: drop-shadow(0 0 1.4px rgba(255,255,255,0.95));
-}
-
 #nestdisplay line.merged{
 opacity: 0;
 transition: opacity 2s;
@@ -2575,6 +2571,7 @@ text-transform: uppercase;
 letter-spacing: 0.05em;
 }
 
+#solverstatus,
 #localrefinementstatus{
 align-self: center;
 display: inline-flex;
@@ -2593,6 +2590,7 @@ text-align: center;
 white-space: normal;
 }
 
+#solverstatus strong,
 #localrefinementstatus strong{
 font-weight: 700;
 color: #39424D;
@@ -2603,6 +2601,25 @@ font-size: 0.78em;
 
 #localrefinementstatus.is-off{
 opacity: 0.72;
+}
+
+#solverstatus.is-default{
+opacity: 0.78;
+}
+
+#solverstatus.is-running{
+border-color: rgba(30, 188, 224, 0.42);
+background: rgba(231, 249, 253, 0.95);
+}
+
+#solverstatus.is-improved{
+border-color: rgba(57, 181, 119, 0.5);
+background: rgba(229, 249, 238, 0.95);
+}
+
+#solverstatus.is-fallback{
+border-color: rgba(220, 160, 58, 0.52);
+background: rgba(255, 248, 229, 0.96);
 }
 
 #localrefinementstatus.is-enabled,
@@ -2771,10 +2788,6 @@ overflow: visible;
 #nestdisplay svg g.sheet{
 /* Keep the sheet boundary crisp even at high zoom. */
 vector-effect: non-scaling-stroke;
-}
-
-#nestdisplay svg g.part{
-filter: drop-shadow(0 0 1.1px rgba(255,255,255,0.9));
 }
 
 #nestdisplay line.merged{

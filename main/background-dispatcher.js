@@ -8,6 +8,7 @@ function createBackgroundDispatcher(options) {
   var maxWindows = Math.max(1, parseInt(options.maxWindows, 10) || 1);
   var windows = [];
   var queue = [];
+  var suspended = false;
   var createWindow = options.createWindow;
   var getMainWindow = options.getMainWindow || function () { return null; };
   var sendToWindow = options.sendToWindow || function (win, channel, payload) {
@@ -67,6 +68,9 @@ function createBackgroundDispatcher(options) {
   }
 
   function createWindows() {
+    if (suspended) {
+      return;
+    }
     while (countWindows() < maxWindows) {
       var win = createWindow();
       win.isBusy = false;
@@ -142,6 +146,7 @@ function createBackgroundDispatcher(options) {
   }
 
   function enqueue(payload) {
+    suspended = false;
     queue.push(payload);
     dispatch();
   }
@@ -169,6 +174,7 @@ function createBackgroundDispatcher(options) {
   }
 
   function recreate() {
+    suspended = false;
     queue.length = 0;
     for (var i = 0; i < windows.length; i++) {
       if (windows[i]) {
@@ -179,6 +185,22 @@ function createBackgroundDispatcher(options) {
     }
     onPoolChanged(0);
     createWindows();
+  }
+
+  function suspend() {
+    suspended = true;
+    queue.length = 0;
+    for (var i = 0; i < windows.length; i++) {
+      if (windows[i]) {
+        var win = windows[i];
+        win.currentPayload = null;
+        win.isBusy = false;
+        win.isReady = false;
+        windows[i] = null;
+        destroyWindow(win);
+      }
+    }
+    onPoolChanged(0);
   }
 
   var api = {
@@ -193,6 +215,7 @@ function createBackgroundDispatcher(options) {
     markReady: markReady,
     markClosed: markClosed,
     recreate: recreate,
+    suspend: suspend,
     reportOrphanPayload: reportOrphanPayload
   };
 

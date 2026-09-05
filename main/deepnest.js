@@ -40,6 +40,9 @@
 			populationSize: 10,
 			mutationRate: 10,
 			threads: 4,
+			solverMode: 'deepnest',
+			sparrowTimeSec: 15,
+			sparrowSeed: 1,
 			placementType: 'gravity',
 			stepRepeatAlternate180: true,
 			stepRepeatFillDirection: 'columns',
@@ -141,6 +144,9 @@
 			var activeSuperpartValidationParts = null;
 			var superpartCache = {};
 			var activeSuperpartStats = null;
+			var activeSolverParts = null;
+			var activeSparrowJob = null;
+			var activeSparrowBase = null;
 		
 		var progressCallback = null;
 		var displayCallback = null;
@@ -206,6 +212,322 @@
 					}
 				}
 				return geometry;
+			}
+
+			function ringBounds(ring){
+				var minX = Infinity;
+				var minY = Infinity;
+				var maxX = -Infinity;
+				var maxY = -Infinity;
+				for(var i=0; i<ring.length; i++){
+					minX = Math.min(minX, Number(ring[i].x));
+					minY = Math.min(minY, Number(ring[i].y));
+					maxX = Math.max(maxX, Number(ring[i].x));
+					maxY = Math.max(maxY, Number(ring[i].y));
+				}
+				return {
+					x: minX,
+					y: minY,
+					width: maxX-minX,
+					height: maxY-minY
+				};
+			}
+
+			function sparrowMode(value){
+				return value === 'sparrow' || value === 'hybrid' ? value : 'deepnest';
+			}
+
+			function sparrowMinimumSeparation(multiplier){
+				var tolerance = Math.max(0, Number(config.curveTolerance) || 0);
+				var integerGrid = 4 / Math.max(1, Number(config.clipperScale) || 1);
+				return Math.max(integerGrid, tolerance * (Number(multiplier) || 0.05));
+			}
+
+			function disabledLocalRefinementStats(){
+				return {
+					enabled: false,
+					pending: false,
+					ran: false,
+					sheetsChecked: 0,
+					movesTested: 0,
+					movesAccepted: 0,
+					scoreBefore: null,
+					scoreAfter: null
+				};
+			}
+
+			function requestedSparrowInstances(parts){
+				var instances = [];
+				var nextId = 0;
+				for(var source=0; source<parts.length; source++){
+					if(parts[source].sheet){
+						continue;
+					}
+					var quantity = Math.max(0, parseInt(parts[source].quantity, 10) || 0);
+					for(var quantityIndex=0; quantityIndex<quantity; quantityIndex++){
+						instances.push({id: nextId++, source: source});
+					}
+				}
+				return instances;
+			}
+
+			function placementCount(placementSheets){
+				var count = 0;
+				placementSheets = Array.isArray(placementSheets) ? placementSheets : [];
+				for(var sheetIndex=0; sheetIndex<placementSheets.length; sheetIndex++){
+					var sheetplacements = placementSheets[sheetIndex].sheetplacements || [];
+					count += sheetplacements.length;
+				}
+				return count;
+			}
+
+			function placementStripWidth(placements, partsBySource, bounds){
+				var maxX = 0;
+				for(var placementIndex=0; placementIndex<placements.length; placementIndex++){
+					var placement = placements[placementIndex];
+					var polygon = partsBySource[placement.source];
+					if(!polygon){
+						throw new Error('Hybrid Sparrow seed references missing part geometry.');
+					}
+					var radians = Number(placement.rotation || 0) * Math.PI / 180;
+					var cos = Math.cos(radians);
+					var sin = Math.sin(radians);
+					for(var pointIndex=0; pointIndex<polygon.length; pointIndex++){
+						var point = polygon[pointIndex];
+						var x = Number(point.x) * cos - Number(point.y) * sin +
+							Number(placement.x) - bounds.x;
+						if(!isFinite(x)){
+							throw new Error('Hybrid Sparrow seed contains a non-finite transform.');
+						}
+						maxX = Math.max(maxX, x);
+					}
+				}
+				return Math.max(maxX, 0.0001);
+			}
+
+			function buildSparrowJob(mode, parts, basePayload){
+				mode = sparrowMode(mode);
+				if(mode === 'deepnest'){
+					throw new Error('A Sparrow job requires Sparrow or Hybrid mode.');
+				}
+				var partsBySource = {};
+				for(var source=0; source<parts.length; source++){
+					if(!parts[source].sheet && parts[source].polygontree && parts[source].polygontree.length >= 3){
+						partsBySource[source] = parts[source].polygontree.map(function(point){
+							return {x: point.x, y: point.y};
+						});
+					}
+				}
+				var requestedInstances = requestedSparrowInstances(parts);
+				if(requestedInstances.length === 0){
+					throw new Error('Sparrow has no parts to place.');
+				}
+				var sheets = [];
+				if(mode === 'sparrow'){
+					var firstSheetSource = -1;
+					for(source=0; source<parts.length; source++){
+						if(parts[source].sheet && Number(parts[source].quantity) > 0){
+							firstSheetSource = source;
+							break;
+						}
+					}
+					if(firstSheetSource < 0){
+						throw new Error('Pure Sparrow needs one selected sheet.');
+					}
+					sheets.push({
+						sheet: firstSheetSource,
+						sheetid: 0,
+						bounds: ringBounds(parts[firstSheetSource].polygontree),
+						instances: requestedInstances,
+						allowPartial: true
+					});
+				}
+				else{
+					if(!basePayload || !Array.isArray(basePayload.placements) || basePayload.placements.length === 0){
+						throw new Error('Hybrid Sparrow needs a Deepnest seed placement.');
+					}
+					var requestedById = {};
+					var placedById = {};
+					for(var requestedIndex=0; requestedIndex<requestedInstances.length; requestedIndex++){
+						requestedById[String(requestedInstances[requestedIndex].id)] = requestedInstances[requestedIndex];
+					}
+					for(var sheetIndex=0; sheetIndex<basePayload.placements.length; sheetIndex++){
+						var baseSheet = basePayload.placements[sheetIndex];
+						var basePlacements = baseSheet.sheetplacements || [];
+						if(basePlacements.length === 0){
+							continue;
+						}
+						var hybridInstances = [];
+						var initialPlacements = [];
+						for(var placementIndex=0; placementIndex<basePlacements.length; placementIndex++){
+							var placement = basePlacements[placementIndex];
+							var requested = requestedById[String(placement.id)];
+							if(!requested || placedById[String(placement.id)] ||
+								Number(requested.source) !== Number(placement.source)){
+								throw new Error('Hybrid Sparrow seed contains an unknown or duplicate part identity.');
+							}
+							placedById[String(placement.id)] = true;
+							hybridInstances.push({id: placement.id, source: placement.source});
+							initialPlacements.push({
+								id: placement.id,
+								source: placement.source,
+								x: placement.x,
+								y: placement.y,
+								rotation: placement.rotation
+							});
+						}
+						if(!parts[baseSheet.sheet] || !parts[baseSheet.sheet].polygontree){
+							throw new Error('Hybrid Sparrow seed references a missing sheet.');
+						}
+						var bounds = ringBounds(parts[baseSheet.sheet].polygontree);
+						sheets.push({
+							sheet: baseSheet.sheet,
+							sheetid: baseSheet.sheetid,
+							bounds: bounds,
+							instances: hybridInstances,
+							initialPlacements: initialPlacements,
+							beforeWidth: placementStripWidth(initialPlacements, partsBySource, bounds)
+						});
+					}
+					if(sheets.length === 0){
+						throw new Error('Hybrid Sparrow seed contains no placed parts.');
+					}
+					var missingInstances = requestedInstances.filter(function(instance){
+						return !placedById[String(instance.id)];
+					});
+					if(missingInstances.length > 0){
+						var completionSheetIndex = 0;
+						for(sheetIndex=1; sheetIndex<sheets.length; sheetIndex++){
+							var candidateBounds = sheets[sheetIndex].bounds;
+							var selectedBounds = sheets[completionSheetIndex].bounds;
+							if(candidateBounds.height > selectedBounds.height ||
+								(candidateBounds.height === selectedBounds.height &&
+									candidateBounds.width * candidateBounds.height > selectedBounds.width * selectedBounds.height)){
+								completionSheetIndex = sheetIndex;
+							}
+						}
+						var completionSheet = sheets[completionSheetIndex];
+						completionSheet.instances = completionSheet.instances.concat(missingInstances);
+						// Sparrow ignores demand omitted from a warm solution. A cold pass is
+						// therefore required whenever Deepnest left requested instances out.
+						completionSheet.initialPlacements = [];
+						completionSheet.allowPartial = true;
+						completionSheet.seedIncomplete = true;
+					}
+				}
+				return {
+					token: activeNestToken,
+					mode: mode,
+					timeLimitSec: Math.max(1, Math.min(300, Number(config.sparrowTimeSec) || 15)),
+					workers: Math.max(1, Math.min(8, parseInt(config.threads, 10) || 1)),
+					seed: Math.max(0, parseInt(config.sparrowSeed, 10) || 1),
+					minimumSeparation: sparrowMinimumSeparation(0.05),
+					validationRetry: 0,
+					partsBySource: partsBySource,
+					sheets: sheets,
+					requestedParts: requestedInstances.length,
+					basePlacedParts: mode === 'hybrid' ? placementCount(basePayload.placements) : 0
+				};
+			}
+
+			function stopBackgroundForSparrow(){
+				if(workerTimer){
+					clearInterval(workerTimer);
+					workerTimer = null;
+				}
+				if(GA && GA.population){
+					GA.population.forEach(function(individual){
+						individual.processing = false;
+					});
+				}
+				ipcRenderer.send('background-suspend-for-sparrow');
+			}
+
+			function startSparrowJob(mode, basePayload){
+				try{
+					activeSparrowJob = buildSparrowJob(mode, activeSolverParts, basePayload);
+					activeSparrowBase = basePayload || null;
+					stopBackgroundForSparrow();
+					ipcRenderer.send('sparrow-start', activeSparrowJob);
+					return true;
+				}
+				catch(error){
+					self.lastStartError = error && error.message ? error.message : String(error);
+					activeSparrowJob = null;
+					activeSparrowBase = null;
+					return false;
+				}
+			}
+
+			function validateSparrowResponse(response){
+				if(!response || !activeSparrowJob || !Array.isArray(response.placements)){
+					return {valid: false, reason: 'missingSolverPlacements'};
+				}
+				if(response.placements.length !== activeSparrowJob.sheets.length){
+					return {valid: false, reason: 'sheetCountMismatch'};
+				}
+				var expected = {};
+				for(var sheetIndex=0; sheetIndex<activeSparrowJob.sheets.length; sheetIndex++){
+					var jobSheet = activeSparrowJob.sheets[sheetIndex];
+					for(var instanceIndex=0; instanceIndex<jobSheet.instances.length; instanceIndex++){
+						var instance = jobSheet.instances[instanceIndex];
+						expected[String(instance.id)] = {
+							source: Number(instance.source),
+							sheetid: Number(jobSheet.sheetid)
+						};
+					}
+				}
+				var seen = {};
+				var unplacedSeen = {};
+				for(sheetIndex=0; sheetIndex<response.placements.length; sheetIndex++){
+					var responseSheet = response.placements[sheetIndex];
+					var responsePlacements = responseSheet.sheetplacements || [];
+					for(var placementIndex=0; placementIndex<responsePlacements.length; placementIndex++){
+						var placement = responsePlacements[placementIndex];
+						var id = String(placement.id);
+						if(!expected[id] || seen[id] ||
+							Number(placement.source) !== expected[id].source ||
+							Number(responseSheet.sheetid) !== expected[id].sheetid){
+							return {valid: false, reason: 'partIdentityMismatch'};
+						}
+						seen[id] = true;
+					}
+				}
+				var responseUnplaced = Array.isArray(response.unplaced) ? response.unplaced : [];
+				for(var unplacedIndex=0; unplacedIndex<responseUnplaced.length; unplacedIndex++){
+					var unplaced = responseUnplaced[unplacedIndex];
+					var unplacedId = String(unplaced.id);
+					if(!expected[unplacedId] || seen[unplacedId] || unplacedSeen[unplacedId] ||
+						Number(unplaced.source) !== expected[unplacedId].source ||
+						Number(unplaced.sheetid) !== expected[unplacedId].sheetid){
+						return {valid: false, reason: 'unplacedIdentityMismatch'};
+					}
+					unplacedSeen[unplacedId] = true;
+				}
+				if(Object.keys(seen).length + Object.keys(unplacedSeen).length !== Object.keys(expected).length){
+					return {valid: false, reason: 'partCountMismatch'};
+				}
+				if(response.solver &&
+					(Number(response.solver.requestedParts) !== Object.keys(expected).length ||
+					 Number(response.solver.placedParts) !== Object.keys(seen).length ||
+					 Number(response.solver.unplacedParts) !== Object.keys(unplacedSeen).length)){
+					return {valid: false, reason: 'solverCountMismatch'};
+				}
+				if(typeof Superpart === 'undefined' || typeof Superpart.validateExpandedPlacements !== 'function'){
+					return {valid: false, reason: 'exactValidatorUnavailable'};
+				}
+				var exactValidation = Superpart.validateExpandedPlacements(
+					response.placements,
+					activeSolverParts,
+					{
+						clipperScale: config.clipperScale,
+						areaEpsilon: 0,
+						depthEpsilon: 1/config.clipperScale
+					}
+				);
+				exactValidation.placedParts = Object.keys(seen).length;
+				exactValidation.unplacedParts = Object.keys(unplacedSeen).length;
+				return exactValidation;
 			}
 
 			function prepareSuperpartSources(parts, userConfig){
@@ -618,6 +940,15 @@
 			return paint && paint !== 'none' && paint !== 'transparent';
 		}
 
+		function isMagentaPaint(value){
+			var paint = String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+			if(paint === 'magenta' || paint === 'fuchsia' || paint === '#f0f' || paint === '#ff00ff'){
+				return true;
+			}
+			return /^rgba?\(255,0,255(?:,1(?:\.0+)?)?\)$/.test(paint) ||
+				/^rgb\(100%,0%,100%\)$/.test(paint);
+		}
+
 		function strokePaintFrom(value){
 			if(!isVisiblePaint(value)){
 				return null;
@@ -638,19 +969,32 @@
 			var styleMap = parseInlineStyle(element.getAttribute('style'));
 			var sourceFill = element.getAttribute('fill') || styleMap.fill || inheritedPaint.fill;
 			var sourceStroke = element.getAttribute('stroke') || styleMap.stroke || inheritedPaint.stroke;
-			var strokePaint = strokePaintFrom(sourceStroke) || strokePaintFrom(sourceFill) || '#000000';
+			var isCutContour = element.__deepnestCutContour === true;
+			var isHoleColor = isMagentaPaint(sourceFill) || isMagentaPaint(sourceStroke);
+			var hasFill = isVisiblePaint(sourceFill);
+			var strokePaint = isHoleColor ? '#ff00ff' :
+				(strokePaintFrom(sourceStroke) || strokePaintFrom(sourceFill) || '#000000');
 
 			delete styleMap.fill;
-			delete styleMap['fill-opacity'];
 			delete styleMap.stroke;
 			delete styleMap['stroke-width'];
 			writeInlineStyle(element, styleMap);
 
-			element.setAttribute('fill', 'none');
-			element.removeAttribute('fill-opacity');
-			element.setAttribute('stroke', strokePaint);
-			element.setAttribute('stroke-width', '1');
-			element.setAttribute('vector-effect', 'non-scaling-stroke');
+			// Authored stroke width is presentation metadata, never collision geometry.
+			// Cut contours remain visible as hairlines; filled artwork keeps its fill.
+			if(isCutContour || !hasFill){
+				element.setAttribute('fill', 'none');
+				element.removeAttribute('fill-opacity');
+				element.setAttribute('stroke', strokePaint);
+				element.setAttribute('stroke-width', '1');
+				element.setAttribute('vector-effect', 'non-scaling-stroke');
+			}
+			else{
+				element.setAttribute('fill', sourceFill);
+				element.setAttribute('stroke', 'none');
+				element.removeAttribute('stroke-width');
+				element.removeAttribute('vector-effect');
+			}
 
 			for(var i=0; i<element.children.length; i++){
 				normalizeVectorPresentation(element.children[i], {
@@ -1163,6 +1507,20 @@
 				// max 8 threads
 				config.threads = Math.min(parseInt(c.threads), 8);
 			}
+
+			if(c.solverMode === 'deepnest' || c.solverMode === 'sparrow' || c.solverMode === 'hybrid'){
+				config.solverMode = String(c.solverMode);
+			}
+
+			var sparrowTimeSec = Number(c.sparrowTimeSec);
+			if(isFinite(sparrowTimeSec) && sparrowTimeSec >= 1){
+				config.sparrowTimeSec = Math.min(Math.floor(sparrowTimeSec), 300);
+			}
+
+			var sparrowSeed = Number(c.sparrowSeed);
+			if(isFinite(sparrowSeed) && sparrowSeed >= 0){
+				config.sparrowSeed = Math.min(Math.floor(sparrowSeed), 4294967295);
+			}
 			
 			if(c.placementType){
 				config.placementType = String(c.placementType);
@@ -1599,6 +1957,26 @@
 			
 			var i, j;
 			var polygons = [];
+			var polygonCandidates = [];
+			var self = this;
+
+			function hasMagentaHoleMarker(element){
+				var styleMap = parseInlineStyle(element.getAttribute('style'));
+				var fill = element.getAttribute('fill') || styleMap.fill;
+				var stroke = element.getAttribute('stroke') || styleMap.stroke;
+				return isMagentaPaint(fill) || isMagentaPaint(stroke);
+			}
+
+			function mostlyInside(polygon, container){
+				var sampleCount = Math.min(10, polygon.length);
+				var inside = 0;
+				for(var sampleIndex=0; sampleIndex<sampleCount; sampleIndex++){
+					if(self.pointInPolygon(polygon[sampleIndex], container) === true){
+						inside++;
+					}
+				}
+				return inside > 0.5*sampleCount;
+			}
 			
 			var numChildren = paths.length;
 			for(i=0; i<numChildren; i++){
@@ -1618,7 +1996,33 @@
 				// todo: warn user if poly could not be processed and is excluded from the nest
 				if(poly && poly.length > 2 && Math.abs(GeometryUtil.polygonArea(poly)) > config.curveTolerance*config.curveTolerance){
 					poly.source = i;
-					polygons.push(poly);
+					polygonCandidates.push({
+						polygon: poly,
+						area: Math.abs(GeometryUtil.polygonArea(poly)),
+						holeMarker: hasMagentaHoleMarker(paths[i])
+					});
+				}
+			}
+
+			// Closed top-level contours are parts. A nested contour only changes the
+			// collision topology when its fill or stroke is the CNC hole color.
+			for(i=0; i<polygonCandidates.length; i++){
+				var candidate = polygonCandidates[i];
+				var nestedArtwork = false;
+				if(!candidate.holeMarker){
+					for(j=0; j<polygonCandidates.length; j++){
+						var containerCandidate = polygonCandidates[j];
+						if(i === j || containerCandidate.area <= candidate.area){
+							continue;
+						}
+						if(mostlyInside(candidate.polygon, containerCandidate.polygon)){
+							nestedArtwork = true;
+							break;
+						}
+					}
+				}
+				if(!nestedArtwork){
+					polygons.push(candidate.polygon);
 				}
 			}
 						
@@ -1726,7 +2130,9 @@
 				part.quantity = 1;
 				
 				// load root element
-				part.svgelements.push(svgelements[part.polygontree.source]);
+				var rootElement = svgelements[part.polygontree.source];
+				rootElement.__deepnestCutContour = true;
+				part.svgelements.push(rootElement);
 				var index = openelements.indexOf(svgelements[part.polygontree.source]);
 				if(index > -1){
 					openelements.splice(index,1);
@@ -1735,6 +2141,7 @@
 				// load all elements that lie within the outer polygon
 				for(j=0; j<svgelements.length; j++){
 					if(j != part.polygontree.source && findElementById(j, part.polygontree)){
+						svgelements[j].__deepnestCutContour = true;
 						part.svgelements.push(svgelements[j]);
 						index = openelements.indexOf(svgelements[j]);
 						if(index > -1){
@@ -1809,22 +2216,11 @@
 							j--;
 						}
 					}
-					else if(el.tagName == 'path' || el.tagName == 'polyline'){
+					else if(SvgParser.polygonElements.indexOf(el.tagName) > -1){
 						var k;
-						if(el.tagName == 'path'){
-							var p = SvgParser.polygonifyPath(el);
-						}
-						else{
-							var p = [];
-							for(k=0; k<el.points.length; k++){
-								p.push({
-									x: el.points[k].x,
-									y: el.points[k].y
-								});
-							}
-						}
+						var p = SvgParser.polygonify(el);
 						
-						if(p.length < 2){
+						if(!p || p.length < 2){
 							continue;
 						}
 						
@@ -1897,6 +2293,10 @@
 			// progressCallback is called when progress is made
 			// displayCallback is called when a new placement has been made
 			this.start = function(p, d){						
+				try {
+					ipcRenderer.send('sparrow-cancel');
+				}
+				catch(cancelError) {}
 				if(workerTimer){
 					clearInterval(workerTimer);
 					workerTimer = null;
@@ -1904,6 +2304,9 @@
 				GA = null;
 				this.working = false;
 				activeWorkerPayloads = {};
+				activeSolverParts = null;
+				activeSparrowJob = null;
+				activeSparrowBase = null;
 				while(this.nests.length > 0){
 					this.nests.pop();
 				}
@@ -1964,6 +2367,24 @@
 				}
 			}
 
+			var selectedSolverMode = sparrowMode(config.solverMode);
+			if(selectedSolverMode !== 'deepnest'){
+				// Sparrow owns continuous-angle placement in these modes. Keep the
+				// seed and exact-validation geometry free of incompatible postpasses.
+				config.superpartClustering = false;
+				config.superpartPairingActive = false;
+				config.mergeLines = false;
+				config.localRefinement = false;
+				config.localRefinementContinuous = false;
+				config.localRefinementContactAcceptance = false;
+				config.v4FastLegality = false;
+				config.v4LegalityShadow = false;
+				config.v4IncrementalScoring = false;
+				config.v4ScaledCoverage = false;
+				config.v4EnableSwap = false;
+				config.v4WindowedRebuild = false;
+			}
+
 			var superpartPreparation = prepareSuperpartSources(parts, config);
 			config.superpartPairingActive = superpartPreparation.sourcesPaired > 0;
 			if(typeof ConfigCompatibility !== 'undefined'){
@@ -2016,8 +2437,19 @@
 			
 			var self = this;
 			activeNestToken = createNestToken();
+			activeSolverParts = parts;
 			ipcRenderer.send('nest-geometry-set', buildNestGeometry(parts, activeNestToken, this.cloneTree.bind(this)));
 			this.working = true;
+
+			if(selectedSolverMode === 'sparrow'){
+				if(!startSparrowJob('sparrow', null)){
+					this.working = false;
+					activeNestToken = null;
+					activeSolverParts = null;
+					return false;
+				}
+				return true;
+			}
 			
 			if(!workerTimer){
 				workerTimer = setInterval(function(){
@@ -2041,6 +2473,11 @@
 			// nests history. With bounded parallel evaluation we can have up to
 			// workerLimit-1 such stragglers in flight when an error fires.
 			if(!this.working){
+				return;
+			}
+			if(activeSparrowJob && activeSparrowJob.mode === 'hybrid'){
+				// The Deepnest seed is frozen while Sparrow evaluates it. Ignore
+				// already-dispatched GA results that arrive after the handoff.
 				return;
 			}
 			if(payload && payload.postProcessRefinement){
@@ -2070,6 +2507,42 @@
 				bestComparisonFitness = (typeof this.nests[0].refinementBaseFitness === 'number') ? this.nests[0].refinementBaseFitness : this.nests[0].fitness;
 			}
 			if(this.nests.length == 0 || bestComparisonFitness > payload.fitness ){
+				if(sparrowMode(config.solverMode) === 'hybrid'){
+					payload = expandSuperpartPayload(payload);
+					if(!payload){
+						this.stop(true);
+						if(typeof window.message === 'function'){
+							window.message(self.lastSuperpartError || 'Hybrid seed expansion failed.', true);
+						}
+						return;
+					}
+					payload.localRefinement = disabledLocalRefinementStats();
+					payload.solver = {
+						mode: 'hybrid',
+						engine: 'Deepnest + Sparrow',
+						status: 'optimizing',
+						continuousRotation: true
+					};
+					this.nests.unshift(payload);
+					if(displayCallback){
+						displayCallback();
+					}
+					if(!startSparrowJob('hybrid', payload)){
+						payload.solver.status = 'fallback';
+						payload.solver.fallback = true;
+						payload.solver.error = this.lastStartError;
+						this.working = false;
+						activeNestToken = null;
+						activeSolverParts = null;
+						if(displayCallback){
+							displayCallback();
+						}
+						if(typeof window.message === 'function'){
+							window.message('Sparrow could not start; the Deepnest result was kept. ' + this.lastStartError, true);
+						}
+					}
+					return;
+				}
 				requestLocalRefinementForBest(payload, config);
 				payload = expandSuperpartPayload(payload);
 				if(!payload){
@@ -2090,6 +2563,169 @@
 			}
 			if(GA.deterministic){
 				this.stop();
+			}
+		});
+
+		ipcRenderer.on('sparrow-response', (event, response) => {
+			if(!activeSparrowJob || !response || response.token !== activeNestToken || !this.working){
+				return;
+			}
+			var mode = activeSparrowJob.mode;
+			var basePayload = activeSparrowBase;
+
+			function finishSparrowRun(){
+				this.working = false;
+				activeNestToken = null;
+				activeSolverParts = null;
+				activeSparrowJob = null;
+				activeSparrowBase = null;
+			}
+
+			function keepHybridSeed(reason, validation){
+				if(!basePayload){
+					return;
+				}
+				basePayload.solver = basePayload.solver || {};
+				basePayload.solver.mode = 'hybrid';
+				basePayload.solver.engine = 'Deepnest + Sparrow';
+				basePayload.solver.status = 'fallback';
+				basePayload.solver.fallback = true;
+				basePayload.solver.error = reason;
+				if(validation){
+					basePayload.solver.validation = validation;
+				}
+				finishSparrowRun.call(this);
+				if(displayCallback){
+					displayCallback();
+				}
+			}
+
+			if(response.ok !== true){
+				var solverError = response.error || 'Sparrow did not return a solution.';
+				if(mode === 'hybrid'){
+					keepHybridSeed.call(this, solverError, null);
+					if(typeof window.message === 'function'){
+						window.message('Sparrow could not improve this nest; the Deepnest result was kept. ' + solverError, true);
+					}
+				}
+				else{
+					finishSparrowRun.call(this);
+					if(typeof window.message === 'function'){
+						window.message(solverError, true);
+					}
+				}
+				return;
+			}
+
+			var validation = validateSparrowResponse(response);
+			if(!validation.valid){
+				var retryableGeometryFailure = validation.reason === 'expandedMembersOverlap' ||
+					validation.reason === 'memberOutsideSheet';
+				if(retryableGeometryFailure && Number(activeSparrowJob.validationRetry || 0) < 1){
+					activeSparrowJob.validationRetry = 1;
+					activeSparrowJob.minimumSeparation = Math.max(
+						Number(activeSparrowJob.minimumSeparation) || 0,
+						sparrowMinimumSeparation(0.25)
+					);
+					ipcRenderer.send('sparrow-start', activeSparrowJob);
+					return;
+				}
+				var validationError = 'Sparrow result rejected by exact geometry validation: ' + validation.reason + '.';
+				if(mode === 'hybrid'){
+					keepHybridSeed.call(this, validationError, validation);
+				}
+				else{
+					finishSparrowRun.call(this);
+					if(typeof window.message === 'function'){
+						window.message(validationError, true);
+					}
+				}
+				return;
+			}
+
+			response.solver = response.solver || {};
+			response.solver.validation = validation;
+			response.solver.status = 'accepted';
+
+			if(mode === 'sparrow'){
+				var pureSheet = activeSparrowJob.sheets[0];
+				var pureUnplaced = Math.max(0, Number(response.solver.unplacedParts) || 0);
+				var pureNest = {
+					placements: response.placements,
+					fitness: 1 + pureUnplaced * 100000000 +
+						(Number(response.solver.afterWidth) || pureSheet.bounds.width) / pureSheet.bounds.width,
+					area: pureSheet.bounds.width * pureSheet.bounds.height,
+					mergedLength: 0,
+					localRefinement: disabledLocalRefinementStats(),
+					solver: response.solver
+				};
+				this.nests.unshift(pureNest);
+				finishSparrowRun.call(this);
+				if(displayCallback){
+					displayCallback();
+				}
+				if(pureUnplaced > 0 && typeof window.message === 'function'){
+					window.message(
+						'Sparrow placed ' + response.solver.placedParts + ' of ' +
+						response.solver.requestedParts + ' requested parts on this sheet.',
+						false
+					);
+				}
+				return;
+			}
+
+			var relativeImprovement = Number(response.solver.relativeImprovement) || 0;
+			var basePlacedParts = placementCount(basePayload.placements);
+			var responsePlacedParts = placementCount(response.placements);
+			var placementGain = responsePlacedParts - basePlacedParts;
+			response.solver.basePlacedParts = basePlacedParts;
+			response.solver.placedParts = responsePlacedParts;
+			response.solver.placementGain = placementGain;
+			if(placementGain < 0 || (placementGain === 0 && relativeImprovement <= 0.000001)){
+				basePayload.solver = response.solver;
+				basePayload.solver.status = 'no-improvement';
+				basePayload.solver.fallback = true;
+				finishSparrowRun.call(this);
+				if(displayCallback){
+					displayCallback();
+				}
+				if(response.solver.seedIncomplete && typeof window.message === 'function'){
+					window.message(
+						'Sparrow tested all ' + response.solver.requestedParts +
+						' requested parts; the Deepnest result was still better.',
+						false
+					);
+				}
+				return;
+			}
+
+			var improvedPayload = {};
+			for(var key in basePayload){
+				if(Object.prototype.hasOwnProperty.call(basePayload, key)){
+					improvedPayload[key] = basePayload[key];
+				}
+			}
+			improvedPayload.placements = response.placements;
+			improvedPayload.fitness = Number(basePayload.fitness) -
+				(placementGain > 0 ? placementGain : relativeImprovement);
+			improvedPayload.mergedLength = 0;
+			improvedPayload.localRefinement = disabledLocalRefinementStats();
+			improvedPayload.solver = response.solver;
+			improvedPayload.solver.status = placementGain > 0 ? 'improved-capacity' : 'improved';
+			var baseIndex = this.nests.indexOf(basePayload);
+			if(baseIndex < 0){
+				keepHybridSeed.call(this, 'The Deepnest seed was no longer available.', validation);
+				return;
+			}
+			this.nests.splice(baseIndex, 1, improvedPayload);
+			finishSparrowRun.call(this);
+			if(displayCallback){
+				displayCallback();
+			}
+			if(placementGain > 0 && typeof window.message === 'function'){
+				var capacityMessage = 'Hybrid Sparrow placed ' + responsePlacedParts + ' of ' +
+					response.solver.requestedParts + ' requested parts, up from ' + basePlacedParts + '.';
+				window.message(capacityMessage, false);
 			}
 		});
 		
@@ -2379,6 +3015,13 @@
 				this.working = false;
 				activeNestToken = null;
 				activeSuperpartValidationParts = null;
+				activeSolverParts = null;
+				activeSparrowJob = null;
+				activeSparrowBase = null;
+				try {
+					ipcRenderer.send('sparrow-cancel');
+				}
+				catch(cancelError) {}
 				if(GA && GA.population && GA.population.length > 0){
 					GA.population.forEach(function(i){
 						i.processing = false;
@@ -2405,6 +3048,9 @@
 				activeSuperparts = {};
 				activeSuperpartValidationParts = null;
 				activeSuperpartStats = null;
+				activeSolverParts = null;
+				activeSparrowJob = null;
+				activeSparrowBase = null;
 				this.lastSuperpartError = null;
 				while(this.nests.length > 0){
 					this.nests.pop();

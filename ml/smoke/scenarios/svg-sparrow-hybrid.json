@@ -1,0 +1,37 @@
+{
+  "name": "svg-sparrow-hybrid",
+  "description": "Hybrid mode creates a Deepnest seed and continuously compacts it with Sparrow.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "randomSeed": 0,
+  "partQuantities": [2, 2],
+  "expectedPartsPlaced": 4,
+  "expectedSvgPathCount": 4,
+  "expectedIndependentLegality": true,
+  "expectedDisplayMatchesSelected": true,
+  "expectedDisplayedPartCount": 4,
+  "expectedSolverMode": "hybrid",
+  "expectedSolverStatusLabelContains": "Hybrid:",
+  "minimumOffGridAngles": 1,
+  "expectedRuntimeConfig": {
+    "solverMode": "hybrid",
+    "rotations": 4,
+    "localRefinement": false,
+    "superpartClustering": false,
+    "mergeLines": false
+  },
+  "configOverrides": {
+    "solverMode": "hybrid",
+    "sparrowTimeSec": 2,
+    "rotations": 4,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "localRefinement": true,
+    "localRefinementContinuous": true,
+    "superpartClustering": true,
+    "mergeLines": true
+  }
+}

@@ -8,6 +8,7 @@ const electronSettings = require('electron-settings');
 const packageJson = require('./package.json');
 const backgroundDispatcherModule = require('./main/background-dispatcher');
 const nestGeometryBrokerModule = require('./main/nest-geometry-broker');
+const sparrowAdapter = require('./main/sparrow-adapter');
 
 const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
@@ -41,6 +42,7 @@ let minkowskiRequestSeq = 0;
 const minkowskiPendingRequests = Object.create(null);
 const minkowskiWorkerPath = path.join(__dirname, 'main', 'minkowski-worker.js');
 let localConverterPythonBin = null;
+let activeSparrowToken = null;
 const localConverterScriptPath = resolveLocalConverterScriptPath();
 
 function loadNativeAddon() {
@@ -1001,6 +1003,8 @@ app.on('activate', function () {
 app.on('before-quit', function () {
   cancelScheduledNfpCacheManifestFlush();
   flushNfpCacheManifestIfDirty();
+  activeSparrowToken = null;
+  sparrowAdapter.cancelAll();
   if (minkowskiWorker && typeof minkowskiWorker.kill === 'function') {
     minkowskiWorker.kill();
     minkowskiWorker = null;
@@ -1031,8 +1035,64 @@ ipcMain.on('background-progress', function (event, payload) {
 });
 
 ipcMain.on('background-stop', function () {
+  activeSparrowToken = null;
+  sparrowAdapter.cancelAll();
   nestGeometryBroker.clear();
   recreateBackgroundWindows();
+});
+
+ipcMain.on('background-suspend-for-sparrow', function () {
+  nestGeometryBroker.clear();
+  backgroundDispatcher.suspend();
+});
+
+function sparrowSenderAvailable(sender) {
+  return !!(sender && (typeof sender.isDestroyed !== 'function' || !sender.isDestroyed()));
+}
+
+ipcMain.on('sparrow-start', function (event, payload) {
+  payload = payload || {};
+  var token = payload.token;
+  var sender = event.sender;
+  activeSparrowToken = token;
+  sparrowAdapter.cancelAll();
+
+  sparrowAdapter.runJob(payload, {
+    onProgress: function (progress) {
+      if (activeSparrowToken !== token || !mainWindow || !mainWindow.webContents) {
+        return;
+      }
+      mainWindow.webContents.send('background-progress', {
+        index: 0,
+        progress: progress.progress
+      });
+    }
+  }).then(function (result) {
+    if (activeSparrowToken !== token || !sparrowSenderAvailable(sender)) {
+      return;
+    }
+    activeSparrowToken = null;
+    sender.send('sparrow-response', result);
+  }).catch(function (err) {
+    if (activeSparrowToken !== token || !sparrowSenderAvailable(sender)) {
+      return;
+    }
+    activeSparrowToken = null;
+    sender.send('sparrow-response', {
+      ok: false,
+      token: token,
+      error: err && err.message ? err.message : String(err)
+    });
+  });
+});
+
+ipcMain.on('sparrow-cancel', function () {
+  activeSparrowToken = null;
+  sparrowAdapter.cancelAll();
+});
+
+ipcMain.on('sparrow-status-sync', function (event) {
+  event.returnValue = sparrowAdapter.status();
 });
 
 ipcMain.on('background-ready', function (event) {

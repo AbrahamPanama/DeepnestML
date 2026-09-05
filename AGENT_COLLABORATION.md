@@ -37,9 +37,9 @@ A practical consequence: if a task requires *both* a code change and a live Elec
 ## Current Stable Baseline
 
 - Product: `Deepnest ML`
-- Current version: `0.9.4` (source and installed arm64 release)
+- Current version: `0.10.0` (source and local arm64 release)
 - Local app artifact: `dist/mac-arm64/Deepnest ML.app`
-- Local DMG artifact: `dist/Deepnest ML-0.9.4-mac-arm64.dmg` (built and verified)
+- Local DMG artifact: `dist/Deepnest ML-0.10.0-mac-arm64.dmg` (built and verified)
 - Notarization: not configured; builds are local/ad-hoc signed.
 
 ## Active Code Path
@@ -86,9 +86,10 @@ If a change here is intentional and the ML baseline needs to move, plan for a ch
 
 ## Working Tree State
 
-State (verified 2026-07-28 by Codex): clean for tracked files after the
-completed 0.9.4 repeated-motif release; generated benchmark-result JSONs
-remain untracked by convention.
+State (verified 2026-09-02 by Codex): dirty for the completed, uncommitted
+pure/hybrid Sparrow solver integration, Hybrid complete-demand fix, and Corel
+SVG stroke-neutral/magenta-hole import repair; generated benchmark-result JSONs
+remain untracked and untouched by convention.
 
 Use the format `State (verified YYYY-MM-DD by <agent>): <clean | dirty: reason>`. Re-stamp this line whenever you confirm or change tree state. If the stamp is more than a few hours old, treat it as untrusted and re-verify before editing.
 
@@ -98,6 +99,9 @@ Use this section to claim in-progress work.
 
 | Agent | Task | Files / Area | Status | Updated |
 | --- | --- | --- | --- | --- |
+| Codex | Deepnest ML 0.10.0 macOS release build | release metadata, packaged `app.asar`, bundled Sparrow sidecar, DMG verification, `AGENT_COLLABORATION.md` | Completed: arm64 app and DMG built, integrity/signing/content checks green, packaged app launched | 2026-09-02 |
+| Codex | Corel SVG stroke-neutral import and collision repair | `main/svgparser.js`, `main/deepnest.js`, `main/index.html` display geometry, focused import/nesting regression, `AGENT_COLLABORATION.md` | Completed: filled artwork is preserved, cut contours stay hairlines, SVG display/export transforms agree, and visible parts are regression-checked inside the sheet | 2026-09-02 |
+| Codex | Pure Sparrow and Deepnest/Sparrow hybrid solver modes | `main.js`, `main/index.html`, `main/deepnest.js`, new Sparrow adapter/sidecar integration, focused tests, packaging/docs, `AGENT_COLLABORATION.md` | Completed: complete-demand Hybrid pass plus tolerance-derived zero-spacing safety clearance and one stronger exact-validation retry; invalid candidates remain fail-closed | 2026-09-02 |
 | Codex | Production angular-refinement efficacy for supplied 6273 shape | `main/background.js`, renderer display/smoke verification, exact local production fixture, focused tests/smoke, release docs | Completed in 0.9.4. Opt-in repeated-motif rebuild rotates all 15 supplied production parts to 45 degrees, improves continuous score 9.71%, visibly refreshes the selected canvas, and exports with zero overlap/outside | 2026-07-28 |
 | Codex | Default-off rolling large-layout refinement | `main/background.js`, existing `v4WindowedRebuild` config/UI, focused tests/smoke, release docs | Completed in 0.9.3. Opt-in scheduler continues across fair-budgeted overlapping windows; seven-part production smoke covered 7/7 parts across three windows, accepted an exact-legal improvement, and preserved default-off equivalence | 2026-07-27 |
 | Codex | Refined selected-nest live canvas refresh | `main/index.html` display callback/current render identity, smoke regression, `AGENT_COLLABORATION.md` | Completed in 0.9.2. Production and installed callbacks repaint the selected replacement automatically: 0-degree construction -> 315/315/30/30-degree refined canvas, 32.1% compacted | 2026-07-27 |
@@ -167,6 +171,48 @@ Park decisions either agent cannot make alone. Resolve and clear when answered.
 ## Handoff Notes
 
 Use newest notes at the top.
+
+### 2026-09-02 - Deepnest ML 0.10.0 macOS release built (Codex)
+
+- Versioned `package.json`, `package-lock.json`, the renderer title, and release documentation as `0.10.0` for the optional pure/hybrid Sparrow solver family plus the Corel SVG stroke-neutral rendering repair.
+- Built `dist/mac-arm64/Deepnest ML.app` and `dist/Deepnest ML-0.10.0-mac-arm64.dmg` (102 MB) with Electron 40.9.3 for Apple-silicon macOS. Notarization remains intentionally unconfigured; the app is ad-hoc signed.
+- Verification: `git diff --check`, active JavaScript syntax checks, and the renderer boot check passed; `hdiutil verify` reports a valid image; `codesign --verify --deep --strict` passes; the app plist reports `0.10.0`; packaged `app.asar` contains `main/sparrow-adapter.js`, the current display/export transform fix, and the bundled arm64 Sparrow executable. The packaged app was launched successfully from `dist`.
+- DMG SHA-256: `3bf1e9ed84ec1c3b993a8fd761a299fd375e48e4cef9869bbc98661e61ebbf50`.
+- Electron Builder emitted a non-fatal JSON-transform warning caused by the upstream legacy `node_modules/paralleljs/package.json` BOM. Packaging completed, the dependency remained present, and the packaged app booted normally.
+
+### 2026-09-02 - Corel visible-render and sheet-overflow follow-up complete (Codex)
+
+- Corrected the presentation regression that converted every filled artwork path into a colored outline. Collision roots and semantic magenta holes remain no-fill hairline cut contours; non-cut artwork now preserves its authored fill and ignores stroke completely.
+- The live nest now uses the same SVG `translate(...) rotate(...)` transform convention as export. The previous CSS transform could rotate a group around a rendered-box origin and visually move a legal part outside its sheet.
+- Removed the part drop-shadow filter, which enlarged rendered client bounds without representing cut geometry.
+- Display smoke telemetry now distinguishes painted child bounds from the historically noisy whole-group bounds. The Corel scenario requires the blue fill and requires every displayed part to remain inside a visible sheet, with only a 1 px legacy-Chromium tolerance.
+- Production-runtime proof on supplied `6317-3524.svg`: one requested part rendered with its blue artwork intact; its painted bounds were 6.26 px inside the left sheet edge, 11.41 px below the top, and 27.09 px above the bottom. The selected-canvas digest matched the selected placement.
+- Verification green: syntax checks, `git diff --check`, engine equivalence, focused legacy and modern Electron production smokes, visual PNG inspection, focused Corel/magenta regression, independent export audit, and the full 20-scenario smoke battery including Deepnest, refinement, Step & Repeat, PDF, pure Sparrow, and Hybrid.
+
+### 2026-09-02 - Corel SVG stroke-neutral import and magenta CNC holes complete (Codex)
+
+- Fixed `SvgParser.filter` to recurse over a snapshot of child elements. Recursive removal previously mutated the live children collection and could leave an adjacent Corel `<style>` node active; the surviving authored `stroke-width:125.8` produced the apparent black background.
+- Stroke paint and stroke width are presentation-only for collision geometry. Deepnest continues to use each closed path's centerline contour and never expands it by stroke thickness.
+- Changed imported collision topology so a nested closed contour becomes a useful CNC hole only when its resolved fill or stroke is canonical magenta (`magenta`/`fuchsia`, `#f0f`, `#ff00ff`, or equivalent RGB). Other nested closed contours remain attached presentation artwork and no longer create false collision holes.
+- Added `ml/examples/corel-magenta-hole.svg` plus `svg-corel-magenta-hole` smoke coverage. The fixture proves Corel CSS cleanup, two semantic magenta holes, blue artwork preservation, hairline cut contours, exact placement count, and zero overlap/outside.
+- On supplied `/Volumes/vacards-tn/tarjetas-nas/LaserCut/6317-3524.svg`, import now produces one physical part with no holes because its inner artwork is blue rather than magenta. With a generated test sheet, both Deepnest and Sparrow placed two requested copies; full-resolution renderer validation and the independent exported-layout audit both reported zero overlap and zero sheet escape. The exported SVG has no `<defs>/<style>` or 125.8-unit stroke: the cut contour is `fill="none"`/`stroke-width="1"`, while blue artwork keeps its fill and has no stroke.
+- Verification green: syntax checks, `git diff --check`, engine equivalence, focused Corel/magenta smoke, and the full default smoke battery including Deepnest, local-refinement, export, pure Sparrow, and Hybrid scenarios. `npm run pack` rebuilt `dist/mac-arm64/Deepnest ML.app`; the app asar contains both fixes, strict deep code-sign verification passed, and the fresh packaged bundle was launched from `dist`.
+
+### 2026-09-02 - Pure Sparrow and Deepnest/Sparrow hybrid modes complete (Codex)
+
+- Packaged-path hotfix: the first build allowed Electron's patched `fs.statSync` to select the virtual `/app.asar/vendor/.../sparrow` entry, which cannot be passed to `spawn` and surfaced as `spawn ENOTDIR`. Candidate ordering now always prefers `/app.asar.unpacked/`. A focused ordering regression, a rebuilt package, an in-package Electron-as-Node resolution check, and an actual packaged two-part `runJob` all pass; the resolved executable is the unpacked filesystem path.
+- Added an opt-in native sidecar adapter pinned to Sparrow commit `57c45cd295f5d2ce2a11edf6e765318a51d2b41e` / Jagua 0.8.0. Deepnest remains the default. **Sparrow (pure)** bypasses the GA; **Hybrid** warm-starts from a complete legal Deepnest nest, but when Deepnest leaves demand unplaced it sends every requested instance through a cold complete-demand Sparrow pass instead of optimizing only the seed subset.
+- Hybrid acceptance is completeness-first: a legal result with more placed parts beats the Deepnest seed, while equal-count results still require a strict strip-width improvement. Sparrow may return a legal partial layout when the full request cannot fit; all requested IDs must be accounted for exactly once across placed and unplaced results, and the existing Deepnest nest remains the fallback.
+- Zero visible part spacing no longer asks Sparrow to run at literal zero clearance. Every Sparrow job receives a small internal minimum separation derived from `curveTolerance`; an exact overlap/outside rejection triggers one automatic retry at a stronger clearance. The full-resolution validator is unchanged and still rejects any remaining illegal candidate.
+- Added full renderer/main-process wiring, cancellation, progress, token isolation, settings compatibility gates, disabled-control explanations, and a visible solver badge with off-grid-angle counts. Both Sparrow modes suspend the hidden GA worker pool during the sidecar run and lazily recreate it for the next Deepnest job.
+- Every Sparrow candidate is fail-closed behind full-resolution requested-part accounting, placed-part identity, sheet containment, and pair-overlap validation. Holes are conservatively treated as solid by Sparrow; common-line merging, superparts, and local-refinement postpasses are disabled in Sparrow modes.
+- Bundled the MIT-licensed `darwin-arm64` executable under `vendor/sparrow`; packaged resolution correctly finds it under `app.asar.unpacked`. Other platforms report unavailable unless `DEEPNEST_SPARROW_BIN` names a compatible pinned build.
+- Efficacy proof through the production UI/export path (`laurel-two-crossed.svg`, four parts, 2-second sidecar budget): pure rotations `271.2346, 269.968605, 181.08751, 180.09686`; hybrid rotations `1.510223, 0.196794, 90.188866, 91.596146`; hybrid width `550.621544 -> 281.94742` (`48.79%` tighter). Both selected-canvas digests matched and both independent export gates reported all four parts, zero overlaps, and zero sheet escapes.
+- Complete-demand proof: the deterministic incomplete-seed smoke improved `9/20 -> 14/20` with zero overlap/outside. On the user's supplied `6273-674333.svg` at quantity 55, the rebuilt packaged app improved the Deepnest seed from `47/55 -> 50/55`; full-resolution validation and an independent export audit both found zero overlaps and zero sheet escapes.
+- Zero-spacing clearance proof on the same 55-part production geometry: with `spacing: 0`, the internal `0.036`-unit safety clearance improved `42/55 -> 49/55`; renderer validation and the independent exported-SVG audit both reported zero overlap and zero sheet escape.
+- Verification green: syntax checks; `node ml/tests/sparrow_adapter/run.js`; `node ml/tests/parallel_ga/repro.js`; `node ml/tests/engine_equivalence/run.js`; boot check; focused pure, complete-seed Hybrid, and incomplete-seed Hybrid smoke scenarios; `git diff --check`; `npm run pack`; packaged binary execution and production-shaped packaged-app audit. All three Sparrow scenarios are now included in the default smoke battery.
+- `npm run ml:checkpoint -- --name sparrow-solvers-pre` was attempted before engine edits but could not create a checkpoint because the workspace contains no completed training run with a trained model. No ML bakeoff was run because no required manifest/model/output inputs were available; the default Deepnest equivalence harness passed.
+- Packaging emitted the existing non-fatal electron-builder warning about a BOM-prefixed JSON dependency, then completed and signed `dist/mac-arm64/Deepnest ML.app`. The final clearance build passed strict deep code-sign verification and was launched directly from `dist`. No version bump, commit, push, DMG, installation, or Windows binary was performed in this work package.
 
 ### 2026-07-28 - Production repeated-motif compaction and 0.9.4 release complete (Codex)
 

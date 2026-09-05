@@ -1,0 +1,34 @@
+{
+  "name": "svg-corel-magenta-hole",
+  "description": "Corel CSS strokes stay centerlines, blue artwork stays presentation-only, and only magenta nested contours become holes.",
+  "input": "ml/examples/corel-magenta-hole.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 60000,
+  "partQuantities": [2],
+  "expectedPartCount": 2,
+  "expectedTopologyHoleCounts": [2],
+  "expectedPartsPlaced": 2,
+  "expectedIndependentLegality": true,
+  "expectedDisplayedPartsInsideSheet": true,
+  "displayBoundsTolerancePx": 1,
+  "expectedNoAuthorStyleNodes": true,
+  "expectedMaxStrokeWidth": 1,
+  "expectedRequiredFills": ["blue"],
+  "expectedRuntimeConfig": {
+    "solverMode": "deepnest",
+    "processHoles": true,
+    "localRefinement": false,
+    "superpartClustering": false,
+    "mergeLines": false
+  },
+  "configOverrides": {
+    "solverMode": "deepnest",
+    "rotations": 4,
+    "threads": 1,
+    "processHoles": true,
+    "localRefinement": false,
+    "superpartClustering": false,
+    "mergeLines": false
+  }
+}

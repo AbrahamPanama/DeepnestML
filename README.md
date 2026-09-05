@@ -8,10 +8,10 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 
 ## Current Local Release
 
-- **Version:** `0.9.4`
+- **Version:** `0.10.0`
 - **Product name:** `Deepnest ML`
 - **Repository:** `https://github.com/AbrahamPanama/DeepnestML`
-- **macOS local build:** `dist/Deepnest ML-0.9.4-mac-arm64.dmg`
+- **macOS local build:** `dist/Deepnest ML-0.10.0-mac-arm64.dmg`
 - **Packaged app:** `dist/mac-arm64/Deepnest ML.app`
 - **Notarization:** not configured; local builds use ad-hoc signing
 
@@ -28,6 +28,7 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Export SVG, PDF, DXF, and per-sheet TIFF through a unified export modal.
 - Export TIFFs for print/RIP workflows with artwork-only outline filtering, optional top-edge indicator marks, optional sheet numbering, DPI presets/custom DPI, RGB/CMYK color handling, ICC profile embedding/conversion, transparent RGB output, and TIFF compression choices.
 - Use the standard compact nesting modes or the deterministic **Step & Repeat** optimization mode for print/template layouts.
+- Select the default Deepnest solver, pure continuous-angle Sparrow strip packing, or a hybrid mode that lets Sparrow compact an exact Deepnest seed.
 - Pre-pair profitable repeated concave parts into conservative rigid clusters, then expand every member back to its exact cut path for export.
 - Optionally roll exact continuous-compaction rebuilds across overlapping clusters on layouts larger than six parts.
 - Route outer NFP generation through the native Boost addon first, with JS fallbacks and an optional hole-processing toggle.
@@ -35,6 +36,19 @@ It is based on [SVGNest](https://github.com/Jack000/SVGnest), with a native/C-ba
 - Run in a unified light workspace where the parts list remains visible while nesting runs in the main workspace pane.
 
 ## Recent Highlights
+
+### 0.10.0: Sparrow Solver Modes and SVG Import Repair
+
+The **Solver** setting keeps Deepnest as the default and adds two explicit alternatives powered by the MIT-licensed [Sparrow strip-packing solver](https://github.com/JeroenGar/sparrow):
+
+- **Sparrow (pure)** bypasses the Deepnest genetic search and packs the requested inventory on the first selected rectangular sheet with continuous rotations. When the full request cannot fit, it returns the largest legal in-sheet subset it found and reports the remainder as unplaced.
+- **Hybrid (Deepnest + Sparrow)** waits for the first legal Deepnest result. A complete seed is warm-started for compaction; an incomplete seed triggers a complete-demand Sparrow pass so missing requested parts are tried too. Hybrid prefers a legal result that places more parts, then uses tighter width to break ties, and otherwise keeps the Deepnest seed.
+
+Every returned layout must pass Deepnest ML's full-resolution sheet-containment, part-identity, part-count, and pair-overlap validator before it can be displayed or exported. Sparrow receives a small tolerance-derived safety clearance even when the visible part spacing is zero; if the exact gate still finds contact penetration, the solver retries once with stronger clearance and never exposes the invalid candidate. The result badge reports the solver, hybrid improvement, and number of rotations that are off the normal 90-degree construction grid. Sparrow modes conservatively treat holes as solid material and disable common-line merging, superpart clustering, and local-refinement postpasses while active.
+
+The repository currently bundles the pinned Sparrow native sidecar for Apple-silicon macOS. Other platforms leave these two options unavailable unless `DEEPNEST_SPARROW_BIN` points to a compatible Sparrow executable; the normal Deepnest solver remains available everywhere.
+
+Corel-style SVG imports now ignore authored stroke width for nesting geometry, preserve filled artwork for display and export, and treat only magenta contours as intentional holes. The live canvas uses the same SVG transform semantics as export, preventing filled artwork from appearing offset or outside its selected sheet.
 
 ### 0.9.4: Repeated-Motif Continuous Compaction
 
@@ -159,10 +173,14 @@ node --check main/deepnest.js
 python3 -c "import ast; ast.parse(open('scripts/conversion/local-convert.py').read())"
 python3 scripts/conversion/local-convert.py --mode doctor
 node ml/tests/tiff_export/run.js
+node ml/tests/sparrow_adapter/run.js
+node ml/tests/parallel_ga/repro.js
 node ml/tests/engine_equivalence/run.js
 node ml/tests/separation/run.js
 bash ml/scripts/run_boot_check.sh
 bash ml/scripts/run_smoke_battery.sh
+bash ml/scripts/run_smoke_battery.sh svg-sparrow-pure
+bash ml/scripts/run_smoke_battery.sh svg-sparrow-hybrid
 ```
 
 ## License

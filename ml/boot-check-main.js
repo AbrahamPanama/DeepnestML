@@ -165,6 +165,16 @@ function collectInvariantsInRenderer() {
 		return { value: opt.value, text: (opt.textContent || '').trim() };
 	}
 
+	function optionValuesOf(selectName) {
+		const sel = document.querySelector('select[name="' + selectName + '"]');
+		if (!sel) return [];
+		const values = [];
+		for (let i = 0; i < sel.options.length; i++) {
+			values.push(sel.options[i].value);
+		}
+		return values;
+	}
+
 	function sidenavIds() {
 		const items = document.querySelectorAll('#sidenav > li');
 		const out = [];
@@ -230,6 +240,9 @@ function collectInvariantsInRenderer() {
 		hasConfigPage: !!document.getElementById('config'),
 		hasInfoPage: !!document.getElementById('info'),
 		placementType: selectedOptionOf('placementType'),
+		solverMode: selectedOptionOf('solverMode'),
+		solverModeOptions: optionValuesOf('solverMode'),
+		hasSparrowBudget: !!document.querySelector('input[data-config="sparrowTimeSec"]'),
 		dxfImportScale: selectedOptionOf('dxfImportScale'),
 		dxfExportScale: selectedOptionOf('dxfExportScale'),
 		placementTypeMarkupDefault: selectedMarkupOptionOf('placementType'),
@@ -298,6 +311,13 @@ function evaluateInvariants(snapshot) {
 		snapshot.placementTypeMarkupDefault && snapshot.placementTypeMarkupDefault.value === 'gravity');
 	assert('fresh runtime default uses Gravity',
 		snapshot.deepNestConfig && snapshot.deepNestConfig.placementType === 'gravity');
+	assert('solver selector exposes Deepnest, pure Sparrow, and hybrid modes',
+		arraysEqual(snapshot.solverModeOptions, ['deepnest', 'sparrow', 'hybrid']));
+	assert('solver selector defaults to Deepnest',
+		snapshot.solverMode && snapshot.solverMode.value === 'deepnest');
+	assert('fresh runtime solver remains Deepnest',
+		snapshot.deepNestConfig && snapshot.deepNestConfig.solverMode === 'deepnest');
+	assert('Sparrow per-sheet budget control is present', snapshot.hasSparrowBudget);
 	assert('fresh runtime default uses 0.005 inch curve tolerance',
 		snapshot.deepNestConfig && Math.abs(snapshot.deepNestConfig.curveTolerance - 0.36) <= 1e-9);
 	assert('fresh runtime default enables improved placement scoring',

@@ -1,7 +1,7 @@
 {
   "name": "deepnest-ml",
   "productName": "Deepnest ML",
-  "version": "0.9.4",
+  "version": "0.10.0",
   "description": "ML-assisted deep nesting for laser and CNC workflows",
   "main": "main.js",
   "scripts": {
@@ -79,6 +79,7 @@
       "ml/live/**/*",
       "ml/lib/**/*",
       "scripts/conversion/**/*",
+      "vendor/sparrow/**/*",
       "build/Release/**/*",
       "minkowski/Release/**/*",
       "node_modules/**/*",
@@ -87,6 +88,7 @@
     ],
     "asarUnpack": [
       "scripts/conversion/**",
+      "vendor/sparrow/bin/**",
       "build/Release/*.node",
       "minkowski/Release/*.node"
     ],

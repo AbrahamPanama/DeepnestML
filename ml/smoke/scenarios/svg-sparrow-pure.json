@@ -1,0 +1,34 @@
+{
+  "name": "svg-sparrow-pure",
+  "description": "Pure Sparrow continuously rotates and packs four laurel parts through the production UI path.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "partQuantities": [2, 2],
+  "expectedPartsPlaced": 4,
+  "expectedSvgPathCount": 4,
+  "expectedIndependentLegality": true,
+  "expectedDisplayMatchesSelected": true,
+  "expectedDisplayedPartCount": 4,
+  "expectedSolverMode": "sparrow",
+  "expectedSolverStatusLabelContains": "Sparrow: 4/4 placed",
+  "minimumOffGridAngles": 1,
+  "expectedRuntimeConfig": {
+    "solverMode": "sparrow",
+    "rotations": 4,
+    "localRefinement": false,
+    "superpartClustering": false,
+    "mergeLines": false
+  },
+  "configOverrides": {
+    "solverMode": "sparrow",
+    "sparrowTimeSec": 2,
+    "rotations": 4,
+    "threads": 2,
+    "localRefinement": true,
+    "localRefinementContinuous": true,
+    "superpartClustering": true,
+    "mergeLines": true
+  }
+}

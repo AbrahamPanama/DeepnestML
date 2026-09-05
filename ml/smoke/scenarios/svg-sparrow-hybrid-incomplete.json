@@ -1,0 +1,44 @@
+{
+  "name": "svg-sparrow-hybrid-incomplete",
+  "description": "Hybrid mode gives Sparrow all requested instances when the Deepnest seed is incomplete.",
+  "input": "ml/examples/laurel-two-crossed.svg",
+  "sourceFormat": "svg",
+  "outputFormat": "svg",
+  "timeoutMs": 90000,
+  "randomSeed": 0,
+  "partQuantities": [10, 10],
+  "minimumPartsPlaced": 10,
+  "expectedRequestedPartInstances": 20,
+  "expectedIndependentLegality": true,
+  "expectedDisplayMatchesSelected": true,
+  "expectedSolverMode": "hybrid",
+  "expectedSolverStatusLabelContains": "/20 placed",
+  "expectedSolverValues": {
+    "status": "improved-capacity",
+    "seedIncomplete": true,
+    "requestedParts": 20,
+    "basePlacedParts": 9
+  },
+  "expectedSolverMinimums": {
+    "placedParts": 10,
+    "placementGain": 1
+  },
+  "expectedRuntimeConfig": {
+    "solverMode": "hybrid",
+    "rotations": 4,
+    "localRefinement": false,
+    "superpartClustering": false,
+    "mergeLines": false
+  },
+  "configOverrides": {
+    "solverMode": "hybrid",
+    "sparrowTimeSec": 2,
+    "rotations": 4,
+    "populationSize": 1,
+    "mutationRate": 0,
+    "threads": 1,
+    "localRefinement": false,
+    "superpartClustering": false,
+    "mergeLines": false
+  }
+}
